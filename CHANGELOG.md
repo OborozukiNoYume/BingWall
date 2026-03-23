@@ -1,5 +1,76 @@
 # CHANGELOG
 
+## 2026-03-23T12:30:47Z
+
+### 变更内容
+
+- 更新 [docs/system-design.md](docs/system-design.md)，统一公开筛选与公开可见规则
+- 更新 [docs/data-model.md](docs/data-model.md)，明确 `image_status` 与 `resource_status` 的关系，并补充下载可见性规则
+- 更新 [docs/api-conventions.md](docs/api-conventions.md)，澄清统一响应结构示例语义，并补齐站点信息、后台详情、日志和审计接口契约
+- 更新 [docs/deployment-runbook.md](docs/deployment-runbook.md)，区分阶段一公开链路最小检查与阶段二完整上线检查
+- 更新 [docs/TODO.md](docs/TODO.md)，同步调整 API、部署和验收口径
+- 更新 [docs/README.md](docs/README.md)，同步 TODO 文档定位
+
+### 变更原因
+
+- 修正文档间公开筛选规则冲突
+- 补齐设计总纲已要求但 API 契约缺失的接口
+- 让部署检查与阶段路线图保持一致
+- 让 TODO 的验收标准与最新文档口径一致
+
+### 影响范围
+
+- 影响范围仅限文档层
+- 不涉及代码实现
+- 不涉及依赖变更
+- 不涉及运行时行为变更
+
+### 验证步骤
+
+- 确认公开可见规则在系统设计、数据模型、API 契约和 TODO 中一致
+- 确认 API 文档中的示例已明确为 `data` 字段结构
+- 确认后台详情、任务详情、日志和审计接口在 API 文档中已有定义
+- 确认部署文档的阶段一和阶段二检查项与 TODO 阶段边界一致
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复本次修改前的相关文档版本
+- 本次变更仅影响文档说明，不影响现有代码或数据
+
+## 2026-03-23T12:11:15Z
+
+### 变更内容
+
+- 更新 [docs/TODO.md](docs/TODO.md)
+- 对阶段 TODO 做系统级校准，补充依赖拓扑、来源标注、输入输出和状态字段
+- 合并重复或过细任务：`TODO-3 + TODO-4`、`TODO-10 + TODO-11`
+- 强化每条 TODO 的验收标准和可观测性要求
+
+### 变更原因
+
+- 让路线图与系统设计总纲及专项文档保持一致
+- 修正任务依赖，避免后台绕过 API、部署顺序失真和任务粒度不一致
+- 让后续实施时可以直接按任务来源、输入输出和验收条件执行
+
+### 影响范围
+
+- 影响范围仅限文档层
+- 不涉及代码实现
+- 不涉及依赖变更
+- 不涉及运行时行为变更
+
+### 验证步骤
+
+- 确认每条 TODO 都标注了 `source_design` 和 `source_spec`
+- 确认所有任务均带有 `depends_on`、`输入`、`输出`、`验收标准` 和 `status`
+- 确认不存在循环依赖和跨阶段反向依赖
+- 确认每阶段任务数均不超过 8
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复上一版 `docs/TODO.md`
+- 本次变更仅影响路线图结构，不影响已有设计总纲和其他文档边界
+
 ## 2026-03-23T00:00:00Z
 
 ### 变更内容
@@ -9,7 +80,7 @@
 - 新增数据模型说明：[docs/data-model.md](docs/data-model.md)
 - 新增 API 约定：[docs/api-conventions.md](docs/api-conventions.md)
 - 新增部署与运行说明：[docs/deployment-runbook.md](docs/deployment-runbook.md)
-- 新增阶段 TODO 路线图：[docs/development-roadmap.md](docs/development-roadmap.md)
+- 新增阶段 TODO 路线图：[docs/TODO.md](docs/TODO.md)
 - 新增项目状态文件：`PROJECT_STATE.md`
 - 更新 `README.md`，补充项目说明和文档入口
 

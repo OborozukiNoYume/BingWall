@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-23T00:00:00Z
+- 更新时间：2026-03-23T12:30:47Z
 - 文档定位：文档入口与阅读顺序说明
 - 总纲文件：`docs/system-design.md`
 
@@ -15,7 +15,7 @@
 3. [数据模型说明](data-model.md)
 4. [API 约定](api-conventions.md)
 5. [部署与运行说明](deployment-runbook.md)
-6. [阶段 TODO 路线图](development-roadmap.md)
+6. [阶段 TODO 路线图](TODO.md)
 7. [项目状态](../PROJECT_STATE.md)
 8. [变更记录](../CHANGELOG.md)
 
@@ -53,9 +53,9 @@
 
 ### 6. 阶段 TODO 路线图
 
-- 文件：`docs/development-roadmap.md`
-- 作用：把工作拆成阶段一、阶段二、阶段三的可执行 TODO
-- 使用方式：作为开发排期、验收和依赖管理依据
+- 文件：`docs/TODO.md`
+- 作用：把工作拆成阶段一、阶段二、阶段三的可执行 TODO，并标注来源、依赖和校准状态
+- 使用方式：作为开发排期、来源追踪、验收和依赖管理依据
 
 ## 文档维护原则
 

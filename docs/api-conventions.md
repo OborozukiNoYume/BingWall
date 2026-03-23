@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-23T00:00:00Z
+- 更新时间：2026-03-23T12:30:47Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：公开接口与后台接口的统一契约说明
 
@@ -91,6 +91,10 @@
 | `pagination` | 列表分页信息，仅列表接口返回 |
 | `error_code` | 业务错误码，仅失败响应返回 |
 
+说明：
+
+- 本文后续“响应数据结构”示例，如无特别说明，均表示统一响应结构中 `data` 字段的内部结构，而不是完整 HTTP 响应包裹对象
+
 ## 分页约定
 
 列表接口建议使用页码分页。
@@ -117,6 +121,8 @@
 
 - 无需登录
 - 只能查询可公开数据
+- 公开查询默认只返回同时满足以下条件的内容：`content_status = enabled`、`is_public = true`、资源状态可用，且当前时间处于发布时间窗口内
+- 若内容不允许下载，公开详情可返回内容本身，但下载地址应为空或不返回
 
 ### 后台接口
 
@@ -157,7 +163,7 @@
 | `resolution_min_height` | integer | 否 | 最小高度 |
 | `sort` | string | 否 | 一期建议支持 `date_desc` |
 
-响应数据结构：
+响应数据结构（`data` 字段）：
 
 ```json
 {
@@ -180,7 +186,7 @@
 - 方法：`GET`
 - 路径：`/api/public/wallpapers/{wallpaper_id}`
 
-响应数据结构：
+响应数据结构（`data` 字段）：
 
 ```json
 {
@@ -193,6 +199,7 @@
   "wallpaper_date": "2026-03-22",
   "preview_url": "/images/bing/2026/03/en-US/example.jpg",
   "download_url": "/images/bing/2026/03/en-US/example.jpg",
+  "is_downloadable": true,
   "width": 1920,
   "height": 1080,
   "source_name": "Bing"
@@ -204,7 +211,7 @@
 - 方法：`GET`
 - 路径：`/api/public/wallpaper-filters`
 
-响应数据结构：
+响应数据结构（`data` 字段）：
 
 ```json
 {
@@ -223,7 +230,22 @@
 }
 ```
 
-### 4. 后台登录
+### 4. 站点基础信息
+
+- 方法：`GET`
+- 路径：`/api/public/site-info`
+
+响应数据结构（`data` 字段）：
+
+```json
+{
+  "site_name": "BingWall",
+  "site_description": "Bing 壁纸图片服务",
+  "default_market_code": "en-US"
+}
+```
+
+### 5. 后台登录
 
 - 方法：`POST`
 - 路径：`/api/admin/auth/login`
@@ -237,7 +259,7 @@
 }
 ```
 
-响应数据结构：
+响应数据结构（`data` 字段）：
 
 ```json
 {
@@ -251,7 +273,7 @@
 }
 ```
 
-### 5. 后台内容列表
+### 6. 后台内容列表
 
 - 方法：`GET`
 - 路径：`/api/admin/wallpapers`
@@ -264,7 +286,21 @@
 - 支持 `created_from_utc`
 - 支持 `created_to_utc`
 
-### 6. 后台内容状态切换
+### 7. 后台内容详情
+
+- 方法：`GET`
+- 路径：`/api/admin/wallpapers/{wallpaper_id}`
+
+响应数据结构（`data` 字段）应至少包含：
+
+- 展示字段
+- 来源字段
+- 资源信息
+- 当前状态
+- 失败原因
+- 最近操作记录
+
+### 8. 后台内容状态切换
 
 - 方法：`POST`
 - 路径：`/api/admin/wallpapers/{wallpaper_id}/status`
@@ -283,7 +319,7 @@
 - 非法状态流转必须返回明确错误码
 - 必须写入审计日志
 
-### 7. 手动采集任务创建
+### 9. 手动采集任务创建
 
 - 方法：`POST`
 - 路径：`/api/admin/collection-tasks`
@@ -300,7 +336,7 @@
 }
 ```
 
-响应数据结构：
+响应数据结构（`data` 字段）：
 
 ```json
 {
@@ -309,7 +345,7 @@
 }
 ```
 
-### 8. 后台任务列表
+### 10. 后台任务列表
 
 - 方法：`GET`
 - 路径：`/api/admin/collection-tasks`
@@ -322,7 +358,19 @@
 - `created_from_utc`
 - `created_to_utc`
 
-### 9. 后台任务重试
+### 11. 后台任务详情
+
+- 方法：`GET`
+- 路径：`/api/admin/collection-tasks/{task_id}`
+
+响应数据结构（`data` 字段）应至少包含：
+
+- 任务基本信息
+- 成功数、重复数、失败数
+- 错误摘要
+- 逐条处理明细
+
+### 12. 后台任务重试
 
 - 方法：`POST`
 - 路径：`/api/admin/collection-tasks/{task_id}/retry`
@@ -332,7 +380,32 @@
 - 只能重试明确目标任务
 - 不允许无筛选条件的批量重试
 
-### 10. 健康检查
+### 13. 后台日志查询
+
+- 方法：`GET`
+- 路径：`/api/admin/logs`
+
+请求参数至少应支持：
+
+- `task_id`
+- `error_type`
+- `started_from_utc`
+- `started_to_utc`
+
+### 14. 后台审计记录查询
+
+- 方法：`GET`
+- 路径：`/api/admin/audit-logs`
+
+请求参数至少应支持：
+
+- `admin_user_id`
+- `target_type`
+- `target_id`
+- `started_from_utc`
+- `started_to_utc`
+
+### 15. 健康检查
 
 #### 存活检查
 
