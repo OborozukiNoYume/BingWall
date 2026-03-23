@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-23T12:30:47Z
+- 更新时间：2026-03-23T12:57:44Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：按阶段拆解的 TODO、依赖关系、来源映射与验收标准
 
@@ -76,6 +76,7 @@
   - 相同来源、日期和地区再次采集时，不会重复创建壁纸内容
   - 图片文件先进入临时目录，校验成功后再进入正式资源目录
   - 下载成功时资源状态更新为 `ready`，下载失败时更新为 `failed`
+  - 可配置的下载重试会在限定次数内执行，超过次数后任务和资源状态会稳定落为失败并保留失败原因
   - 任务汇总中能观察到成功数、重复数、失败数，失败原因可在日志或任务明细中定位
 - status：adjusted
 
@@ -89,7 +90,7 @@
 - 输出：公开列表接口、详情接口、筛选接口、站点基础信息接口、统一错误响应
 - depends_on：`T1.2`，`T1.3`
 - 验收标准：
-  - 列表接口只返回同时满足 `content_status = enabled`、`is_public = true`、资源状态可用且处于发布时间窗口内的数据
+  - 列表接口只返回同时满足 `content_status = enabled`、`is_public = true`、资源真实状态 `image_status = ready`、壁纸快照 `resource_status = ready` 且处于发布时间窗口内的数据
   - 详情接口返回标题、说明、版权、地区、日期、资源地址和尺寸信息；当内容不可下载时，不返回下载地址或明确返回不可下载状态
   - 站点基础信息接口可返回站点名称、站点说明和默认地区信息
   - 非法参数请求返回明确的 HTTP 状态码和业务错误码
@@ -139,7 +140,7 @@
 - 名称：实现管理员认证与会话控制
 - 描述：提供后台登录、会话过期控制和基础鉴权能力，为后台管理接口和页面提供统一入口。
 - source_design：`6.5 管理后台`，`8.7 管理员账号与审计日志`，`14.1 目标`，`20.2 核心安全要求`，`25.2 阶段二：后台管理与运维补齐`
-- source_spec：`docs/module-overview.md#5-后台-api-模块`，`docs/module-overview.md#7-管理后台模块`，`docs/data-model.md#5-管理员账号-admin_users`，`docs/api-conventions.md#鉴权约定`，`docs/api-conventions.md#5-后台登录`
+- source_spec：`docs/module-overview.md#5-后台-api-模块`，`docs/module-overview.md#7-管理后台模块`，`docs/data-model.md#5-管理员账号-admin_users`，`docs/data-model.md#7-管理员会话-admin_sessions`，`docs/api-conventions.md#鉴权约定`，`docs/api-conventions.md#5-后台登录`，`docs/api-conventions.md#51-后台登出`
 - 输入：T1.2 管理员账号表、后台登录请求、安全配置
 - 输出：后台登录接口、会话校验能力、登录失败处理、鉴权上下文
 - depends_on：`T1.2`
@@ -192,9 +193,9 @@
 - 描述：提供服务存活、就绪和深度健康检查，并实现数据库记录与资源文件一致性巡检。
 - source_design：`16. 异常处理策略`，`17. 日志、监控与健康检查`，`25.2 阶段二：后台管理与运维补齐`
 - source_spec：`docs/module-overview.md#8-调度与运维模块`，`docs/data-model.md#状态联动规则`，`docs/api-conventions.md#15-健康检查`，`docs/deployment-runbook.md#6-启动与运行要求`，`docs/deployment-runbook.md#7-日志要求`，`docs/deployment-runbook.md#10-上线前检查清单`
-- 输入：T1.6 已部署公开链路、T2.3 最近任务状态、数据库连接、资源目录
+- 输入：T1.6 已部署公开链路、最近一次采集任务记录、数据库连接、资源目录
 - 输出：`/api/health/live`、`/api/health/ready`、`/api/health/deep` 接口、资源巡检脚本、巡检结果日志
-- depends_on：`T1.6`，`T2.3`
+- depends_on：`T1.6`
 - 验收标准：
   - `live` 接口能确认进程可响应
   - `ready` 接口能确认数据库和关键目录可访问
@@ -216,7 +217,8 @@
   - 备份产物同时覆盖数据库、正式资源目录和关键配置
   - 数据库备份采用一致性方式，不直接拷贝活跃写入文件
   - 按恢复手册执行后，公开页面、公开 API 和后台 API 均可访问
-  - 恢复后执行资源巡检可通过
+  - 恢复后执行资源巡检时，不存在未解释的资源丢失；如存在异常项，必须已被自动下线或从公开查询排除
+  - 恢复后 `deep` 健康检查返回成功，且最近一次恢复验证记录可追踪
   - 备份和恢复过程都有独立日志记录
 - status：adjusted
 
@@ -227,7 +229,7 @@
 - 名称：增加标签体系
 - 描述：为内容增加标签关联、后台维护和公开筛选能力，为后续搜索与运营组织提供结构化基础。
 - source_design：`8.3 壁纸主体实体`，`13.2 页面组成`，`25.3 阶段三：增强能力`，`27. 标签与搜索`
-- source_spec：`docs/data-model.md#1-壁纸主体-wallpapers`，`docs/module-overview.md#4-公开-api-模块`，`docs/module-overview.md#5-后台-api-模块`，`docs/module-overview.md#7-管理后台模块`
+- source_spec：`docs/data-model.md#1-壁纸主体-wallpapers`，`docs/data-model.md#8-标签定义-tags`，`docs/data-model.md#9-内容标签关联-wallpaper_tags`，`docs/module-overview.md#4-公开-api-模块`，`docs/module-overview.md#5-后台-api-模块`，`docs/module-overview.md#7-管理后台模块`，`docs/api-conventions.md#阶段三扩展接口预留`
 - 输入：T1.4 公开 API 基线、T2.2 后台内容管理能力、标签配置
 - 输出：标签数据结构、后台标签维护入口、公开标签筛选能力
 - depends_on：`T1.4`，`T2.2`
@@ -278,7 +280,7 @@
 - source_spec：`docs/data-model.md#2-图片资源-image_resources`，`docs/api-conventions.md#下载策略约定`，`docs/deployment-runbook.md#3-目录约定`，`docs/deployment-runbook.md#8-备份要求`
 - 输入：T1.3 资源记录与文件、T1.6 已部署资源访问链路、对象存储配置
 - 输出：存储后端抽象、统一资源定位方式、兼容本地与 OSS 的访问能力
-- depends_on：`T1.6`，`T3.2`
+- depends_on：`T1.6`
 - 验收标准：
   - `storage_backend` 能区分本地与 OSS 资源
   - 迁移期间本地资源和 OSS 资源可以同时对外提供访问
@@ -291,7 +293,7 @@
 - 名称：增加下载统计与分析
 - 描述：在不让应用服务承担大文件传输主链路的前提下，记录下载行为并输出基础统计结果。
 - source_design：`11.4 图片访问策略`，`17.2 指标建议`，`25.3 阶段三：增强能力`，`27. 下载统计与内容分析`
-- source_spec：`docs/api-conventions.md#下载策略约定`，`docs/module-overview.md#4-公开-api-模块`，`docs/module-overview.md#5-后台-api-模块`，`docs/module-overview.md#7-管理后台模块`
+- source_spec：`docs/data-model.md#10-下载登记-download_events`，`docs/api-conventions.md#阶段三扩展接口预留`，`docs/api-conventions.md#下载策略约定`，`docs/module-overview.md#4-公开-api-模块`，`docs/module-overview.md#5-后台-api-模块`，`docs/module-overview.md#7-管理后台模块`
 - 输入：T1.4 公开 API、T2.2 后台管理能力、下载登记事件
 - 输出：下载登记能力、基础统计接口或页面、下载趋势视图
 - depends_on：`T1.4`，`T2.2`
@@ -316,6 +318,7 @@
   - 后台可按关键词和状态联合检索内容
   - 搜索结果继续遵循公开状态和后台状态规则
   - 相同关键词在公开端和后台端的结果差异能通过状态规则解释
+  - 在一期目标数据量基线下，需记录代表性搜索样本的响应时间，公开与后台搜索接口常规请求应在 `1` 秒内返回
 - status：adjusted
 
 ## 问题总结
@@ -330,10 +333,10 @@
 - `T1.6`：调整为仅依赖公开链路完成后的部署闭环，保持部署任务位于阶段一末端
 - `T2.2`：明确后台页面必须通过后台 API 工作，不直接依赖数据库
 - `T2.3`：重建为“手动采集任务 + 后台观测”闭环，依赖后台鉴权和采集主链路
-- `T2.4`：改为依赖部署闭环和任务链路，确保深度健康检查有可观测对象
+- `T2.4`：改为仅依赖部署闭环，最近采集状态直接读取既有任务记录，避免对手动采集页面形成硬依赖
 - `T2.5`：改为依赖健康检查与巡检能力，保证恢复后可验证
 - `T3.1`、`T3.5`、`T3.6`：补齐对后台管理链路的依赖，避免直接跨越后台 API
-- `T3.4`：改为依赖多来源采集后的统一资源语义，避免对象存储迁移与来源抽象脱节
+- `T3.4`：改为仅依赖已部署的资源访问链路，保持存储后端迁移与来源扩展正交
 
 ### 合并 / 拆分的任务
 

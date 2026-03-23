@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-03-23T12:57:44Z
+
+### 变更内容
+
+- 更新 [docs/TODO.md](docs/TODO.md)，修正 `T2.4`、`T3.4` 依赖与验收口径，并补充采集重试、恢复验证、搜索响应时间要求
+- 更新 [docs/data-model.md](docs/data-model.md)，补齐 `admin_sessions`、`tags`、`wallpaper_tags`、`download_events` 数据结构，并明确 `resource_status` 与 `image_status` 的同步责任
+- 更新 [docs/api-conventions.md](docs/api-conventions.md)，补充后台登出接口、标签与下载登记扩展接口，并澄清后台日志查询与结构化任务日志的关系
+- 更新 [docs/module-overview.md](docs/module-overview.md) 与 [docs/system-design.md](docs/system-design.md)，明确调度模块只负责触发，补充 API 路由前缀和运维告警基线
+- 更新 [docs/deployment-runbook.md](docs/deployment-runbook.md)，补齐会话密钥、密码策略和默认告警阈值要求
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)，同步最新文档决策与开放问题
+
+### 变更原因
+
+- 修正文档中已确认的依赖链和职责边界不一致
+- 补齐阶段二和阶段三路线图已承诺但尚未落到数据模型或 API 契约的内容
+- 让状态联动、会话管理和运维配置要求具备更明确的执行口径
+
+### 影响范围
+
+- 影响范围仅限文档层
+- 不涉及代码实现
+- 不涉及依赖变更
+- 不涉及运行时行为变更
+
+### 验证步骤
+
+- 确认 `docs/TODO.md` 的依赖拓扑与 `depends_on` 字段不再互相冲突
+- 确认标签、会话和下载登记在 TODO、数据模型、API 约定之间均有对应落点
+- 确认公开可见规则统一为 `content_status`、`is_public`、`image_status` 与 `resource_status` 联合约束
+- 确认调度模块与采集模块的职责边界在模块说明和系统设计中一致
+- 确认部署文档中的安全与告警基线已给出可执行的默认值
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复本次修改前的相关文档版本
+- 本次变更仅影响文档说明，不影响现有代码或数据
+
 ## 2026-03-23T12:30:47Z
 
 ### 变更内容
