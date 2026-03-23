@@ -1,5 +1,36 @@
 # CHANGELOG
 
+## 2026-03-23T13:33:04Z
+
+### 变更内容
+
+- 更新 [README.md](README.md)，同步当前阶段状态，并补充已确认的一期开发运行时基线 `Python 3.14.2`、`Node.js 24.13.0`
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)，将项目状态调整为阶段一 `T1.1` 前置准备阶段，并记录已确认的开发运行时基线
+- 更新 [docs/deployment-runbook.md](docs/deployment-runbook.md)，将目标环境中的 `Python` 与 `Node.js` 运行时版本改为明确记录，补充“已确认基线但尚未生成锁定文件”的说明
+
+### 变更原因
+
+- 根据当前机器已确认可用的开发环境，先固定一期实现所使用的运行时基线
+- 关闭“运行时版本尚未确定”的文档缺口，为后续阶段一代码初始化提供统一依据
+
+### 影响范围
+
+- 影响范围仅限文档层
+- 不涉及代码实现
+- 不涉及依赖安装
+- 不涉及运行时行为变更
+
+### 验证步骤
+
+- 确认 [README.md](README.md) 已记录 `Python 3.14.2` 和 `Node.js 24.13.0`
+- 确认 [PROJECT_STATE.md](PROJECT_STATE.md) 中“当前阶段”“当前技术路线”“未完成内容”与运行时基线表述一致
+- 确认 [docs/deployment-runbook.md](docs/deployment-runbook.md) 的目标环境表已记录精确运行时版本，且未误写为“已存在锁定文件”
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [CHANGELOG.md](CHANGELOG.md) 的上一版本
+- 本次变更仅影响文档说明，不影响现有代码、依赖或数据
+
 ## 2026-03-23T13:18:49Z
 
 ### 变更内容
