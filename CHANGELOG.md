@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## 2026-03-23T13:59:42Z
+
+### 变更内容
+
+- 新增 `.python-version`、`.nvmrc`、`.env.example`、`pyproject.toml`、`requirements.lock.txt`、`.gitignore` 与 `Makefile`，固定 `Python 3.14.2`、`Node.js 24.13.0` 运行时基线，并提供 `make setup`、`make verify`、`make run` 统一命令入口
+- 新增 `app/` 最小后端工程骨架，包含统一配置加载入口、日志基础设施、根路由和 `GET /api/health/live` 最小健康检查
+- 新增 `tests/unit/test_config.py` 与 `tests/smoke/test_health_live.py`，覆盖关键配置缺失、会话密钥校验和最小 HTTP 响应
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/TODO.md](docs/TODO.md)，同步 `T1.1` 已实现状态、运行命令、验证方式与后续缺口
+
+### 变更原因
+
+- 落实阶段一 `T1.1`，把仓库从纯文档状态推进到可启动、可验证、可继续承载后续模块的最小后端工程状态
+- 先完成最小 FastAPI 服务、统一配置入口和基础验证命令，为后续数据库、采集和 API 实现提供稳定底座
+
+### 依赖变更
+
+- 直接依赖：`fastapi==0.116.1`，用途是提供最小 API 服务与健康检查接口
+- 直接依赖：`pydantic-settings==2.11.0`，用途是提供统一配置加载与启动期校验
+- 直接依赖：`uvicorn==0.35.0`，用途是提供本地开发启动与 HTTP 服务承载
+- 直接开发依赖：`pytest==8.4.2`，用途是执行单元测试与冒烟测试
+- 直接开发依赖：`ruff==0.13.3`，用途是执行格式化与静态检查
+- 直接开发依赖：`mypy==1.18.2`，用途是执行类型检查
+- 直接开发依赖：`httpx==0.28.1`，用途是支撑 FastAPI 测试客户端
+- 间接依赖：已通过 `pip freeze --all` 生成 [requirements.lock.txt](requirements.lock.txt)，记录本次安装时解析出的精确版本集合
+- 变更时间：`2026-03-23T13:59:42Z`
+
+### 影响范围
+
+- 影响范围覆盖后端工程初始化与文档同步
+- 不涉及数据库表结构和迁移
+- 不涉及采集逻辑、公开 API 业务接口、后台 API 或前端页面
+- 新增最小健康检查与开发命令后，仓库从不可运行转为可在本地最小启动
+
+### 验证步骤
+
+- 执行 `make setup`
+- 执行 `make verify`
+- 以 `.env.example` 的配置值启动 `make run`
+- 请求 `GET /api/health/live`，确认返回 `200` 和最小 JSON 响应
+- 确认缺失关键配置时，`tests/unit/test_config.py` 会触发启动期校验失败
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复新增的工程初始化文件与文档更新，或执行 `git revert` 回退本次提交
+- 回滚后仓库将退回到仅包含文档、尚无最小可执行后端实现的状态
+
 ## 2026-03-23T13:33:04Z
 
 ### 变更内容

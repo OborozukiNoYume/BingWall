@@ -1,0 +1,24 @@
+import os
+
+from app.core.config import reset_settings_cache
+
+ENV_KEYS = (
+    "BINGWALL_APP_ENV",
+    "BINGWALL_APP_HOST",
+    "BINGWALL_APP_PORT",
+    "BINGWALL_APP_BASE_URL",
+    "BINGWALL_DATABASE_PATH",
+    "BINGWALL_STORAGE_TMP_DIR",
+    "BINGWALL_STORAGE_PUBLIC_DIR",
+    "BINGWALL_STORAGE_FAILED_DIR",
+    "BINGWALL_BACKUP_DIR",
+    "BINGWALL_SECURITY_SESSION_SECRET",
+    "BINGWALL_SECURITY_SESSION_TTL_HOURS",
+    "BINGWALL_LOG_LEVEL",
+)
+
+
+def clear_bingwall_env() -> None:
+    for key in ENV_KEYS:
+        os.environ.pop(key, None)
+    reset_settings_cache()
