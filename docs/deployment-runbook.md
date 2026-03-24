@@ -2,13 +2,13 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-24T13:14:16Z
+- 更新时间：2026-03-24T14:01:12Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
 ## 当前状态说明
 
-当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线，以及阶段一 `T1.3` 的 Bing 采集与资源入库主链路。本文件继续记录一期实施时必须遵循的部署与运行要求；除明确写出的最小开发命令外，其余部署项仍视为后续阶段待补齐内容。
+当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端，以及阶段一 `T1.6` 的单机部署模板。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
 
 ## 1. 部署目标
 
@@ -38,6 +38,7 @@
 说明：
 
 - 当前仓库已生成 `.python-version`、`.nvmrc` 和 `requirements.lock.txt`
+- 当前仓库已生成 `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example`
 - 当前已确认 `Python 3.14.2` 为一期开发基线，阶段一初始化代码时必须围绕该版本生成运行时与依赖锁定文件
 - 当前已确认 `Node.js 24.13.0` 为前端与构建运行时基线；若后续引入 Node.js 构建链路，必须补充对应版本锁定文件
 - SQLite、Nginx、cron 的精确版本必须在目标部署环境创建时记录到部署清单
@@ -56,6 +57,20 @@
 | `/var/log/bingwall` | 应用和任务日志目录 |
 | `/var/backups/bingwall` | 备份目录 |
 | `/etc/bingwall` | 受控配置目录 |
+
+### 目录权限建议
+
+为满足“应用写入、Nginx 读取”的最小要求，建议按以下方式创建目录：
+
+- `/opt/bingwall/app`：代码目录，建议 `bingwall:bingwall`
+- `/var/lib/bingwall/data`：仅应用可读写，建议 `0750`，`bingwall:bingwall`
+- `/var/lib/bingwall/images/tmp`：仅应用可读写，建议 `0750`，`bingwall:bingwall`
+- `/var/lib/bingwall/images/failed`：仅应用可读写，建议 `0750`，`bingwall:bingwall`
+- `/var/lib/bingwall/images/public`：应用写入、Nginx 读取，建议 `2750`，`bingwall:www-data`
+- `/var/log/bingwall`：应用日志和 Nginx 日志目录，建议 `0750`
+- `/etc/bingwall`：受控配置目录，建议 `0750`，仅运维与应用账户可访问
+
+当前仓库提供的 `deploy/systemd/bingwall.tmpfiles.conf` 已按上述口径写出目录模板。
 
 ## 4. 配置要求
 
@@ -157,10 +172,41 @@
 - 本地开发验证命令：`make verify`
 - 本地开发启动命令：`make run`
 - 最小健康检查接口：`GET /api/health/live`
+- 生产环境变量示例：`deploy/systemd/bingwall.env.example`
+- `systemd` 服务模板：`deploy/systemd/bingwall-api.service`
+- 目录权限模板：`deploy/systemd/bingwall.tmpfiles.conf`
+- Nginx 路由模板：`deploy/nginx/bingwall.conf`
 
-后续仍需补齐：
+### 生产环境最小启动步骤
 
-- 生产环境 `systemd` 启动方式
+1. 把仓库代码部署到 `/opt/bingwall/app`
+2. 使用 `python3.14` 在 `/opt/bingwall/app/.venv` 创建虚拟环境并安装 `pip install -e .`
+3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径
+4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `.venv/bin/python -m app.repositories.migrations`
+5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
+6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`、`nginx -t`、`systemctl reload nginx`
+
+### 生产环境模板说明
+
+#### `deploy/systemd/bingwall-api.service`
+
+- 通过 `/etc/bingwall/bingwall.env` 注入受控环境变量
+- 使用 `bingwall` 账号运行应用
+- 通过 `SupplementaryGroups=www-data` 配合正式资源目录权限，保证应用写入、Nginx 读取
+- 采用 `Restart=on-failure`，在进程异常退出后自动重启
+
+#### `deploy/systemd/bingwall.tmpfiles.conf`
+
+- 统一创建数据库、图片、日志、备份和配置目录
+- 正式资源目录使用 `bingwall:www-data` 和 `2750`
+- 临时目录、失败目录、数据库目录不对 Nginx 开放
+
+#### `deploy/nginx/bingwall.conf`
+
+- `/api/` 反向代理到 `127.0.0.1:8000`
+- `/` 代理公开页面
+- `/assets/` 直接读取前端静态资源
+- `/images/` 直接读取正式资源目录，不暴露磁盘真实路径给浏览器
 
 ### 定时任务
 
@@ -244,6 +290,17 @@
 - 公开页面、公开 API 和静态资源可访问
 - `README.md` 中存在可复制启动说明
 
+建议按以下顺序执行并记录结果：
+
+1. 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
+2. 执行 `systemd-tmpfiles --create --prefix=/var/lib/bingwall --prefix=/var/log/bingwall --prefix=/etc/bingwall /opt/bingwall/app/deploy/systemd/bingwall.tmpfiles.conf`
+3. 在目标机执行 `nginx -t`
+4. 执行 `curl http://127.0.0.1/api/health/live`
+5. 执行 `curl http://127.0.0.1/api/public/site-info`
+6. 执行 `curl http://127.0.0.1/`
+7. 如已有正式资源，执行 `curl -I http://127.0.0.1/images/<正式资源相对路径>`
+8. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
+
 ### 完整上线检查（阶段二目标）
 
 - 配置文件已审查
@@ -259,9 +316,13 @@
 ## 11. 当前已知缺口
 
 - 尚无真实部署脚本
-- 尚无生产环境 `systemd`、Nginx、cron 的真实配置文件
 - 尚无 `/api/health/ready` 与 `/api/health/deep` 实现
 - 尚无备份脚本
 - 尚无 cron 级自动采集与手动任务消费脚本
+
+补充说明：
+
+- 当前仓库已提供生产环境 `systemd` 与 Nginx 模板文件，但尚未在本仓库所在机器完成真实 `nginx` 装载验证
+- 因系统中未安装 `nginx`，仓库内只能先校验配置模板是否齐备，真实代理转发需在目标部署机执行
 
 这些缺口必须在阶段一和阶段二实施中逐项关闭。

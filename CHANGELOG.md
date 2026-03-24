@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## 2026-03-24T14:01:12Z
+
+### 变更内容
+
+- 新增 [deploy/nginx/bingwall.conf](deploy/nginx/bingwall.conf)、[deploy/systemd/bingwall-api.service](deploy/systemd/bingwall-api.service)、[deploy/systemd/bingwall.tmpfiles.conf](deploy/systemd/bingwall.tmpfiles.conf) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，落地阶段一 `T1.6` 所需的 Nginx 路由模板、`systemd` 服务模板、目录权限模板和生产环境变量示例
+- 新增 [tests/unit/test_deploy_templates.py](tests/unit/test_deploy_templates.py)，约束部署模板中的关键路由、环境文件和权限配置，避免后续修改破坏一期单机部署假设
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/TODO.md](docs/TODO.md)，补充可复制部署命令、最小上线检查、`T1.6` 状态和当前剩余验证边界
+
+### 变更原因
+
+- 落实阶段一 `T1.6`，把公开链路的单机部署要求从纯文档约束推进为可复用的仓库内模板
+- 为后续阶段二健康检查、巡检、备份与后台能力提供稳定的部署底座
+- 保持保守范围，不引入容器、反向代理新特性、`gunicorn` 或新的第三方依赖
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增部署模板：`deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf`、`deploy/systemd/bingwall.env.example`
+- 变更时间：`2026-03-24T14:01:12Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖单机部署配置模板、目录权限约定、生产环境变量示例和部署说明文档
+- Nginx 将区分公开页面、公开 API、页面静态资源和正式图片资源访问路径
+- FastAPI 进程将以 `systemd` 受管服务方式启动，并通过受控环境文件读取配置
+- 不涉及数据库表结构、采集逻辑、公开 API 业务规则或前端页面交互变更
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `make test`
+- 执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`
+- 执行 `systemd-tmpfiles --create --graceful --root="<临时目录>" /home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf`
+- 在安装了 Nginx 的目标机执行 `nginx -t`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复部署模板、模板测试与文档更新，或执行 `git revert` 回退本次提交
+- 如目标环境已经安装了新的 `systemd`、`tmpfiles.d` 和 Nginx 配置，应同时删除 `/etc/systemd/system/bingwall-api.service`、`/etc/tmpfiles.d/bingwall.conf`、`/etc/nginx/sites-available/bingwall.conf` 及对应启用链接
+- 回滚后仓库将退回到已具备公开页面和公开 API，但尚未提供单机部署模板与最小部署检查说明的状态
+
 ## 2026-03-24T13:51:37Z
 
 ### 变更内容
