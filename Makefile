@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify run clean
+.PHONY: setup format lint typecheck test verify db-migrate run clean
 
 setup:
 	$(PYTHON_BIN) -m venv $(VENV)
@@ -24,6 +24,9 @@ test:
 	$(VENV_PYTHON) -m pytest
 
 verify: lint typecheck test
+
+db-migrate:
+	$(VENV_PYTHON) -m app.repositories.migrations
 
 run:
 	$(VENV_PYTHON) -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000

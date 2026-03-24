@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## 2026-03-24T12:54:37Z
+
+### 变更内容
+
+- 新增 [app/repositories/migrations/runner.py](app/repositories/migrations/runner.py)、[app/repositories/migrations/__main__.py](app/repositories/migrations/__main__.py) 与 [app/repositories/migrations/versions/V0001__baseline.sql](app/repositories/migrations/versions/V0001__baseline.sql)，落地 SQLite 版本化迁移基线、`schema_migrations` 管理表和 `T1.2` 的首个基线迁移脚本
+- 新增 [app/repositories/sqlite.py](app/repositories/sqlite.py)，统一 SQLite 连接和外键约束启用方式
+- 更新 [Makefile](Makefile) 与 [pyproject.toml](pyproject.toml)，补充 `make db-migrate` 数据库初始化命令，并将迁移 SQL 文件纳入包数据
+- 新增 [tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)，覆盖空库迁移、重复执行迁移、表结构、索引和审计外键校验
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/TODO.md](docs/TODO.md)，同步 `T1.2` 已完成状态、数据库初始化命令、验证方式与下一阶段优先级
+
+### 变更原因
+
+- 落实阶段一 `T1.2`，把数据模型说明中的核心实体、唯一约束和关键索引落成真实 SQLite 表结构
+- 为后续 `T1.3` 采集链路提供可重复执行、可审计、无需手工改库的数据库基线
+- 在不引入 ORM 或外部迁移框架的前提下，采用更保守的标准库方案控制范围和依赖
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 迁移执行基于 Python 标准库 `sqlite3`
+- 包数据变更：通过 [pyproject.toml](pyproject.toml) 纳入 `app.repositories.migrations` 下的 `versions/*.sql`
+- 变更时间：`2026-03-24T12:54:37Z`
+
+### 影响范围
+
+- 影响范围覆盖 SQLite 数据库初始化、迁移执行和核心表结构落地
+- 已落地 `wallpapers`、`image_resources`、`collection_tasks`、`collection_task_items`、`admin_users`、`audit_logs` 六张核心表
+- 已落地 `source_type + wallpaper_date + market_code` 唯一约束，以及公开查询、任务查询和状态筛选所需关键索引
+- 不涉及 Bing 采集逻辑、公开 API、后台 API、前端页面或生产部署配置
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make verify`
+- 执行 `cp .env.example .env`
+- 执行 `make db-migrate`
+- 检查数据库中是否存在六张核心表、`schema_migrations` 管理表和关键索引
+- 重复执行一次 `make db-migrate`，确认不会重复落库或要求手工改库
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复迁移模块、迁移脚本、测试与文档更新，或执行 `git revert` 回退本次提交
+- 如数据库已经执行过本次基线迁移，回滚代码前应先备份当前 SQLite 文件，再按环境策略决定是否回退数据库文件
+- 回滚后仓库将退回到仅具备最小应用骨架、尚无数据库迁移与真实表结构的状态
+
 ## 2026-03-23T13:59:42Z
 
 ### 变更内容

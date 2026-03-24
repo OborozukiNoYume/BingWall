@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "bingwall"
 version = "0.1.0"
-description = "BingWall backend bootstrap for T1.1."
+description = "BingWall backend foundation for T1.2."
 readme = "README.md"
 requires-python = "==3.14.2"
 dependencies = [
@@ -24,6 +24,9 @@ dev = [
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.repositories.migrations" = ["versions/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

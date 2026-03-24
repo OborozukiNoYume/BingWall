@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-23T13:59:42Z
+- 更新时间：2026-03-24T12:54:37Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：按阶段拆解的 TODO、依赖关系、来源映射与验收标准
 
@@ -71,12 +71,12 @@
 - status：adjusted
 
 子任务：
-- [ ] 创建数据库迁移基线，并将核心表拆分为可重复执行的版本化迁移脚本
-- [ ] 落地 `wallpapers`、`image_resources`、`collection_tasks`、`collection_task_items`、`admin_users`、`audit_logs` 表结构及 UTC 时间字段
-- [ ] 增加 `source_type + wallpaper_date + market_code` 唯一约束，并创建公开查询、任务查询和状态筛选所需索引
-- [ ] 实现 `admin_users` 与 `audit_logs` 的主外键或关联字段约束，保证后台审计链路可追踪
-- [ ] 编写空库初始化和迁移执行入口，避免手工改库
-- [ ] 验证迁移在空数据库和已迁移数据库上可重复执行，并检查表、字段、约束和索引完整可见
+- [x] 创建数据库迁移基线，并将核心表拆分为可重复执行的版本化迁移脚本
+- [x] 落地 `wallpapers`、`image_resources`、`collection_tasks`、`collection_task_items`、`admin_users`、`audit_logs` 表结构及 UTC 时间字段
+- [x] 增加 `source_type + wallpaper_date + market_code` 唯一约束，并创建公开查询、任务查询和状态筛选所需索引
+- [x] 实现 `admin_users` 与 `audit_logs` 的主外键或关联字段约束，保证后台审计链路可追踪
+- [x] 编写空库初始化和迁移执行入口，避免手工改库
+- [x] 验证迁移在空数据库和已迁移数据库上可重复执行，并检查表、字段、约束和索引完整可见
 
 ### T1.3（原 TODO-3 + TODO-4）
 
