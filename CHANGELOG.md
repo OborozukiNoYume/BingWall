@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## 2026-03-24T13:14:16Z
+
+### 变更内容
+
+- 新增 [app/collectors/bing.py](app/collectors/bing.py)、[app/services/bing_collection.py](app/services/bing_collection.py)、[app/domain/collection.py](app/domain/collection.py)，落地 Bing 元数据拉取、字段映射、下载与采集主链路
+- 新增 [app/repositories/collection_repository.py](app/repositories/collection_repository.py) 与 [app/repositories/file_storage.py](app/repositories/file_storage.py)，封装采集任务、壁纸、资源、任务明细写入，以及临时目录、正式目录、失败隔离目录的文件操作
+- 更新 [app/core/config.py](app/core/config.py)、[.env.example](.env.example) 与 [Makefile](Makefile)，补充 Bing 采集开关、默认地区、超时、重试次数配置，以及 `make collect-bing MARKET=en-US COUNT=1` 手动采集命令
+- 新增 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)，覆盖首次采集、业务主键重复、`source_url_hash` 重复、下载失败与重试耗尽四类集成测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/TODO.md](docs/TODO.md)，同步 `T1.3` 已完成状态、运行命令、验证方式与下一阶段优先级
+
+### 变更原因
+
+- 落实阶段一 `T1.3`，把 Bing 采集、去重、任务记录、下载入库和资源状态联动从设计文档推进为可运行代码
+- 为后续 `T1.4` 公开 API 提供真实内容数据、资源文件和任务观测基础
+- 继续保持保守实现，不引入 ORM、任务队列或额外第三方 HTTP 依赖
+
+### 依赖变更
+
+- 无新增第三方依赖
+- Bing 元数据请求与图片下载基于 Python 标准库 `urllib.request`
+- 新增配置项：`BINGWALL_COLLECT_BING_ENABLED`、`BINGWALL_COLLECT_BING_DEFAULT_MARKET`、`BINGWALL_COLLECT_BING_TIMEOUT_SECONDS`、`BINGWALL_COLLECT_BING_MAX_DOWNLOAD_RETRIES`
+- 变更时间：`2026-03-24T13:14:16Z`
+
+### 影响范围
+
+- 影响范围覆盖 Bing 采集主链路、任务记录、资源下载与本地文件落盘
+- 采集成功后会向数据库写入 `wallpapers`、`image_resources`、`collection_tasks`、`collection_task_items`
+- 采集成功后会向正式资源目录写入图片文件；校验失败时会写入失败隔离目录
+- 不涉及公开 API、后台 API、前端页面或生产环境部署配置
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make verify`
+- 执行 `cp .env.example .env`
+- 执行 `make db-migrate`
+- 执行 `make collect-bing MARKET=en-US COUNT=1`
+- 重复执行一次 `make collect-bing MARKET=en-US COUNT=1`，确认命中重复而不重复建内容
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复采集模块、仓储模块、测试与文档更新，或执行 `git revert` 回退本次提交
+- 如数据库和图片目录已经执行过真实采集，回滚前应先备份 SQLite 文件与正式资源目录、失败隔离目录
+- 回滚后仓库将退回到具备数据库迁移基线但尚无 Bing 采集与资源入库主链路的状态
+
 ## 2026-03-24T12:54:37Z
 
 ### 变更内容
