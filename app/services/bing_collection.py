@@ -8,6 +8,8 @@ import logging
 from pathlib import Path
 import re
 from typing import Protocol
+from urllib.parse import parse_qs
+from urllib.parse import urlparse
 
 from app.domain.collection import BingImageMetadata
 from app.domain.collection import CollectionRunSummary
@@ -305,7 +307,7 @@ class BingCollectionService:
 
 def build_relative_path(*, item: BingImageMetadata) -> str:
     safe_source_key = SAFE_PATH_PATTERN.sub("-", item.source_key.replace(":", "-")).strip("-")
-    file_ext = Path(item.origin_image_url).suffix.lstrip(".").lower() or "jpg"
+    file_ext = extract_file_ext_from_source_url(item.origin_image_url)
     return (
         f"bing/{item.wallpaper_date.year:04d}/{item.wallpaper_date.month:02d}/"
         f"{item.market_code}/{safe_source_key}.{file_ext}"
@@ -326,6 +328,17 @@ def guess_mime_type(*, file_ext: str, fallback: str | None) -> str:
         "png": "image/png",
         "webp": "image/webp",
     }.get(file_ext.lower(), "application/octet-stream")
+
+
+def extract_file_ext_from_source_url(source_url: str) -> str:
+    parsed_url = urlparse(source_url)
+    query_id = parse_qs(parsed_url.query).get("id", [])
+    candidates = [*query_id, parsed_url.path]
+    for candidate in candidates:
+        suffix = Path(candidate).suffix.lstrip(".").lower()
+        if suffix:
+            return suffix
+    return "jpg"
 
 
 def validate_downloaded_image(content: bytes) -> None:

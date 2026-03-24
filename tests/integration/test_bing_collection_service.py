@@ -34,7 +34,7 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
                 market_code="en-US",
                 wallpaper_date="2026-03-24",
                 source_key="bing:en-US:2026-03-24:OHR.Success",
-                source_url="https://www.bing.com/th?id=OHR.Success_1920x1080.jpg",
+                source_url="https://www.bing.com/th?id=OHR.Success_1920x1080.jpg&pid=hp",
             )
         ],
         downloads=[DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg")],
@@ -73,6 +73,7 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert items[0]["result_status"] == "succeeded"
     public_files = list(storage.public_dir.rglob("*"))
     assert any(path.is_file() for path in public_files)
+    assert all(path.suffix == ".jpg" for path in public_files if path.is_file())
 
 
 def test_bing_collection_service_skips_business_key_duplicates(tmp_path: Path) -> None:
