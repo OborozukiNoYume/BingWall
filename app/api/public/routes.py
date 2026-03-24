@@ -1,0 +1,119 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import Iterator
+from typing import Annotated
+from typing import Any
+
+from fastapi import APIRouter
+from fastapi import Depends
+from fastapi import Request
+
+from app.api.errors import build_success_response
+from app.core.config import Settings
+from app.core.config import get_settings
+from app.repositories.public_repository import PublicRepository
+from app.schemas.common import ErrorEnvelope
+from app.schemas.common import SuccessEnvelope
+from app.schemas.public import PublicSiteInfoData
+from app.schemas.public import PublicWallpaperDetailData
+from app.schemas.public import PublicWallpaperFiltersData
+from app.schemas.public import PublicWallpaperListData
+from app.schemas.public import PublicWallpaperListQuery
+from app.services.public_catalog import PublicCatalogService
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/public", tags=["public"])
+
+ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
+    404: {"model": ErrorEnvelope},
+    422: {"model": ErrorEnvelope},
+}
+
+
+def get_public_repository(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Iterator[PublicRepository]:
+    repository = PublicRepository(settings.database_path)
+    try:
+        yield repository
+    finally:
+        repository.close()
+
+
+@router.get(
+    "/wallpapers",
+    response_model=SuccessEnvelope[PublicWallpaperListData],
+    responses=ERROR_RESPONSES,
+)
+def list_public_wallpapers(
+    request: Request,
+    query: Annotated[PublicWallpaperListQuery, Depends()],
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(repository)
+    data, pagination = service.list_wallpapers(query=query)
+    logger.info(
+        "Public wallpaper list served: market=%s page=%s page_size=%s total=%s",
+        query.market_code,
+        query.page,
+        query.page_size,
+        pagination.total,
+    )
+    return build_success_response(
+        request=request,
+        data=data.model_dump(),
+        pagination=pagination.model_dump(),
+    )
+
+
+@router.get(
+    "/wallpapers/{wallpaper_id}",
+    response_model=SuccessEnvelope[PublicWallpaperDetailData],
+    responses=ERROR_RESPONSES,
+)
+def get_public_wallpaper_detail(
+    wallpaper_id: int,
+    request: Request,
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(repository)
+    data = service.get_wallpaper_detail(wallpaper_id=wallpaper_id)
+    logger.info("Public wallpaper detail served: wallpaper_id=%s", wallpaper_id)
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/wallpaper-filters",
+    response_model=SuccessEnvelope[PublicWallpaperFiltersData],
+    responses=ERROR_RESPONSES,
+)
+def get_public_wallpaper_filters(
+    request: Request,
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(repository)
+    data = service.get_filters()
+    logger.info("Public wallpaper filters served: market_count=%s", len(data.markets))
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/site-info",
+    response_model=SuccessEnvelope[PublicSiteInfoData],
+    responses=ERROR_RESPONSES,
+)
+def get_public_site_info(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(repository)
+    data = service.get_site_info(
+        site_name=settings.site_name,
+        site_description=settings.site_description,
+        default_market_code=settings.collect_bing_default_market,
+    )
+    logger.info("Public site info served.")
+    return build_success_response(request=request, data=data.model_dump())

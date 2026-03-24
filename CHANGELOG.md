@@ -1,5 +1,51 @@
 # CHANGELOG
 
+## 2026-03-24T13:40:19Z
+
+### 变更内容
+
+- 新增 [app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/public_catalog.py](app/services/public_catalog.py)、[app/schemas/public.py](app/schemas/public.py) 与 [app/schemas/common.py](app/schemas/common.py)，落地公开列表、详情、筛选项和站点信息的查询结构、响应结构与分页结构
+- 新增 [app/api/public/routes.py](app/api/public/routes.py)、更新 [app/api/router.py](app/api/router.py)、[app/api/public/__init__.py](app/api/public/__init__.py) 与 [app/main.py](app/main.py)，接入 `/api/public/wallpapers`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/site-info` 四个接口，并补齐统一错误响应、`trace_id` 回传和访问日志
+- 更新 [app/core/config.py](app/core/config.py)、[.env.example](.env.example) 与 [tests/conftest.py](tests/conftest.py)，补充 `BINGWALL_SITE_NAME`、`BINGWALL_SITE_DESCRIPTION` 最小站点配置
+- 新增 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，覆盖公开可见性过滤、分页、筛选项、站点信息、不可下载详情和统一错误响应
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/TODO.md](docs/TODO.md)，同步 `T1.4` 已完成状态、公开接口验证方式和下一阶段优先级
+
+### 变更原因
+
+- 落实阶段一 `T1.4`，把公开 API 最小集从设计文档推进为可调用代码
+- 为后续 `T1.5` 公开前端提供稳定的数据接口、统一响应格式和错误处理口径
+- 保持保守范围，不引入 ORM、分页库、鉴权框架或额外第三方依赖
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增配置项：`BINGWALL_SITE_NAME`、`BINGWALL_SITE_DESCRIPTION`
+- 变更时间：`2026-03-24T13:40:19Z`
+- 依赖类型：配置项变更，不涉及直接或间接第三方包升级
+
+### 影响范围
+
+- 影响范围覆盖公开 API 路由、公开查询服务、统一成功响应、统一错误响应和访问日志
+- 公开接口只返回已启用、允许公开、资源已就绪且处于发布时间窗口内的内容
+- 不涉及前端页面、后台鉴权、后台管理、部署脚本或数据库迁移结构变更
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `make test`
+- 执行 `cp .env.example .env`
+- 执行 `make db-migrate`
+- 执行 `curl http://127.0.0.1:8000/api/public/site-info`
+- 执行 `curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc"`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复公开 API 路由、查询服务、响应 schema、测试与文档更新，或执行 `git revert` 回退本次提交
+- 如环境中已经依赖 `BINGWALL_SITE_NAME`、`BINGWALL_SITE_DESCRIPTION` 配置，可同时回退对应环境变量设置
+- 回滚后仓库将退回到已具备 Bing 采集主链路但尚未提供公开 API 最小集的状态
+
 ## 2026-03-24T13:14:16Z
 
 ### 变更内容

@@ -21,6 +21,8 @@ class Settings(BaseSettings):
     app_host: str
     app_port: int = Field(ge=1, le=65535)
     app_base_url: AnyHttpUrl
+    site_name: str = Field(default="BingWall", min_length=1, max_length=100)
+    site_description: str = Field(default="Bing 壁纸图片服务", min_length=1, max_length=200)
     database_path: Path
     storage_tmp_dir: Path
     storage_public_dir: Path
