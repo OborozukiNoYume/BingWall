@@ -6,6 +6,7 @@ from uuid import uuid4
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response
+from fastapi.staticfiles import StaticFiles
 
 from app.api.errors import ApiError
 from app.api.errors import api_error_exception_handler
@@ -13,6 +14,8 @@ from app.api.errors import request_validation_exception_handler
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import bind_trace_id, configure_logging, reset_trace_id
+from app.web import get_assets_dir
+from app.web import router as web_router
 
 
 def create_app() -> FastAPI:
@@ -26,8 +29,15 @@ def create_app() -> FastAPI:
         redoc_url="/redoc",
     )
     app.include_router(api_router)
+    app.include_router(web_router)
     app.add_exception_handler(ApiError, api_error_exception_handler)
     app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
+    app.mount("/assets", StaticFiles(directory=get_assets_dir()), name="assets")
+    app.mount(
+        "/images",
+        StaticFiles(directory=settings.storage_public_dir, check_dir=False),
+        name="images",
+    )
 
     @app.middleware("http")
     async def trace_id_middleware(
@@ -52,14 +62,6 @@ def create_app() -> FastAPI:
             reset_trace_id(token)
         response.headers["X-Trace-Id"] = trace_id
         return response
-
-    @app.get("/")
-    async def root() -> dict[str, str]:
-        return {
-            "service": "bingwall-api",
-            "status": "ok",
-            "health_url": "/api/health/live",
-        }
 
     logger = logging.getLogger(__name__)
     logger.info("Application configured for %s:%s.", settings.app_host, settings.app_port)

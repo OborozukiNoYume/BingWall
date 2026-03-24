@@ -1,5 +1,50 @@
 # CHANGELOG
 
+## 2026-03-24T13:51:37Z
+
+### 变更内容
+
+- 新增 [app/web/routes.py](app/web/routes.py)、[app/web/__init__.py](app/web/__init__.py)、[web/public/assets/site.css](web/public/assets/site.css) 与 [web/public/assets/site.js](web/public/assets/site.js)，落地首页 `/`、列表页 `/wallpapers`、详情页 `/wallpapers/{wallpaper_id}` 以及公开前端所需的样式和前端脚本
+- 更新 [app/main.py](app/main.py)，挂载公开页面路由、`/assets/*` 页面静态资源和 `/images/*` 本地开发图片访问目录
+- 新增 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，覆盖公开页面外壳、静态资源引用和图片目录访问
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/TODO.md](docs/TODO.md)，同步 `T1.5` 已完成状态、公开页面验证方式和下一阶段优先级
+
+### 变更原因
+
+- 落实阶段一 `T1.5`，把首页、列表页、详情页和错误提示从设计文档推进为可访问页面
+- 在不引入新前端框架或构建链的前提下，为一期公开链路提供最保守可运行的页面实现
+- 为后续 `T1.6` 单机部署闭环提供公开页面入口和静态资源结构
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 变更时间：`2026-03-24T13:51:37Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开页面路由、静态资源、浏览器端公开 API 调用和本地开发图片访问挂载
+- 首页、列表页和详情页仅通过 `/api/public/*` 读取业务数据，不直接访问数据库
+- 不涉及后台页面、后台 API、Nginx 配置、systemd 配置或数据库迁移结构变更
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `make test`
+- 执行 `cp .env.example .env`
+- 执行 `make db-migrate`
+- 执行 `curl http://127.0.0.1:8000/`
+- 执行 `curl "http://127.0.0.1:8000/wallpapers?page=1&market_code=en-US"`
+- 执行 `curl http://127.0.0.1:8000/wallpapers/1`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复公开页面路由、静态资源、前端测试与文档更新，或执行 `git revert` 回退本次提交
+- 如本地运行依赖 `/images/*` 开发挂载，可一并回退 [app/main.py](app/main.py) 中的图片目录挂载
+- 回滚后仓库将退回到具备公开 API 最小集但尚未提供基础公开前端的状态
+
 ## 2026-03-24T13:40:19Z
 
 ### 变更内容
