@@ -9,7 +9,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
 
     applied = migrate_database(database_path)
 
-    assert [migration.version for migration in applied] == [1]
+    assert [migration.version for migration in applied] == [1, 2]
 
     connection = sqlite3.connect(database_path)
     try:
@@ -39,6 +39,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         connection.close()
 
     assert tables == [
+        "admin_sessions",
         "admin_users",
         "audit_logs",
         "collection_task_items",
@@ -48,6 +49,8 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "wallpapers",
     ]
     assert indexes == [
+        "idx_admin_sessions_token_hash",
+        "idx_admin_sessions_user_expires",
         "idx_collection_task_items_result_status",
         "idx_collection_task_items_task_occurred",
         "idx_collection_tasks_status_created",
@@ -72,7 +75,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
     first_run = migrate_database(database_path)
     second_run = migrate_database(database_path)
 
-    assert [migration.version for migration in first_run] == [1]
+    assert [migration.version for migration in first_run] == [1, 2]
     assert second_run == []
 
     connection = sqlite3.connect(database_path)
@@ -87,7 +90,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
     finally:
         connection.close()
 
-    assert schema_migrations_rows == [(1, "baseline")]
+    assert schema_migrations_rows == [(1, "baseline"), (2, "admin_sessions")]
 
 
 def _fetch_names(connection: sqlite3.Connection, query: str) -> list[str]:

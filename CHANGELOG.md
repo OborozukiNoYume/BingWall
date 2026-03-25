@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 2026-03-25T12:49:06Z
+
+### 变更内容
+
+- 新增 [app/repositories/migrations/versions/V0002__admin_sessions.sql](app/repositories/migrations/versions/V0002__admin_sessions.sql)，把后台会话表 `admin_sessions` 以独立迁移方式落地，并补齐 `(session_token_hash)` 唯一索引与 `(admin_user_id, expires_at_utc)` 会话校验索引
+- 新增 [app/core/security.py](app/core/security.py)、[app/repositories/admin_auth_repository.py](app/repositories/admin_auth_repository.py)、[app/services/admin_auth.py](app/services/admin_auth.py)、[app/schemas/admin_auth.py](app/schemas/admin_auth.py) 与 [app/api/admin/routes.py](app/api/admin/routes.py)，落地管理员密码摘要校验、会话令牌签发与摘要存储、会话过期判断、主动登出失效、审计日志写入和当前管理员上下文注入
+- 更新 [app/api/router.py](app/api/router.py) 与 [app/api/admin/__init__.py](app/api/admin/__init__.py)，接入 `/api/admin/auth/login`、`/api/admin/auth/logout` 两个后台认证接口
+- 新增 [tests/integration/test_admin_auth.py](tests/integration/test_admin_auth.py) 与 [tests/unit/test_security.py](tests/unit/test_security.py)，覆盖正确登录、错误登录、禁用账号、会话过期、登出失效、密码摘要与会话摘要关键路径
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md) 与 [docs/api-conventions.md](docs/api-conventions.md)，同步 `T2.1` 完成状态、后台鉴权使用方式和后续优先级
+
+### 变更原因
+
+- 完成阶段二 `T2.1`，把后台登录、登出、会话控制和基础鉴权能力从设计文档推进为可运行实现
+- 保持保守范围，只补齐后台认证入口和会话基础设施，不提前展开后台内容管理页面、任务管理或额外框架引入
+- 为 `T2.2` 后台内容管理接口与页面提供统一的管理员上下文、错误码和审计基础
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 密码摘要、会话令牌哈希和客户端摘要基于 Python 标准库 `hashlib`、`hmac`、`secrets` 实现
+- 变更时间：`2026-03-25T12:49:06Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖后台认证 API、管理员会话持久化、审计日志写入、后台鉴权测试和相关文档同步
+- 公开 API、公开前端、采集链路、部署模板和现有依赖版本均未改动
+- 新会话默认通过 `Authorization: Bearer <session_token>` 使用，服务端仅保存会话令牌摘要，不保存明文令牌
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `make test`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除后台鉴权代码与测试、回退 [app/repositories/migrations/versions/V0002__admin_sessions.sql](app/repositories/migrations/versions/V0002__admin_sessions.sql) 以及相关文档更新，或执行 `git revert` 回退本次提交
+- 若目标环境数据库已应用 `V0002__admin_sessions.sql`，回滚前应先停用后台登录调用，并删除 `admin_sessions` 表及其索引后再回退代码
+- 回滚后仓库将恢复到“已具备阶段一公开链路，但尚未提供后台登录与会话控制”的状态
+
 ## 2026-03-25T12:27:30Z
 
 ### 变更内容

@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-23T12:57:44Z
+- 更新时间：2026-03-25T12:49:06Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：公开接口与后台接口的统一契约说明
 
@@ -127,6 +127,7 @@
 ### 后台接口
 
 - 必须登录
+- 使用 `Authorization: Bearer <session_token>` 传递当前会话令牌
 - 必须有会话过期时间
 - 必须记录审计日志
 - 危险操作必须具备明确操作者身份
@@ -283,6 +284,18 @@
 
 - 方法：`POST`
 - 路径：`/api/admin/auth/logout`
+
+请求头：
+
+- `Authorization: Bearer <session_token>`
+
+响应数据结构（`data` 字段）：
+
+```json
+{
+  "revoked": true
+}
+```
 
 约束：
 
