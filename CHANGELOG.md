@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 2026-03-25T13:39:04Z
+
+### 变更内容
+
+- 新增 [app/schemas/admin_collection.py](app/schemas/admin_collection.py)、[app/repositories/admin_collection_repository.py](app/repositories/admin_collection_repository.py) 与 [app/services/admin_collection.py](app/services/admin_collection.py)，落地手动采集任务创建、任务列表、任务详情、失败任务重试和结构化日志查询的 schema、SQLite 查询逻辑与后台服务
+- 更新 [app/api/admin/routes.py](app/api/admin/routes.py)、[app/repositories/collection_repository.py](app/repositories/collection_repository.py) 与 [app/services/bing_collection.py](app/services/bing_collection.py)，接入 `/api/admin/collection-tasks`、`/api/admin/collection-tasks/{task_id}`、`/api/admin/collection-tasks/{task_id}/retry`、`/api/admin/logs`，并把既有 Bing 采集主链路扩展为可消费 `queued` 任务的模式
+- 新增 [app/collectors/manual_tasks.py](app/collectors/manual_tasks.py) 并更新 [Makefile](Makefile)，提供 `make consume-collection-tasks` 队列消费入口，便于后续由 cron 直接调用
+- 更新 [app/web/routes.py](app/web/routes.py)、[web/admin/assets/admin.js](web/admin/assets/admin.js) 与 [web/admin/assets/admin.css](web/admin/assets/admin.css)，新增 `/admin/tasks`、`/admin/tasks/{task_id}`、`/admin/logs` 后台页面，展示任务创建、执行统计、错误摘要、逐条处理明细和结构化日志
+- 新增 [tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py)，并更新 [tests/integration/test_admin_frontend.py](tests/integration/test_admin_frontend.py)，覆盖任务创建、队列消费、失败日志查询、任务重试和后台任务页面壳
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步 `T2.3` 完成状态、运行命令、接口约定和后续优先级
+
+### 变更原因
+
+- 完成阶段二 `T2.3`，把“后台提交任务、cron 近实时消费、后台查看结果和失败原因”的设计约束推进为可运行实现
+- 继续保持最保守方案，复用既有 Bing 采集主链路和后台页面技术栈，不引入消息队列、新前端框架或额外部署组件
+- 让手动采集与自动采集继续共用同一条采集逻辑，同时把任务状态、结构化日志和失败定位统一落到数据库中
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增运行入口：`make consume-collection-tasks`
+- 变更时间：`2026-03-25T13:39:04Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖后台任务 API、后台任务页面、结构化日志查询、手动采集任务队列消费、任务重试与审计日志写入
+- 当前实现仅支持 `source_type = bing`，并对 Bing 手动采集日期范围采用最近 `8` 天的保守窗口约束
+- 不涉及 `/api/health/ready`、`/api/health/deep`、备份恢复、阶段三扩展能力或依赖版本升级
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m ruff check app tests web`
+- 执行 `./.venv/bin/python -m mypy app tests`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除后台任务相关 schema / repository / service / 页面 / 测试，回退新的后台 API 路由、队列消费入口与文档更新，或执行 `git revert` 回退本次提交
+- 若目标环境已经开始使用 `/api/admin/collection-tasks` 创建新任务，回滚前应先确认是否需要保留 `collection_tasks`、`collection_task_items` 和 `audit_logs` 中新增的后台任务记录
+- 回滚后仓库将恢复到“已具备后台内容管理与审计查询，但尚未提供手动采集任务与后台观测闭环”的状态
+
 ## 2026-03-25T13:12:07Z
 
 ### 变更内容

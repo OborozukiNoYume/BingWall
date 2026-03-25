@@ -11,7 +11,7 @@ from pydantic import field_validator
 
 ContentStatus = Literal["draft", "enabled", "disabled", "deleted"]
 ImageStatus = Literal["pending", "ready", "failed"]
-AdminTargetType = Literal["wallpaper", "admin_session"]
+AdminTargetType = Literal["wallpaper", "admin_session", "collection_task"]
 
 
 class AdminWallpaperListQuery(BaseModel):

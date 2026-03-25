@@ -26,6 +26,9 @@ def test_admin_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
         login_response = client.get("/admin/login")
         list_response = client.get("/admin/wallpapers?page=2&content_status=draft")
         detail_response = client.get(f"/admin/wallpapers/{wallpaper_id}")
+        task_list_response = client.get("/admin/tasks?page=1&task_status=queued")
+        task_detail_response = client.get("/admin/tasks/7")
+        logs_response = client.get("/admin/logs?task_id=7&error_type=failed")
         audit_response = client.get("/admin/audit-logs?target_type=wallpaper&target_id=1")
 
     assert login_response.status_code == 200
@@ -40,6 +43,18 @@ def test_admin_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
     assert detail_response.status_code == 200
     assert 'data-page="admin-detail"' in detail_response.text
     assert f'data-wallpaper-id="{wallpaper_id}"' in detail_response.text
+
+    assert task_list_response.status_code == 200
+    assert 'data-page="admin-tasks"' in task_list_response.text
+    assert "采集任务" in task_list_response.text
+
+    assert task_detail_response.status_code == 200
+    assert 'data-page="admin-task-detail"' in task_detail_response.text
+    assert 'data-task-id="7"' in task_detail_response.text
+
+    assert logs_response.status_code == 200
+    assert 'data-page="admin-logs"' in logs_response.text
+    assert "结构化日志" in logs_response.text
 
     assert audit_response.status_code == 200
     assert 'data-page="admin-audit"' in audit_response.text
@@ -57,6 +72,8 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     assert "/api/admin/auth/login" in js_response.text
     assert "/api/admin/auth/logout" in js_response.text
     assert "/api/admin/wallpapers" in js_response.text
+    assert "/api/admin/collection-tasks" in js_response.text
+    assert "/api/admin/logs" in js_response.text
     assert "/api/admin/audit-logs" in js_response.text
     assert "逻辑删除" in js_response.text
     assert "sqlite" not in js_response.text.lower()
@@ -64,3 +81,4 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     assert css_response.status_code == 200
     assert ".admin-shell" in css_response.text
     assert ".detail-grid" in css_response.text
+    assert ".stats-grid" in css_response.text

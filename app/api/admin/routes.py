@@ -15,7 +15,16 @@ from app.api.errors import build_success_response
 from app.core.config import Settings
 from app.core.config import get_settings
 from app.repositories.admin_auth_repository import AdminAuthRepository
+from app.repositories.admin_collection_repository import AdminCollectionRepository
 from app.repositories.admin_content_repository import AdminContentRepository
+from app.schemas.admin_collection import AdminCollectionLogListData
+from app.schemas.admin_collection import AdminCollectionLogListQuery
+from app.schemas.admin_collection import AdminCollectionTaskCreateData
+from app.schemas.admin_collection import AdminCollectionTaskCreateRequest
+from app.schemas.admin_collection import AdminCollectionTaskDetailData
+from app.schemas.admin_collection import AdminCollectionTaskListData
+from app.schemas.admin_collection import AdminCollectionTaskListQuery
+from app.schemas.admin_collection import AdminCollectionTaskRetryData
 from app.schemas.admin_auth import AdminLoginData
 from app.schemas.admin_auth import AdminLoginRequest
 from app.schemas.admin_auth import AdminLogoutData
@@ -29,6 +38,7 @@ from app.schemas.admin_content import AdminWallpaperStatusUpdateData
 from app.schemas.admin_content import AdminWallpaperStatusUpdateRequest
 from app.schemas.common import ErrorEnvelope
 from app.schemas.common import SuccessEnvelope
+from app.services.admin_collection import AdminCollectionService
 from app.services.admin_auth import AdminAuthService
 from app.services.admin_content import AdminContentService
 
@@ -80,6 +90,26 @@ def get_admin_content_service(
     repository: Annotated[AdminContentRepository, Depends(get_admin_content_repository)],
 ) -> AdminContentService:
     return AdminContentService(
+        repository,
+        session_secret=settings.security_session_secret.get_secret_value(),
+    )
+
+
+def get_admin_collection_repository(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Iterator[AdminCollectionRepository]:
+    repository = AdminCollectionRepository(settings.database_path)
+    try:
+        yield repository
+    finally:
+        repository.close()
+
+
+def get_admin_collection_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[AdminCollectionRepository, Depends(get_admin_collection_repository)],
+) -> AdminCollectionService:
+    return AdminCollectionService(
         repository,
         session_secret=settings.security_session_secret.get_secret_value(),
     )
@@ -234,6 +264,126 @@ def list_admin_audit_logs(
         query.admin_user_id,
         query.target_type,
         query.target_id,
+        query.page,
+    )
+    return build_success_response(
+        request=request,
+        data=data.model_dump(),
+        pagination=pagination.model_dump(),
+    )
+
+
+@router.post(
+    "/collection-tasks",
+    response_model=SuccessEnvelope[AdminCollectionTaskCreateData],
+    responses=ERROR_RESPONSES,
+)
+def create_admin_collection_task(
+    payload: AdminCollectionTaskCreateRequest,
+    request: Request,
+    session: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminCollectionService, Depends(get_admin_collection_service)],
+) -> dict[str, object]:
+    data = service.create_task(
+        payload=payload,
+        session=session,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info(
+        "Admin collection task created: task_id=%s source_type=%s market=%s",
+        data.task_id,
+        payload.source_type,
+        payload.market_code,
+    )
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/collection-tasks",
+    response_model=SuccessEnvelope[AdminCollectionTaskListData],
+    responses=ERROR_RESPONSES,
+)
+def list_admin_collection_tasks(
+    request: Request,
+    query: Annotated[AdminCollectionTaskListQuery, Depends()],
+    _: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminCollectionService, Depends(get_admin_collection_service)],
+) -> dict[str, object]:
+    data, pagination = service.list_tasks(query=query)
+    logger.info(
+        "Admin collection task list served: task_status=%s trigger_type=%s source_type=%s page=%s",
+        query.task_status,
+        query.trigger_type,
+        query.source_type,
+        query.page,
+    )
+    return build_success_response(
+        request=request,
+        data=data.model_dump(),
+        pagination=pagination.model_dump(),
+    )
+
+
+@router.get(
+    "/collection-tasks/{task_id}",
+    response_model=SuccessEnvelope[AdminCollectionTaskDetailData],
+    responses=ERROR_RESPONSES,
+)
+def get_admin_collection_task_detail(
+    task_id: int,
+    request: Request,
+    _: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminCollectionService, Depends(get_admin_collection_service)],
+) -> dict[str, object]:
+    data = service.get_task_detail(task_id=task_id)
+    logger.info("Admin collection task detail served: task_id=%s", task_id)
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.post(
+    "/collection-tasks/{task_id}/retry",
+    response_model=SuccessEnvelope[AdminCollectionTaskRetryData],
+    responses=ERROR_RESPONSES,
+)
+def retry_admin_collection_task(
+    task_id: int,
+    request: Request,
+    session: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminCollectionService, Depends(get_admin_collection_service)],
+) -> dict[str, object]:
+    data = service.retry_task(
+        task_id=task_id,
+        session=session,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info(
+        "Admin collection task retried: new_task_id=%s original_task_id=%s",
+        data.task_id,
+        data.retry_of_task_id,
+    )
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/logs",
+    response_model=SuccessEnvelope[AdminCollectionLogListData],
+    responses=ERROR_RESPONSES,
+)
+def list_admin_collection_logs(
+    request: Request,
+    query: Annotated[AdminCollectionLogListQuery, Depends()],
+    _: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminCollectionService, Depends(get_admin_collection_service)],
+) -> dict[str, object]:
+    data, pagination = service.list_logs(query=query)
+    logger.info(
+        "Admin collection logs served: task_id=%s error_type=%s page=%s",
+        query.task_id,
+        query.error_type,
         query.page,
     )
     return build_success_response(

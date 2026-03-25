@@ -2,6 +2,7 @@ const adminRoot = document.querySelector("#admin-root");
 const body = document.body;
 const pageName = body.dataset.page;
 const wallpaperId = body.dataset.wallpaperId;
+const taskId = body.dataset.taskId;
 const sessionCopyNode = document.querySelector("[data-admin-session]");
 const logoutButton = document.querySelector("[data-admin-logout]");
 const SESSION_STORAGE_KEY = "bingwall_admin_session";
@@ -39,6 +40,21 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   if (pageName === "admin-detail" && wallpaperId) {
     await renderWallpaperDetailPage(session, wallpaperId);
+    return;
+  }
+
+  if (pageName === "admin-tasks") {
+    await renderTaskListPage(session);
+    return;
+  }
+
+  if (pageName === "admin-task-detail" && taskId) {
+    await renderTaskDetailPage(session, taskId);
+    return;
+  }
+
+  if (pageName === "admin-logs") {
+    await renderLogPage(session);
     return;
   }
 
@@ -132,9 +148,7 @@ async function renderWallpaperListPage(session) {
     const state = readWallpaperListState();
     const payload = await fetchAdmin(
       `/api/admin/wallpapers?${buildWallpaperListParams(state).toString()}`,
-      {
-        token: session.session_token,
-      },
+      { token: session.session_token },
     );
     renderWallpaperListView(session, payload, state);
   } catch (error) {
@@ -257,14 +271,10 @@ function renderWallpaperListView(session, payload, state) {
     tableBody.innerHTML = items.map((item) => renderWallpaperRow(item)).join("");
   }
 
-  setNotice(
-    feedback,
-    "查询说明",
-    "列表数据来自 /api/admin/wallpapers，危险操作会二次确认并写入审计日志。",
-  );
+  setNotice(feedback, "查询说明", "列表数据来自 /api/admin/wallpapers，危险操作会二次确认并写入审计日志。");
   paginationNode.innerHTML = renderPaginationLinks("/admin/wallpapers", state, pagination.total_pages);
 
-  filterForm.addEventListener("submit", async (event) => {
+  filterForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const formData = new FormData(filterForm);
     const nextState = {
@@ -286,42 +296,7 @@ function renderWallpaperListView(session, payload, state) {
     });
   }
 
-  tableBody.querySelectorAll("[data-status-action]").forEach((button) => {
-    if (!(button instanceof HTMLButtonElement)) {
-      return;
-    }
-    button.addEventListener("click", async () => {
-      const targetStatus = button.dataset.statusAction;
-      const targetId = button.dataset.wallpaperId;
-      if (!targetStatus || !targetId) {
-        return;
-      }
-      const confirmed = window.confirm(`确认把内容 ${targetId} 切换为 ${targetStatus} 吗？`);
-      if (!confirmed) {
-        return;
-      }
-      const operatorReason = window.prompt("请输入操作原因", `后台手动切换为 ${targetStatus}`);
-      if (!operatorReason) {
-        return;
-      }
-      setNotice(feedback, "正在提交状态切换...", "请求会写入审计日志，请稍候。");
-      try {
-        await fetchAdmin(`/api/admin/wallpapers/${encodeURIComponent(targetId)}/status`, {
-          method: "POST",
-          token: session.session_token,
-          body: JSON.stringify({
-            target_status: targetStatus,
-            operator_reason: operatorReason,
-          }),
-        });
-        redirectTo(window.location.pathname + window.location.search);
-      } catch (error) {
-        console.error(error);
-        const message = error instanceof ApiError ? error.message : "状态切换失败，请稍后重试。";
-        setNotice(feedback, "操作失败", message);
-      }
-    });
-  });
+  bindWallpaperStatusActions(session, feedback);
 }
 
 async function renderWallpaperDetailPage(session, id) {
@@ -414,42 +389,480 @@ function renderWallpaperDetailView(session, detail) {
     return;
   }
 
-  document.querySelectorAll("[data-status-action]").forEach((button) => {
-    if (!(button instanceof HTMLButtonElement)) {
-      return;
+  bindWallpaperStatusActions(session, feedback);
+}
+
+async function renderTaskListPage(session) {
+  setLoadingState("正在读取后台采集任务...");
+
+  try {
+    const state = readTaskListState();
+    const payload = await fetchAdmin(
+      `/api/admin/collection-tasks?${buildTaskParams(state).toString()}`,
+      { token: session.session_token },
+    );
+    renderTaskListView(session, payload, state);
+  } catch (error) {
+    handleAdminError(error);
+  }
+}
+
+function renderTaskListView(session, payload, state) {
+  const items = Array.isArray(payload.data.items) ? payload.data.items : [];
+  const pagination = payload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
+
+  adminRoot.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h2>采集任务与后台观测</h2>
+        <p class="muted-copy">手动创建任务后，由 cron 消费队列；页面只负责通过后台 API 观察状态和重试。</p>
+      </div>
+      <p class="meta-pill">共 ${pagination.total} 条任务</p>
+    </div>
+    <section class="detail-grid">
+      <article class="detail-card">
+        <h3>创建手动采集任务</h3>
+        <form class="admin-form" id="task-create-form">
+          <div class="filter-grid">
+            <div class="field-group">
+              <label for="task-source-type">来源类型</label>
+              <select id="task-source-type" name="source_type">
+                <option value="bing">bing</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="task-market-code">地区</label>
+              <input id="task-market-code" name="market_code" type="text" value="en-US" required />
+            </div>
+            <div class="field-group">
+              <label for="task-date-from">开始日期</label>
+              <input id="task-date-from" name="date_from" type="date" required />
+            </div>
+            <div class="field-group">
+              <label for="task-date-to">结束日期</label>
+              <input id="task-date-to" name="date_to" type="date" required />
+            </div>
+          </div>
+          <label class="checkbox-row">
+            <input id="task-force-refresh" name="force_refresh" type="checkbox" />
+            <span>记录 force_refresh 请求参数</span>
+          </label>
+          <div class="button-row">
+            <button class="primary-button" type="submit">创建 queued 任务</button>
+          </div>
+        </form>
+        <div id="task-create-feedback"></div>
+      </article>
+      <article class="detail-card">
+        <h3>任务筛选</h3>
+        <form class="admin-form" id="task-filter-form">
+          <div class="filter-grid">
+            <div class="field-group">
+              <label for="task-status-filter">任务状态</label>
+              <select id="task-status-filter" name="task_status">
+                <option value="">全部</option>
+                <option value="queued">queued</option>
+                <option value="running">running</option>
+                <option value="succeeded">succeeded</option>
+                <option value="partially_failed">partially_failed</option>
+                <option value="failed">failed</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="task-trigger-filter">触发方式</label>
+              <select id="task-trigger-filter" name="trigger_type">
+                <option value="">全部</option>
+                <option value="admin">admin</option>
+                <option value="cron">cron</option>
+                <option value="manual">manual</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="task-source-filter">来源类型</label>
+              <select id="task-source-filter" name="source_type">
+                <option value="">全部</option>
+                <option value="bing">bing</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="task-created-from">创建开始时间</label>
+              <input id="task-created-from" name="created_from_utc" type="datetime-local" />
+            </div>
+            <div class="field-group">
+              <label for="task-created-to">创建结束时间</label>
+              <input id="task-created-to" name="created_to_utc" type="datetime-local" />
+            </div>
+            <div class="field-group">
+              <label for="task-page-size">每页数量</label>
+              <select id="task-page-size" name="page_size">
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+              </select>
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" type="submit">刷新任务列表</button>
+            <button class="ghost-button" id="reset-task-filters" type="button">重置筛选</button>
+          </div>
+        </form>
+      </article>
+    </section>
+    <section class="table-card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>任务</th>
+              <th>状态</th>
+              <th>参数</th>
+              <th>统计</th>
+              <th>错误摘要</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="task-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+    <nav class="button-row" id="task-pagination" aria-label="后台任务分页"></nav>
+  `;
+
+  const createForm = document.querySelector("#task-create-form");
+  const createFeedback = document.querySelector("#task-create-feedback");
+  const filterForm = document.querySelector("#task-filter-form");
+  const tableBody = document.querySelector("#task-table-body");
+  const paginationNode = document.querySelector("#task-pagination");
+
+  if (
+    !(createForm instanceof HTMLFormElement) ||
+    !(createFeedback instanceof HTMLElement) ||
+    !(filterForm instanceof HTMLFormElement) ||
+    !(tableBody instanceof HTMLElement) ||
+    !(paginationNode instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  assignFormValue(filterForm, "task_status", state.task_status);
+  assignFormValue(filterForm, "trigger_type", state.trigger_type);
+  assignFormValue(filterForm, "source_type", state.source_type);
+  assignFormValue(filterForm, "created_from_utc", state.created_from_utc);
+  assignFormValue(filterForm, "created_to_utc", state.created_to_utc);
+  assignFormValue(filterForm, "page_size", state.page_size);
+
+  if (items.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="notice-card">
+            <h3>当前没有匹配任务</h3>
+            <p>可以先创建手动采集任务，或调整筛选条件。</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    tableBody.innerHTML = items.map((item) => renderTaskRow(item)).join("");
+  }
+
+  paginationNode.innerHTML = renderPaginationLinks("/admin/tasks", state, pagination.total_pages);
+
+  createForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(createForm);
+    setNotice(createFeedback, "正在创建任务...", "系统会先写入 queued 任务，再由 cron 近实时消费。");
+    try {
+      const response = await fetchAdmin("/api/admin/collection-tasks", {
+        method: "POST",
+        token: session.session_token,
+        body: JSON.stringify({
+          source_type: stringValue(formData.get("source_type")) || "bing",
+          market_code: stringValue(formData.get("market_code")),
+          date_from: stringValue(formData.get("date_from")),
+          date_to: stringValue(formData.get("date_to")),
+          force_refresh: formData.get("force_refresh") === "on",
+        }),
+      });
+      redirectTo(`/admin/tasks/${encodeURIComponent(String(response.task_id))}`);
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof ApiError ? error.message : "创建任务失败，请稍后重试。";
+      setNotice(createFeedback, "创建失败", message);
     }
-    button.addEventListener("click", async () => {
-      const targetStatus = button.dataset.statusAction;
-      const targetId = button.dataset.wallpaperId;
-      if (!targetStatus || !targetId) {
-        return;
-      }
-      const confirmed = window.confirm(`确认执行 ${targetStatus} 吗？`);
-      if (!confirmed) {
-        return;
-      }
-      const operatorReason = window.prompt("请输入操作原因", `详情页执行 ${targetStatus}`);
-      if (!operatorReason) {
-        return;
-      }
-      setNotice(feedback, "正在提交状态切换...", "请求会记录操作者、目标对象和 trace_id。");
-      try {
-        await fetchAdmin(`/api/admin/wallpapers/${encodeURIComponent(targetId)}/status`, {
-          method: "POST",
-          token: session.session_token,
-          body: JSON.stringify({
-            target_status: targetStatus,
-            operator_reason: operatorReason,
-          }),
-        });
-        redirectTo(`/admin/wallpapers/${encodeURIComponent(targetId)}`);
-      } catch (error) {
-        console.error(error);
-        const message = error instanceof ApiError ? error.message : "状态切换失败，请稍后重试。";
-        setNotice(feedback, "操作失败", message);
-      }
-    });
   });
+
+  filterForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formData = new FormData(filterForm);
+    const nextState = {
+      task_status: stringValue(formData.get("task_status")),
+      trigger_type: stringValue(formData.get("trigger_type")),
+      source_type: stringValue(formData.get("source_type")),
+      created_from_utc: stringValue(formData.get("created_from_utc")),
+      created_to_utc: stringValue(formData.get("created_to_utc")),
+      page_size: stringValue(formData.get("page_size")) || "20",
+      page: "1",
+    };
+    redirectTo(`/admin/tasks?${buildTaskParams(nextState).toString()}`);
+  });
+
+  const resetButton = document.querySelector("#reset-task-filters");
+  if (resetButton instanceof HTMLButtonElement) {
+    resetButton.addEventListener("click", () => {
+      redirectTo("/admin/tasks?page=1&page_size=20");
+    });
+  }
+
+  bindTaskRetryActions(session);
+}
+
+async function renderTaskDetailPage(session, id) {
+  setLoadingState("正在读取任务详情...");
+
+  try {
+    const payload = await fetchAdmin(`/api/admin/collection-tasks/${encodeURIComponent(id)}`, {
+      token: session.session_token,
+    });
+    renderTaskDetailView(session, payload.data);
+  } catch (error) {
+    handleAdminError(error);
+  }
+}
+
+function renderTaskDetailView(session, detail) {
+  const items = Array.isArray(detail.items) ? detail.items : [];
+  const snapshot = detail.request_snapshot || {};
+  const allowRetry = detail.task_status === "failed" || detail.task_status === "partially_failed";
+
+  adminRoot.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h2>任务 #${escapeHtml(String(detail.id))}</h2>
+        <p class="muted-copy">任务详情通过 <code>/api/admin/collection-tasks/${escapeHtml(String(detail.id))}</code> 读取。</p>
+      </div>
+      <div class="button-row">
+        <a class="ghost-button" href="/admin/tasks">返回任务列表</a>
+        <a class="ghost-button" href="/admin/logs?task_id=${escapeHtml(String(detail.id))}">查看结构化日志</a>
+      </div>
+    </div>
+    <div id="task-detail-feedback"></div>
+    <section class="detail-grid">
+      <article class="detail-card">
+        <h3>当前状态</h3>
+        <dl class="detail-list">
+          ${renderDetailRow("任务类型", detail.task_type)}
+          ${renderDetailRow("来源类型", detail.source_type)}
+          ${renderDetailRow("触发方式", detail.trigger_type)}
+          ${renderDetailRow("触发人", detail.triggered_by || "无")}
+          ${renderDetailRow("任务状态", detail.task_status)}
+          ${renderDetailRow("重试源任务", detail.retry_of_task_id ? String(detail.retry_of_task_id) : "无")}
+          ${renderDetailRow("开始时间", detail.started_at_utc || "未开始")}
+          ${renderDetailRow("结束时间", detail.finished_at_utc || "未结束")}
+        </dl>
+        <div class="button-row">
+          ${allowRetry ? `<button class="primary-button" type="button" data-task-retry="${escapeHtml(String(detail.id))}">重试该任务</button>` : ""}
+        </div>
+      </article>
+      <article class="detail-card">
+        <h3>请求参数快照</h3>
+        <dl class="detail-list">
+          ${renderDetailRow("地区", snapshot.market_code || "无")}
+          ${renderDetailRow("开始日期", snapshot.date_from || "无")}
+          ${renderDetailRow("结束日期", snapshot.date_to || "无")}
+          ${renderDetailRow("force_refresh", formatBoolean(snapshot.force_refresh))}
+        </dl>
+      </article>
+      <article class="detail-card detail-card-wide">
+        <h3>执行统计</h3>
+        <div class="stats-grid">
+          <div class="stats-card">
+            <strong>${escapeHtml(String(detail.success_count))}</strong>
+            <span>成功</span>
+          </div>
+          <div class="stats-card">
+            <strong>${escapeHtml(String(detail.duplicate_count))}</strong>
+            <span>重复</span>
+          </div>
+          <div class="stats-card">
+            <strong>${escapeHtml(String(detail.failure_count))}</strong>
+            <span>失败</span>
+          </div>
+        </div>
+        <div class="notice-card">
+          <h4>错误摘要</h4>
+          <p>${escapeHtml(detail.error_summary || "当前没有错误摘要。")}</p>
+        </div>
+      </article>
+      <article class="detail-card detail-card-wide">
+        <h3>逐条处理明细</h3>
+        ${
+          items.length === 0
+            ? `<div class="notice-card"><h4>暂无处理明细</h4><p>任务尚未执行，或当前没有结构化明细。</p></div>`
+            : `
+              <div class="table-wrapper">
+                <table class="data-table">
+                  <thead>
+                    <tr>
+                      <th>时间</th>
+                      <th>来源项</th>
+                      <th>动作</th>
+                      <th>结果</th>
+                      <th>定位信息</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    ${items.map((item) => renderTaskItemRow(item)).join("")}
+                  </tbody>
+                </table>
+              </div>
+            `
+        }
+      </article>
+    </section>
+  `;
+
+  const feedback = document.querySelector("#task-detail-feedback");
+  if (!(feedback instanceof HTMLElement)) {
+    return;
+  }
+
+  bindTaskRetryActions(session, feedback);
+}
+
+async function renderLogPage(session) {
+  setLoadingState("正在读取结构化日志...");
+
+  try {
+    const state = readLogState();
+    const payload = await fetchAdmin(`/api/admin/logs?${buildLogParams(state).toString()}`, {
+      token: session.session_token,
+    });
+    renderLogView(payload, state);
+  } catch (error) {
+    handleAdminError(error);
+  }
+}
+
+function renderLogView(payload, state) {
+  const items = Array.isArray(payload.data.items) ? payload.data.items : [];
+  const pagination = payload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
+
+  adminRoot.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h2>结构化日志查询</h2>
+        <p class="muted-copy">当前读取 <code>collection_task_items</code> 结构化日志，不直接暴露服务器原始日志文件。</p>
+      </div>
+      <p class="meta-pill">共 ${pagination.total} 条</p>
+    </div>
+    <form class="admin-form" id="log-filter-form">
+      <div class="filter-grid">
+        <div class="field-group">
+          <label for="log-task-id">任务 ID</label>
+          <input id="log-task-id" name="task_id" type="number" min="1" />
+        </div>
+        <div class="field-group">
+          <label for="log-error-type">错误类型 / 结果</label>
+          <input id="log-error-type" name="error_type" type="text" placeholder="例如 failed" />
+        </div>
+        <div class="field-group">
+          <label for="log-started-from">开始时间</label>
+          <input id="log-started-from" name="started_from_utc" type="datetime-local" />
+        </div>
+        <div class="field-group">
+          <label for="log-started-to">结束时间</label>
+          <input id="log-started-to" name="started_to_utc" type="datetime-local" />
+        </div>
+        <div class="field-group">
+          <label for="log-page-size">每页数量</label>
+          <select id="log-page-size" name="page_size">
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+          </select>
+        </div>
+      </div>
+      <div class="button-row">
+        <button class="primary-button" type="submit">刷新日志</button>
+        <button class="ghost-button" id="reset-log-filters" type="button">重置筛选</button>
+      </div>
+    </form>
+    <section class="table-card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>任务</th>
+              <th>动作</th>
+              <th>结果</th>
+              <th>失败原因</th>
+              <th>定位</th>
+            </tr>
+          </thead>
+          <tbody id="log-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+    <nav class="button-row" id="log-pagination" aria-label="后台日志分页"></nav>
+  `;
+
+  const filterForm = document.querySelector("#log-filter-form");
+  const tableBody = document.querySelector("#log-table-body");
+  const paginationNode = document.querySelector("#log-pagination");
+
+  if (
+    !(filterForm instanceof HTMLFormElement) ||
+    !(tableBody instanceof HTMLElement) ||
+    !(paginationNode instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  assignFormValue(filterForm, "task_id", state.task_id);
+  assignFormValue(filterForm, "error_type", state.error_type);
+  assignFormValue(filterForm, "started_from_utc", state.started_from_utc);
+  assignFormValue(filterForm, "started_to_utc", state.started_to_utc);
+  assignFormValue(filterForm, "page_size", state.page_size);
+
+  if (items.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="notice-card">
+            <h3>当前没有匹配日志</h3>
+            <p>可以按任务 ID、错误类型或时间范围继续筛选。</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    tableBody.innerHTML = items.map((item) => renderLogRow(item)).join("");
+  }
+
+  paginationNode.innerHTML = renderPaginationLinks("/admin/logs", state, pagination.total_pages);
+
+  filterForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formData = new FormData(filterForm);
+    const nextState = {
+      task_id: stringValue(formData.get("task_id")),
+      error_type: stringValue(formData.get("error_type")),
+      started_from_utc: stringValue(formData.get("started_from_utc")),
+      started_to_utc: stringValue(formData.get("started_to_utc")),
+      page_size: stringValue(formData.get("page_size")) || "20",
+      page: "1",
+    };
+    redirectTo(`/admin/logs?${buildLogParams(nextState).toString()}`);
+  });
+
+  const resetButton = document.querySelector("#reset-log-filters");
+  if (resetButton instanceof HTMLButtonElement) {
+    resetButton.addEventListener("click", () => {
+      redirectTo("/admin/logs?page=1&page_size=20");
+    });
+  }
 }
 
 async function renderAuditPage(session) {
@@ -489,6 +902,7 @@ function renderAuditView(payload, state) {
           <select id="target-type" name="target_type">
             <option value="">全部</option>
             <option value="wallpaper">wallpaper</option>
+            <option value="collection_task">collection_task</option>
             <option value="admin_session">admin_session</option>
           </select>
         </div>
@@ -597,6 +1011,81 @@ function renderAuditView(payload, state) {
   }
 }
 
+function bindWallpaperStatusActions(session, feedback) {
+  document.querySelectorAll("[data-status-action]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    button.addEventListener("click", async () => {
+      const targetStatus = button.dataset.statusAction;
+      const targetId = button.dataset.wallpaperId;
+      if (!targetStatus || !targetId) {
+        return;
+      }
+      const confirmed = window.confirm(`确认把内容 ${targetId} 切换为 ${targetStatus} 吗？`);
+      if (!confirmed) {
+        return;
+      }
+      const operatorReason = window.prompt("请输入操作原因", `后台手动切换为 ${targetStatus}`);
+      if (!operatorReason) {
+        return;
+      }
+      setNotice(feedback, "正在提交状态切换...", "请求会写入审计日志，请稍候。");
+      try {
+        await fetchAdmin(`/api/admin/wallpapers/${encodeURIComponent(targetId)}/status`, {
+          method: "POST",
+          token: session.session_token,
+          body: JSON.stringify({
+            target_status: targetStatus,
+            operator_reason: operatorReason,
+          }),
+        });
+        redirectTo(window.location.pathname + window.location.search);
+      } catch (error) {
+        console.error(error);
+        const message = error instanceof ApiError ? error.message : "状态切换失败，请稍后重试。";
+        setNotice(feedback, "操作失败", message);
+      }
+    });
+  });
+}
+
+function bindTaskRetryActions(session, feedbackNode = null) {
+  document.querySelectorAll("[data-task-retry]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    button.addEventListener("click", async () => {
+      const targetId = button.dataset.taskRetry;
+      if (!targetId) {
+        return;
+      }
+      const confirmed = window.confirm(`确认重试任务 ${targetId} 吗？`);
+      if (!confirmed) {
+        return;
+      }
+      if (feedbackNode instanceof HTMLElement) {
+        setNotice(feedbackNode, "正在创建重试任务...", "系统会复制原任务参数并创建新的 queued 任务。");
+      }
+      try {
+        const response = await fetchAdmin(`/api/admin/collection-tasks/${encodeURIComponent(targetId)}/retry`, {
+          method: "POST",
+          token: session.session_token,
+        });
+        redirectTo(`/admin/tasks/${encodeURIComponent(String(response.task_id))}`);
+      } catch (error) {
+        console.error(error);
+        const message = error instanceof ApiError ? error.message : "任务重试失败，请稍后重试。";
+        if (feedbackNode instanceof HTMLElement) {
+          setNotice(feedbackNode, "重试失败", message);
+        } else {
+          window.alert(message);
+        }
+      }
+    });
+  });
+}
+
 function renderWallpaperRow(item) {
   return `
     <tr>
@@ -631,8 +1120,94 @@ function renderWallpaperRow(item) {
   `;
 }
 
-function renderStatusButton(wallpaperId, targetStatus, label) {
-  return `<button class="mini-button" type="button" data-wallpaper-id="${escapeHtml(String(wallpaperId))}" data-status-action="${escapeHtml(targetStatus)}">${escapeHtml(label)}</button>`;
+function renderStatusButton(wallpaperIdValue, targetStatus, label) {
+  return `<button class="mini-button" type="button" data-wallpaper-id="${escapeHtml(String(wallpaperIdValue))}" data-status-action="${escapeHtml(targetStatus)}">${escapeHtml(label)}</button>`;
+}
+
+function renderTaskRow(item) {
+  return `
+    <tr>
+      <td>
+        <div class="table-title">
+          <strong>#${escapeHtml(String(item.id))}</strong>
+          <span>${escapeHtml(item.task_type)} / ${escapeHtml(item.trigger_type)}</span>
+        </div>
+      </td>
+      <td>
+        <div class="stacked-copy">
+          <span class="status-badge">${escapeHtml(item.task_status)}</span>
+          <span class="muted-inline">${escapeHtml(item.started_at_utc || "未开始")}</span>
+        </div>
+      </td>
+      <td>
+        <div class="stacked-copy">
+          <span>${escapeHtml(item.source_type)} / ${escapeHtml(item.market_code || "无地区")}</span>
+          <span class="muted-inline">${escapeHtml(item.date_from || "无")} ~ ${escapeHtml(item.date_to || "无")}</span>
+        </div>
+      </td>
+      <td>
+        <div class="stacked-copy">
+          <span>成功 ${escapeHtml(String(item.success_count))}</span>
+          <span class="muted-inline">重复 ${escapeHtml(String(item.duplicate_count))} / 失败 ${escapeHtml(String(item.failure_count))}</span>
+        </div>
+      </td>
+      <td>${escapeHtml(item.error_summary || "无")}</td>
+      <td>
+        <div class="button-row">
+          <a class="inline-link" href="/admin/tasks/${escapeHtml(String(item.id))}">详情</a>
+          <a class="inline-link" href="/admin/logs?task_id=${escapeHtml(String(item.id))}">日志</a>
+          ${renderRetryButton(item)}
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function renderRetryButton(item) {
+  if (item.task_status !== "failed" && item.task_status !== "partially_failed") {
+    return "";
+  }
+  return `<button class="mini-button" type="button" data-task-retry="${escapeHtml(String(item.id))}">重试</button>`;
+}
+
+function renderTaskItemRow(item) {
+  return `
+    <tr>
+      <td>${escapeHtml(item.occurred_at_utc)}</td>
+      <td><code>${escapeHtml(item.source_item_key || "-")}</code></td>
+      <td>${escapeHtml(item.action_name)}</td>
+      <td>${escapeHtml(item.result_status)}</td>
+      <td><pre>${escapeHtml(JSON.stringify({
+        dedupe_hit_type: item.dedupe_hit_type,
+        db_write_result: item.db_write_result,
+        file_write_result: item.file_write_result,
+        failure_reason: item.failure_reason,
+      }, null, 2))}</pre></td>
+    </tr>
+  `;
+}
+
+function renderLogRow(item) {
+  return `
+    <tr>
+      <td>${escapeHtml(item.occurred_at_utc)}</td>
+      <td>
+        <div class="stacked-copy">
+          <span><a class="inline-link" href="/admin/tasks/${escapeHtml(String(item.task_id))}">#${escapeHtml(String(item.task_id))}</a></span>
+          <span class="muted-inline">${escapeHtml(item.task_status)} / ${escapeHtml(item.trigger_type)}</span>
+        </div>
+      </td>
+      <td>${escapeHtml(item.action_name)}</td>
+      <td>${escapeHtml(item.result_status)}</td>
+      <td>${escapeHtml(item.failure_reason || "无")}</td>
+      <td><pre>${escapeHtml(JSON.stringify({
+        source_item_key: item.source_item_key,
+        dedupe_hit_type: item.dedupe_hit_type,
+        db_write_result: item.db_write_result,
+        file_write_result: item.file_write_result,
+      }, null, 2))}</pre></td>
+    </tr>
+  `;
 }
 
 function renderAuditRow(item) {
@@ -706,7 +1281,14 @@ function renderPaginationLinks(basePath, state, totalPages) {
 
 function buildPageHref(basePath, state, page) {
   const nextState = { ...state, page: String(page) };
-  const params = basePath.includes("audit") ? buildAuditParams(nextState) : buildWallpaperListParams(nextState);
+  let params = buildWallpaperListParams(nextState);
+  if (basePath.includes("/admin/audit-logs")) {
+    params = buildAuditParams(nextState);
+  } else if (basePath === "/admin/tasks") {
+    params = buildTaskParams(nextState);
+  } else if (basePath === "/admin/logs") {
+    params = buildLogParams(nextState);
+  }
   return `${basePath}?${params.toString()}`;
 }
 
@@ -718,6 +1300,31 @@ function readWallpaperListState() {
     market_code: params.get("market_code") || "",
     created_from_utc: toDatetimeLocalValue(params.get("created_from_utc")),
     created_to_utc: toDatetimeLocalValue(params.get("created_to_utc")),
+    page: params.get("page") || "1",
+    page_size: params.get("page_size") || "20",
+  };
+}
+
+function readTaskListState() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    task_status: params.get("task_status") || "",
+    trigger_type: params.get("trigger_type") || "",
+    source_type: params.get("source_type") || "",
+    created_from_utc: toDatetimeLocalValue(params.get("created_from_utc")),
+    created_to_utc: toDatetimeLocalValue(params.get("created_to_utc")),
+    page: params.get("page") || "1",
+    page_size: params.get("page_size") || "20",
+  };
+}
+
+function readLogState() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    task_id: params.get("task_id") || "",
+    error_type: params.get("error_type") || "",
+    started_from_utc: toDatetimeLocalValue(params.get("started_from_utc")),
+    started_to_utc: toDatetimeLocalValue(params.get("started_to_utc")),
     page: params.get("page") || "1",
     page_size: params.get("page_size") || "20",
   };
@@ -745,6 +1352,29 @@ function buildWallpaperListParams(state) {
   setOptionalParam(params, "market_code", state.market_code);
   setOptionalParam(params, "created_from_utc", toUtcQueryValue(state.created_from_utc));
   setOptionalParam(params, "created_to_utc", toUtcQueryValue(state.created_to_utc));
+  return params;
+}
+
+function buildTaskParams(state) {
+  const params = new URLSearchParams();
+  params.set("page", state.page || "1");
+  params.set("page_size", state.page_size || "20");
+  setOptionalParam(params, "task_status", state.task_status);
+  setOptionalParam(params, "trigger_type", state.trigger_type);
+  setOptionalParam(params, "source_type", state.source_type);
+  setOptionalParam(params, "created_from_utc", toUtcQueryValue(state.created_from_utc));
+  setOptionalParam(params, "created_to_utc", toUtcQueryValue(state.created_to_utc));
+  return params;
+}
+
+function buildLogParams(state) {
+  const params = new URLSearchParams();
+  params.set("page", state.page || "1");
+  params.set("page_size", state.page_size || "20");
+  setOptionalParam(params, "task_id", state.task_id);
+  setOptionalParam(params, "error_type", state.error_type);
+  setOptionalParam(params, "started_from_utc", toUtcQueryValue(state.started_from_utc));
+  setOptionalParam(params, "started_to_utc", toUtcQueryValue(state.started_to_utc));
   return params;
 }
 
@@ -804,6 +1434,7 @@ function handleAdminError(error) {
       <h2>服务繁忙</h2>
       <p>${escapeHtml(message)}</p>
       <div class="button-row">
+        <a class="ghost-button" href="/admin/tasks">返回采集任务</a>
         <a class="ghost-button" href="/admin/wallpapers">返回内容管理</a>
       </div>
     </div>
@@ -889,6 +1520,10 @@ function formatBytes(value) {
     return "未提供";
   }
   return `${value} bytes`;
+}
+
+function formatBoolean(value) {
+  return value ? "true" : "false";
 }
 
 function toDatetimeLocalValue(value) {

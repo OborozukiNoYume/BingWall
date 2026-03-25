@@ -203,6 +203,18 @@ pre {
   font-weight: 800;
 }
 
+.checkbox-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ink-soft);
+}
+
+.checkbox-row input {
+  inline-size: 18px;
+  block-size: 18px;
+}
+
 .field-group input,
 .field-group select {
   width: 100%;
@@ -324,6 +336,25 @@ pre {
   grid-column: 1 / -1;
 }
 
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.stats-card {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: 18px;
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.stats-card strong {
+  font-size: 1.8rem;
+}
+
 .media-card {
   align-content: start;
 }
@@ -372,7 +403,8 @@ pre {
 
 @media (max-width: 960px) {
   .filter-grid,
-  .detail-grid {
+  .detail-grid,
+  .stats-grid {
     grid-template-columns: 1fr;
   }
 

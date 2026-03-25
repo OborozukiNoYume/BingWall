@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing consume-collection-tasks run clean
 
 MARKET ?= en-US
 COUNT ?= 1
@@ -36,6 +36,9 @@ db-migrate:
 
 collect-bing:
 	$(VENV_PYTHON) -m app.collectors.bing --market $(MARKET) --count $(COUNT)
+
+consume-collection-tasks:
+	$(VENV_PYTHON) -m app.collectors.manual_tasks
 
 run:
 	$(VENV_PYTHON) -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC
+from datetime import date
 from datetime import datetime
 import hashlib
 import json
@@ -53,6 +54,8 @@ class BingCollectionService:
         count: int,
         trigger_type: str,
         triggered_by: str | None,
+        date_from: date | None = None,
+        date_to: date | None = None,
     ) -> CollectionRunSummary:
         started_at_utc = utc_now_isoformat()
         request_snapshot_json = json.dumps(
@@ -72,6 +75,40 @@ class BingCollectionService:
             request_snapshot_json=request_snapshot_json,
             created_at_utc=started_at_utc,
         )
+        return self._run_collection(
+            task_id=task_id,
+            market_code=market_code,
+            count=count,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+    def collect_existing_task(
+        self,
+        *,
+        task_id: int,
+        market_code: str,
+        count: int,
+        date_from: date | None = None,
+        date_to: date | None = None,
+    ) -> CollectionRunSummary:
+        return self._run_collection(
+            task_id=task_id,
+            market_code=market_code,
+            count=count,
+            date_from=date_from,
+            date_to=date_to,
+        )
+
+    def _run_collection(
+        self,
+        *,
+        task_id: int,
+        market_code: str,
+        count: int,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> CollectionRunSummary:
         self.storage.ensure_directories()
 
         success_count = 0
@@ -81,8 +118,16 @@ class BingCollectionService:
 
         try:
             metadata_items = self.bing_client.fetch_metadata(market_code, count)
+            metadata_items = filter_metadata_items(
+                metadata_items=metadata_items,
+                date_from=date_from,
+                date_to=date_to,
+            )
             if not metadata_items:
-                msg = "Bing metadata response did not contain any images."
+                if date_from is not None and date_to is not None:
+                    msg = "Bing 上游结果中没有命中请求日期范围的图片。"
+                else:
+                    msg = "Bing metadata response did not contain any images."
                 raise RuntimeError(msg)
 
             for item in metadata_items:
@@ -371,3 +416,14 @@ def task_status_from_counts(*, success_count: int, duplicate_count: int, failure
 
 def utc_now_isoformat() -> str:
     return datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def filter_metadata_items(
+    *,
+    metadata_items: list[BingImageMetadata],
+    date_from: date | None,
+    date_to: date | None,
+) -> list[BingImageMetadata]:
+    if date_from is None or date_to is None:
+        return metadata_items
+    return [item for item in metadata_items if date_from <= item.wallpaper_date <= date_to]

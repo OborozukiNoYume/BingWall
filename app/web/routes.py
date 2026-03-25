@@ -92,6 +92,37 @@ def get_admin_wallpaper_detail_page(wallpaper_id: int) -> HTMLResponse:
     )
 
 
+@router.get("/admin/tasks", response_class=HTMLResponse)
+def get_admin_collection_tasks_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-tasks",
+        page_title="BingWall Admin | 采集任务",
+        page_heading="采集任务",
+        page_summary="创建手动采集任务，查看队列、执行统计、失败摘要和重试入口。",
+    )
+
+
+@router.get("/admin/tasks/{task_id}", response_class=HTMLResponse)
+def get_admin_collection_task_detail_page(task_id: int) -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-task-detail",
+        page_title="BingWall Admin | 任务详情",
+        page_heading="任务详情",
+        page_summary="查看任务参数快照、成功/重复/失败统计和逐条处理明细。",
+        task_id=task_id,
+    )
+
+
+@router.get("/admin/logs", response_class=HTMLResponse)
+def get_admin_collection_logs_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-logs",
+        page_title="BingWall Admin | 结构化日志",
+        page_heading="结构化日志",
+        page_summary="按任务 ID、错误类型和时间范围查询采集任务结构化处理日志。",
+    )
+
+
 @router.get("/admin/audit-logs", response_class=HTMLResponse)
 def get_admin_audit_logs_page() -> HTMLResponse:
     return render_admin_page(
@@ -165,8 +196,10 @@ def render_admin_page(
     page_heading: str,
     page_summary: str,
     wallpaper_id: int | None = None,
+    task_id: int | None = None,
 ) -> HTMLResponse:
     wallpaper_id_attr = f' data-wallpaper-id="{wallpaper_id}"' if wallpaper_id is not None else ""
+    task_id_attr = f' data-task-id="{task_id}"' if task_id is not None else ""
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
@@ -175,7 +208,7 @@ def render_admin_page(
     <title>{page_title}</title>
     <link rel="stylesheet" href="/admin-assets/admin.css" />
   </head>
-  <body data-page="{page_name}"{wallpaper_id_attr}>
+  <body data-page="{page_name}"{wallpaper_id_attr}{task_id_attr}>
     <div class="admin-shell">
       <header class="admin-header">
         <div>
@@ -184,6 +217,8 @@ def render_admin_page(
         </div>
         <nav class="admin-nav" aria-label="后台导航">
           <a href="/admin/wallpapers">内容管理</a>
+          <a href="/admin/tasks">采集任务</a>
+          <a href="/admin/logs">结构化日志</a>
           <a href="/admin/audit-logs">审计记录</a>
           <a href="/admin/login">登录</a>
         </nav>

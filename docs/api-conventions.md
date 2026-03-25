@@ -405,6 +405,13 @@
 }
 ```
 
+约束：
+
+- 当前实现仅支持 `source_type = bing`
+- `date_from` 与 `date_to` 必须满足 `date_from <= date_to`
+- 当前 Bing 手动采集仅支持最近 `8` 天内、且跨度不超过 `8` 天的日期范围
+- 当前实现会记录 `force_refresh` 请求参数，但仍继续沿用一期既有去重规则，不直接覆盖已存在内容
+
 ### 10. 后台任务列表
 
 - 方法：`GET`
@@ -418,6 +425,25 @@
 - `created_from_utc`
 - `created_to_utc`
 
+响应数据结构（`data.items[*]`）至少包含：
+
+- `id`
+- `task_type`
+- `source_type`
+- `trigger_type`
+- `triggered_by`
+- `task_status`
+- `market_code`
+- `date_from`
+- `date_to`
+- `force_refresh`
+- `success_count`
+- `duplicate_count`
+- `failure_count`
+- `error_summary`
+- `retry_of_task_id`
+- `created_at_utc`
+
 ### 11. 后台任务详情
 
 - 方法：`GET`
@@ -429,6 +455,7 @@
 - 成功数、重复数、失败数
 - 错误摘要
 - 逐条处理明细
+- 请求参数快照
 
 ### 12. 后台任务重试
 
@@ -439,6 +466,7 @@
 
 - 只能重试明确目标任务
 - 不允许无筛选条件的批量重试
+- 当前实现仅允许重试 `failed` 或 `partially_failed` 的任务
 
 ### 13. 后台日志查询
 
@@ -456,6 +484,7 @@
 
 - 一期该接口主要查询采集任务的结构化处理日志，基础数据来源为 `collection_task_items`
 - 如需联动应用文本日志，应返回日志摘要或定位信息，不直接暴露服务器原始日志文件路径
+- 当前实现会返回 `task_id`、`task_status`、`source_type`、`trigger_type`、`action_name`、`result_status`、`failure_reason` 和结构化定位字段
 
 ### 14. 后台审计记录查询
 
