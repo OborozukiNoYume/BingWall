@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify db-migrate collect-bing run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing run clean
 
 MARKET ?= en-US
 COUNT ?= 1
@@ -27,6 +27,9 @@ test:
 	$(VENV_PYTHON) -m pytest
 
 verify: lint typecheck test
+
+verify-deploy:
+	$(VENV_PYTHON) scripts/verify_t1_6.py
 
 db-migrate:
 	$(VENV_PYTHON) -m app.repositories.migrations

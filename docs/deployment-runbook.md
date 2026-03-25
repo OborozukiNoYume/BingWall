@@ -2,13 +2,13 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-24T14:01:12Z
+- 更新时间：2026-03-25T12:27:30Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
 ## 当前状态说明
 
-当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端，以及阶段一 `T1.6` 的单机部署模板。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
+当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端，以及阶段一 `T1.6` 的单机部署模板与自动化部署验收入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
 
 ## 1. 部署目标
 
@@ -170,12 +170,34 @@
 - 数据库初始化命令：`make db-migrate`
 - 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
 - 本地开发验证命令：`make verify`
+- 仓库内自动化部署验收命令：`make verify-deploy`
 - 本地开发启动命令：`make run`
 - 最小健康检查接口：`GET /api/health/live`
 - 生产环境变量示例：`deploy/systemd/bingwall.env.example`
 - `systemd` 服务模板：`deploy/systemd/bingwall-api.service`
 - 目录权限模板：`deploy/systemd/bingwall.tmpfiles.conf`
 - Nginx 路由模板：`deploy/nginx/bingwall.conf`
+
+### 仓库内自动化部署验收
+
+当前仓库额外提供：
+
+- 验收脚本：`scripts/verify_t1_6.py`
+- 统一入口：`make verify-deploy`
+
+该验收入口会在不改写系统级 Nginx 和 `/etc/systemd/system` 的前提下，完成以下检查：
+
+- 对正式 `deploy/systemd/bingwall-api.service` 执行离线安全检查
+- 对正式 `deploy/systemd/bingwall.tmpfiles.conf` 执行根目录隔离的模板校验
+- 使用临时 `systemd --user` 服务拉起 FastAPI，并验证重启后恢复服务
+- 使用 Docker 官方 `nginx` 镜像加载正式路由模板，并验证公开页面、公开 API、前端静态资源和图片资源访问
+- 观察用户级 `journalctl` 日志和临时 Nginx 访问日志，确认应用启动成功和代理转发成功可区分
+
+说明：
+
+- 验收脚本默认把 Nginx 监听端口改写到临时本地端口 `18080`，避免占用真实 `80` 端口
+- 验收脚本不会修改 `/etc/systemd/system`、`/etc/nginx`、`/etc/tmpfiles.d`
+- 真实目标机上线前，仍需按本文件的生产步骤安装正式服务配置和真实 Nginx 配置
 
 ### 生产环境最小启动步骤
 
@@ -292,8 +314,8 @@
 
 建议按以下顺序执行并记录结果：
 
-1. 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
-2. 执行 `systemd-tmpfiles --create --prefix=/var/lib/bingwall --prefix=/var/log/bingwall --prefix=/etc/bingwall /opt/bingwall/app/deploy/systemd/bingwall.tmpfiles.conf`
+1. 在仓库根目录执行 `make verify-deploy`
+2. 在目标机按本文件“生产环境最小启动步骤”安装正式服务
 3. 在目标机执行 `nginx -t`
 4. 执行 `curl http://127.0.0.1/api/health/live`
 5. 执行 `curl http://127.0.0.1/api/public/site-info`
@@ -315,14 +337,13 @@
 
 ## 11. 当前已知缺口
 
-- 尚无真实部署脚本
 - 尚无 `/api/health/ready` 与 `/api/health/deep` 实现
 - 尚无备份脚本
 - 尚无 cron 级自动采集与手动任务消费脚本
 
 补充说明：
 
-- 当前仓库已提供生产环境 `systemd` 与 Nginx 模板文件，但尚未在本仓库所在机器完成真实 `nginx` 装载验证
-- 因系统中未安装 `nginx`，仓库内只能先校验配置模板是否齐备，真实代理转发需在目标部署机执行
+- 当前仓库已通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成 `T1.6` 自动化验收
+- 目标机仍需执行真实 Nginx 包安装、systemd 服务安装和公网域名接入，这些属于部署执行动作，不再阻塞阶段一验收
 
 这些缺口必须在阶段一和阶段二实施中逐项关闭。

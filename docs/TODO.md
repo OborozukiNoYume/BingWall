@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-24T13:14:16Z
+- 更新时间：2026-03-25T12:27:30Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：按阶段拆解的 TODO、依赖关系、来源映射与验收标准
 
@@ -180,7 +180,7 @@
 - [x] 编写 FastAPI 的 systemd 服务配置，覆盖启动、重启和失败恢复参数
 - [x] 补充 `README.md` 中的可复制启动说明，包含依赖安装、数据库初始化和服务启动命令
 - [x] 增加公开链路最小检查步骤，覆盖页面访问、API 访问、静态资源访问和日志观察方法
-- [ ] 验证 Nginx 转发、systemd 托管、资源目录权限和运行说明均满足阶段一部署验收标准（仓库内已完成模板测试、`systemd-analyze security --offline=yes` 离线解析和 `tmpfiles --root` 校验，真实 Nginx 转发与 systemd 启动仍需在目标机执行）
+- [x] 验证 Nginx 转发、systemd 托管、资源目录权限和运行说明均满足阶段一部署验收标准（已新增 `scripts/verify_t1_6.py` / `make verify-deploy`，并在当前仓库环境通过临时 `systemd --user` 服务、Docker 化 `nginx`、`systemd-analyze security --offline=yes` 和 `tmpfiles --root` 完成自动化验收）
 
 ## 阶段二：后台管理与运维补齐
 

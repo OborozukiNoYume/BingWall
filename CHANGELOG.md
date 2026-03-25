@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-25T12:27:30Z
+
+### 变更内容
+
+- 新增 [scripts/verify_t1_6.py](scripts/verify_t1_6.py)，把阶段一 `T1.6` 剩余的部署验收固化为可重复执行的自动化脚本，统一覆盖 `systemd` 单元离线校验、`tmpfiles` 模板校验、临时 `systemd --user` 服务重启验证、Docker 化 `nginx` 真实代理验证，以及页面/API/图片与日志检查
+- 更新 [Makefile](Makefile)，新增 `make verify-deploy` 统一命令入口，避免手工拼接部署验收命令
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/TODO.md](docs/TODO.md)，把 `T1.6` 状态从“待目标机部署验收”同步为“已完成自动化验收”，并补充验收边界、使用方式和后续优先级
+
+### 变更原因
+
+- 完成阶段一 `T1.6`，把原先依赖人工执行的部署验收收敛为仓库内可重复运行的自动化流程
+- 在不修改当前机器系统级 Nginx 和 systemd 配置的前提下，补齐公开页面、公开 API、静态资源、图片资源和日志链路的真实访问验证
+- 为阶段二开始前的回归验证保留稳定入口，避免后续修改部署模板后无法快速复验
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 使用现有系统能力：`docker`、`systemd-analyze`、`systemd-tmpfiles`、`systemd-run`、`systemctl --user`
+- 变更时间：`2026-03-25T12:27:30Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖阶段一部署验收脚本、统一命令入口、部署说明文档、项目状态文档和阶段 TODO 状态同步
+- 不涉及数据库表结构、采集链路、公开 API 规则、公开前端交互或任何阶段二业务逻辑
+- 验收脚本默认使用临时本地端口和临时工作目录，不会改写 `/etc/systemd/system`、`/etc/nginx` 或现有目标机配置
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_deploy_templates.py`
+- 执行 `./.venv/bin/python scripts/verify_t1_6.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 `scripts/verify_t1_6.py`、恢复 [Makefile](Makefile) 中的 `make verify-deploy` 入口，并回退相关文档更新，或执行 `git revert` 回退本次提交
+- 回滚后仓库将恢复到“已具备部署模板和说明，但部署验收仍主要依赖人工执行”的状态
+- 回滚不影响现有数据库、采集逻辑、公开 API、公开前端页面和部署模板本身
+
 ## 2026-03-24T14:01:12Z
 
 ### 变更内容

@@ -4,12 +4,12 @@
 
 BingWall 是一个围绕 Bing 壁纸构建的图片服务系统。一期目标不是做单一下载脚本，而是建设一个可持续采集、可管理、可对外服务、可扩展演进的内容系统。
 
-当前仓库已进入阶段一代码落地阶段，核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
+当前仓库已完成阶段一公开链路闭环，核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
 
 ## 当前状态
 
-- 项目阶段：阶段一 `T1.6` 已完成仓库内模板与说明，待目标机部署验收
-- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 采集与资源入库主链路、公开 API 最小集，以及基础公开前端
+- 项目阶段：阶段一已完成，下一优先级为阶段二 `T2.1`
+- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 采集与资源入库主链路、公开 API 最小集、基础公开前端，以及 `T1.6` 自动化部署验收
 - 当前文档状态：系统设计、模块说明、数据模型、API 约定、部署运行说明、项目状态与阶段 TODO 已同步到当前实现
 - 已确认运行时基线：`Python 3.14.2`、`Node.js 24.13.0`
 
@@ -46,6 +46,7 @@ cp .env.example .env
 make db-migrate
 make collect-bing MARKET=en-US COUNT=1
 make verify
+make verify-deploy
 make run
 ```
 
@@ -55,7 +56,19 @@ make run
 curl http://127.0.0.1:8000/api/health/live
 ```
 
-当前 `T1.1` 到 `T1.5` 已补齐内容：
+阶段一自动化部署验收命令：
+
+```bash
+make verify-deploy
+```
+
+说明：
+
+- 该命令会执行 `systemd` 单元离线校验、`tmpfiles` 目录模板校验、临时 `systemd --user` 服务拉起、Docker 化 `nginx` 真实代理验证，以及页面/API/图片与日志检查。
+- 验收默认使用临时本地端口 `18080`，避免占用真实系统 `80` 端口，不会改写 `/etc/systemd/system` 或现有 Nginx 配置。
+- 本机需要可用的 `docker`、`systemd-run`、`systemctl --user`、`systemd-analyze` 和 `systemd-tmpfiles`。
+
+当前 `T1.1` 到 `T1.6` 已补齐内容：
 
 - 后端目录骨架
 - `.python-version` 与 `.nvmrc` 运行时版本锁定
@@ -72,6 +85,9 @@ curl http://127.0.0.1:8000/api/health/live
 - `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面
 - `web/public/assets/site.css` 与 `web/public/assets/site.js` 页面静态资源
 - 前端页面只通过公开 API 获取业务数据，并在空结果、内容不存在、服务繁忙时显示明确提示
+- `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example` 单机部署模板
+- `scripts/verify_t1_6.py` 与 `make verify-deploy` 自动化部署验收入口
+- 已在当前仓库环境通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成公开页面、公开 API、静态资源、图片访问与日志校验
 
 公开 API 最小验证示例：
 
@@ -100,6 +116,8 @@ curl http://127.0.0.1:8000/wallpapers/1
 ## 阶段一单机部署说明
 
 以下命令用于把当前仓库部署到单机 Ubuntu 环境，目标是让公开页面、公开 API 和图片静态资源都通过 Nginx 对外访问。命令假定部署目录遵循 `docs/deployment-runbook.md` 中的一期约定，且部署账号具有 `sudo` 权限。
+
+在执行真实部署前，建议先在仓库根目录执行一次 `make verify-deploy`，确认模板、代理链路和最小日志观察口径都正常。
 
 ### 1. 准备系统用户、目录和代码
 
