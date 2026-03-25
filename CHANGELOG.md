@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 2026-03-25T13:55:53Z
+
+### 变更内容
+
+- 新增 [app/repositories/health_repository.py](app/repositories/health_repository.py)、[app/services/health.py](app/services/health.py) 与 [app/schemas/health.py](app/schemas/health.py)，落地就绪检查、深度检查、磁盘摘要、最近一次采集任务摘要和资源巡检结果结构
+- 更新 [app/api/health.py](app/api/health.py)，新增 `/api/health/ready` 与 `/api/health/deep`，并在数据库、目录或磁盘状态不满足要求时返回明确健康状态和 `503` 响应
+- 新增 [scripts/run_resource_inspection.py](scripts/run_resource_inspection.py) 并更新 [Makefile](Makefile)，提供 `make inspect-resources` 巡检入口，同时把新的巡检脚本纳入 `make typecheck` 校验范围
+- 新增 [tests/integration/test_health_checks.py](tests/integration/test_health_checks.py)，覆盖就绪检查成功/失败、深度检查摘要，以及资源文件缺失后资源状态失败、内容自动下线和公开接口隔离行为
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步 `T2.4` 完成状态、巡检命令、健康检查契约、部署运行说明和下一阶段优先级
+
+### 变更原因
+
+- 完成阶段二 `T2.4`，把健康检查与资源巡检从文档约束推进为可运行实现
+- 继续保持最保守方案，复用现有 SQLite、本地文件存储和 FastAPI，不引入任务队列、监控系统或额外依赖
+- 让资源丢失时的状态联动进入代码闭环，避免公开端继续暴露已失效的内容
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增运行入口：`make inspect-resources`
+- 调整验证入口：`make typecheck` 现包含 `scripts/run_resource_inspection.py`
+- 变更时间：`2026-03-25T13:55:53Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖健康检查 API、资源巡检脚本、资源状态联动、公开可见性隔离、运行命令和相关文档
+- 当正式资源文件缺失且该内容已处于公开启用状态时，巡检会把资源标记为失败，并将内容自动降级为 `disabled`
+- 不涉及数据库结构变更、备份恢复实现、cron 真实安装配置、阶段三扩展能力或依赖版本升级
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m ruff check .`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除健康检查 repository / service / schema、资源巡检脚本与测试，回退 `/api/health/ready`、`/api/health/deep`、`make inspect-resources` 和文档更新，或执行 `git revert` 回退本次提交
+- 若环境中已执行过资源巡检，回滚前应先确认是否需要恢复被自动降级为 `disabled` 的内容状态，以及是否要清理 `image_resources.failure_reason` 中新增的巡检失败原因
+- 回滚后仓库将恢复到“仅提供 `/api/health/live`、尚未具备资源巡检闭环”的状态
+
 ## 2026-03-25T13:39:04Z
 
 ### 变更内容

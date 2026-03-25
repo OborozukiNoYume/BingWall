@@ -2,13 +2,13 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-25T13:39:04Z
+- 更新时间：2026-03-25T13:55:53Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
 ## 当前状态说明
 
-当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
+当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查与资源巡检闭环。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
 
 ## 1. 部署目标
 
@@ -170,10 +170,11 @@
 - 数据库初始化命令：`make db-migrate`
 - 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
 - 手动采集任务消费命令：`make consume-collection-tasks`
+- 资源巡检命令：`make inspect-resources`
 - 本地开发验证命令：`make verify`
 - 仓库内自动化部署验收命令：`make verify-deploy`
 - 本地开发启动命令：`make run`
-- 最小健康检查接口：`GET /api/health/live`
+- 健康检查接口：`GET /api/health/live`、`GET /api/health/ready`、`GET /api/health/deep`
 - 生产环境变量示例：`deploy/systemd/bingwall.env.example`
 - `systemd` 服务模板：`deploy/systemd/bingwall-api.service`
 - 目录权限模板：`deploy/systemd/bingwall.tmpfiles.conf`
@@ -242,11 +243,12 @@
 
 ### 健康检查
 
-后续必须至少提供：
+当前已提供：
 
-- 存活检查方法
-- 就绪检查方法
-- 深度检查方法
+- `GET /api/health/live`：确认进程可响应
+- `GET /api/health/ready`：确认配置、数据库和关键目录可用；失败时返回 `503`
+- `GET /api/health/deep`：返回最近一次采集任务摘要、磁盘使用率和资源目录摘要；严重异常时返回 `503`
+- `make inspect-resources`：巡检数据库就绪资源与正式资源目录的一致性，发现资源缺失时自动刷新资源与内容状态
 
 ## 7. 日志要求
 
@@ -319,10 +321,13 @@
 2. 在目标机按本文件“生产环境最小启动步骤”安装正式服务
 3. 在目标机执行 `nginx -t`
 4. 执行 `curl http://127.0.0.1/api/health/live`
-5. 执行 `curl http://127.0.0.1/api/public/site-info`
-6. 执行 `curl http://127.0.0.1/`
-7. 如已有正式资源，执行 `curl -I http://127.0.0.1/images/<正式资源相对路径>`
-8. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
+5. 执行 `curl http://127.0.0.1/api/health/ready`
+6. 执行 `curl http://127.0.0.1/api/health/deep`
+7. 执行 `curl http://127.0.0.1/api/public/site-info`
+8. 执行 `curl http://127.0.0.1/`
+9. 如已有正式资源，执行 `curl -I http://127.0.0.1/images/<正式资源相对路径>`
+10. 执行 `make inspect-resources`
+11. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
 
 ### 完整上线检查（阶段二目标）
 
@@ -338,7 +343,6 @@
 
 ## 11. 当前已知缺口
 
-- 尚无 `/api/health/ready` 与 `/api/health/deep` 实现
 - 尚无备份脚本
 - 尚未完成目标机 cron 安装与计划配置
 

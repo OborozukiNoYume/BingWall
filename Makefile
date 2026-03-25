@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing consume-collection-tasks run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing consume-collection-tasks inspect-resources run clean
 
 MARKET ?= en-US
 COUNT ?= 1
@@ -21,7 +21,7 @@ lint:
 	$(VENV_PYTHON) -m ruff check .
 
 typecheck:
-	$(VENV_PYTHON) -m mypy app tests
+	$(VENV_PYTHON) -m mypy app tests scripts/run_resource_inspection.py
 
 test:
 	$(VENV_PYTHON) -m pytest
@@ -39,6 +39,9 @@ collect-bing:
 
 consume-collection-tasks:
 	$(VENV_PYTHON) -m app.collectors.manual_tasks
+
+inspect-resources:
+	$(VENV_PYTHON) scripts/run_resource_inspection.py
 
 run:
 	$(VENV_PYTHON) -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
