@@ -15,6 +15,7 @@ from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import bind_trace_id, configure_logging, reset_trace_id
 from app.web import get_assets_dir
+from app.web import get_admin_assets_dir
 from app.web import router as web_router
 
 
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(ApiError, api_error_exception_handler)
     app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
     app.mount("/assets", StaticFiles(directory=get_assets_dir()), name="assets")
+    app.mount("/admin-assets", StaticFiles(directory=get_admin_assets_dir()), name="admin-assets")
     app.mount(
         "/images",
         StaticFiles(directory=settings.storage_public_dir, check_dir=False),

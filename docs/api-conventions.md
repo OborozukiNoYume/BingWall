@@ -316,6 +316,25 @@
 - 支持 `created_from_utc`
 - 支持 `created_to_utc`
 
+响应数据结构（`data.items[*]`）至少包含：
+
+- `id`
+- `title`
+- `market_code`
+- `wallpaper_date`
+- `source_type`
+- `source_name`
+- `content_status`
+- `resource_status`
+- `image_status`
+- `is_public`
+- `is_downloadable`
+- `preview_url`
+- `width`、`height`
+- `failure_reason`
+- `created_at_utc`
+- `updated_at_utc`
+
 ### 7. 后台内容详情
 
 - 方法：`GET`
@@ -329,6 +348,14 @@
 - 当前状态
 - 失败原因
 - 最近操作记录
+
+当前实现会返回以下核心字段：
+
+- 展示字段：`title`、`subtitle`、`description`、`copyright_text`、`location_text`
+- 来源字段：`source_type`、`source_name`、`source_key`、`market_code`、`wallpaper_date`、`published_at_utc`
+- 资源信息：`resource_relative_path`、`preview_url`、`resource_type`、`storage_backend`、`mime_type`、`file_size_bytes`、`width`、`height`、`origin_page_url`、`origin_image_url`
+- 当前状态：`content_status`、`resource_status`、`image_status`、`is_public`、`is_downloadable`、`deleted_at_utc`
+- 最近操作记录：`recent_operations[*].admin_username`、`action_type`、`before_state`、`after_state`、`trace_id`、`created_at_utc`
 
 ### 8. 后台内容状态切换
 
@@ -348,6 +375,9 @@
 
 - 非法状态流转必须返回明确错误码
 - 必须写入审计日志
+- 当前实现仅支持 `enabled`、`disabled`、`deleted` 三个目标状态
+- 当前实现允许 `draft -> enabled`、`enabled -> disabled`、`disabled -> enabled`、任意非删除状态 `-> deleted`
+- 当目标状态为 `enabled` 时，必须同时满足 `resource_status = ready` 且默认资源 `image_status = ready`
 
 ### 9. 手动采集任务创建
 
@@ -439,6 +469,20 @@
 - `target_id`
 - `started_from_utc`
 - `started_to_utc`
+
+响应数据结构（`data.items[*]`）至少包含：
+
+- `id`
+- `admin_user_id`
+- `admin_username`
+- `action_type`
+- `target_type`
+- `target_id`
+- `before_state`
+- `after_state`
+- `request_source`
+- `trace_id`
+- `created_at_utc`
 
 ### 15. 健康检查
 

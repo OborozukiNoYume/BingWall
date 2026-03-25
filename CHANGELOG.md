@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 2026-03-25T13:12:07Z
+
+### 变更内容
+
+- 新增 [app/schemas/admin_content.py](app/schemas/admin_content.py)、[app/repositories/admin_content_repository.py](app/repositories/admin_content_repository.py) 与 [app/services/admin_content.py](app/services/admin_content.py)，落地后台内容列表、详情、状态切换和审计查询的 schema、SQLite 查询逻辑与状态流转服务
+- 更新 [app/api/admin/routes.py](app/api/admin/routes.py)，接入 `/api/admin/wallpapers`、`/api/admin/wallpapers/{wallpaper_id}`、`/api/admin/wallpapers/{wallpaper_id}/status` 与 `/api/admin/audit-logs`，并复用既有后台会话鉴权能力
+- 更新 [app/web/routes.py](app/web/routes.py)、[app/web/__init__.py](app/web/__init__.py) 与 [app/main.py](app/main.py)，新增 `/admin/login`、`/admin`、`/admin/wallpapers/{wallpaper_id}`、`/admin/audit-logs` 后台页面，以及 `/admin-assets/*` 后台静态资源挂载
+- 新增 [web/admin/assets/admin.js](web/admin/assets/admin.js) 与 [web/admin/assets/admin.css](web/admin/assets/admin.css)，实现后台登录页、内容管理页、内容详情页和审计记录页的最小前端，并约束页面仅通过后台 API 工作
+- 新增 [tests/integration/test_admin_content.py](tests/integration/test_admin_content.py) 与 [tests/integration/test_admin_frontend.py](tests/integration/test_admin_frontend.py)，并更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，覆盖状态切换、非法流转拦截、审计查询、后台页面壳和公开可见性联动
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md) 与 [docs/api-conventions.md](docs/api-conventions.md)，同步 `T2.2` 完成状态、后台接口契约、验证方式和下一阶段优先级
+
+### 变更原因
+
+- 完成阶段二 `T2.2`，把后台内容管理、状态切换和审计查询从设计文档推进为可运行实现
+- 保持保守范围，继续沿用 FastAPI 托管页面骨架与原生 HTML/CSS/JavaScript，不提前展开手动采集任务页、日志页或新前端框架引入
+- 保证后台页面全部经由后台 API 工作，同时让状态切换结果能与公开接口可见性形成可验证联动
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 继续使用现有 FastAPI、Pydantic、SQLite 与原生前端资源组织方式
+- 变更时间：`2026-03-25T13:12:07Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖后台内容管理 API、后台页面、审计查询、内容状态流转、审计日志写入和相关集成测试
+- 被禁用或逻辑删除的内容将不再通过公开接口返回；后台详情页会展示失败原因和最近操作记录
+- 不涉及采集主链路、任务消费 cron、健康检查、备份恢复、部署模板或依赖版本升级
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m ruff check .`
+- 执行 `./.venv/bin/python -m mypy app tests`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除后台内容管理服务、后台页面与测试，回退相关 API 路由和文档更新，或执行 `git revert` 回退本次提交
+- 若环境中已有管理员执行过内容状态切换，回滚代码前应先确认当前内容状态是否需要手工恢复，以避免公开端与运营预期不一致
+- 回滚后仓库将恢复到“具备后台登录与会话控制，但尚未提供后台内容管理与审计查询页面”的状态
+
 ## 2026-03-25T12:49:06Z
 
 ### 变更内容

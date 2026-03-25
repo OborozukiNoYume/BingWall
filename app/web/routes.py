@@ -12,6 +12,10 @@ def get_assets_dir() -> Path:
     return project_root() / "web" / "public" / "assets"
 
 
+def get_admin_assets_dir() -> Path:
+    return project_root() / "web" / "admin" / "assets"
+
+
 def project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -44,6 +48,57 @@ def get_public_wallpaper_detail_page(wallpaper_id: int) -> HTMLResponse:
         page_heading="壁纸详情",
         page_summary="查看单张壁纸的完整说明、预览和下载能力。",
         wallpaper_id=wallpaper_id,
+    )
+
+
+@router.get("/admin/login", response_class=HTMLResponse)
+def get_admin_login_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-login",
+        page_title="BingWall Admin | 登录",
+        page_heading="后台登录",
+        page_summary="使用后台认证接口建立受控会话，再进入内容管理与审计页面。",
+    )
+
+
+@router.get("/admin", response_class=HTMLResponse)
+def get_admin_wallpaper_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-wallpapers",
+        page_title="BingWall Admin | 内容管理",
+        page_heading="内容管理",
+        page_summary="查看内容列表、资源状态和失败原因，并通过后台 API 执行启用、禁用或逻辑删除。",
+    )
+
+
+@router.get("/admin/wallpapers", response_class=HTMLResponse)
+def get_admin_wallpapers_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-wallpapers",
+        page_title="BingWall Admin | 内容管理",
+        page_heading="内容管理",
+        page_summary="查看内容列表、资源状态和失败原因，并通过后台 API 执行启用、禁用或逻辑删除。",
+    )
+
+
+@router.get("/admin/wallpapers/{wallpaper_id}", response_class=HTMLResponse)
+def get_admin_wallpaper_detail_page(wallpaper_id: int) -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-detail",
+        page_title="BingWall Admin | 内容详情",
+        page_heading="内容详情",
+        page_summary="查看展示字段、来源字段、资源信息、当前状态和最近操作记录。",
+        wallpaper_id=wallpaper_id,
+    )
+
+
+@router.get("/admin/audit-logs", response_class=HTMLResponse)
+def get_admin_audit_logs_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-audit",
+        page_title="BingWall Admin | 审计记录",
+        page_heading="审计记录",
+        page_summary="按对象和时间范围查询后台审计记录，并关联操作者和 trace_id。",
     )
 
 
@@ -97,6 +152,63 @@ def render_public_page(
       </footer>
     </div>
     <script type="module" src="/assets/site.js"></script>
+  </body>
+</html>
+"""
+    return HTMLResponse(content=html)
+
+
+def render_admin_page(
+    *,
+    page_name: str,
+    page_title: str,
+    page_heading: str,
+    page_summary: str,
+    wallpaper_id: int | None = None,
+) -> HTMLResponse:
+    wallpaper_id_attr = f' data-wallpaper-id="{wallpaper_id}"' if wallpaper_id is not None else ""
+    html = f"""<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{page_title}</title>
+    <link rel="stylesheet" href="/admin-assets/admin.css" />
+  </head>
+  <body data-page="{page_name}"{wallpaper_id_attr}>
+    <div class="admin-shell">
+      <header class="admin-header">
+        <div>
+          <a class="admin-brand" href="/admin/wallpapers">BingWall Admin</a>
+          <p class="admin-caption">后台页面只通过 <code>/api/admin/*</code> 读取与修改数据。</p>
+        </div>
+        <nav class="admin-nav" aria-label="后台导航">
+          <a href="/admin/wallpapers">内容管理</a>
+          <a href="/admin/audit-logs">审计记录</a>
+          <a href="/admin/login">登录</a>
+        </nav>
+      </header>
+      <main class="admin-main">
+        <section class="admin-hero">
+          <p class="admin-eyebrow">管理后台</p>
+          <h1>{page_heading}</h1>
+          <p class="admin-summary">{page_summary}</p>
+          <div class="admin-session-bar">
+            <p class="admin-session-copy" data-admin-session>正在检查后台会话...</p>
+            <button class="ghost-button" type="button" data-admin-logout>退出登录</button>
+          </div>
+        </section>
+        <section class="admin-panel" id="admin-root" aria-live="polite">
+          <noscript>
+            <div class="notice-card notice-card-warning">
+              <h2>需要启用 JavaScript</h2>
+              <p>当前后台页面完全依赖后台 API，请启用浏览器 JavaScript 后重试。</p>
+            </div>
+          </noscript>
+        </section>
+      </main>
+    </div>
+    <script type="module" src="/admin-assets/admin.js"></script>
   </body>
 </html>
 """

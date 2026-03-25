@@ -194,6 +194,9 @@ def seed_wallpaper(
     content_status: str = "enabled",
     is_public: bool = True,
     is_downloadable: bool = True,
+    resource_status: str = "ready",
+    image_status: str = "ready",
+    failure_reason: str | None = None,
     publish_start_at_utc: str = "2000-01-01T00:00:00Z",
     publish_end_at_utc: str | None = "2100-01-01T00:00:00Z",
 ) -> int:
@@ -225,7 +228,7 @@ def seed_wallpaper(
                 created_at_utc,
                 updated_at_utc
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ready', ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "bing",
@@ -246,6 +249,7 @@ def seed_wallpaper(
                 f"https://www.bing.com/{slugify(title)}.jpg",
                 1920,
                 1080,
+                resource_status,
                 now_utc,
                 now_utc,
             ),
@@ -273,11 +277,12 @@ def seed_wallpaper(
                 downloaded_at_utc,
                 integrity_check_result,
                 image_status,
+                failure_reason,
                 last_processed_at_utc,
                 created_at_utc,
                 updated_at_utc
             )
-            VALUES (?, 'original', 'local', ?, ?, 'jpg', 'image/jpeg', 1024, 1920, 1080, ?, ?, ?, ?, 'passed', 'ready', ?, ?, ?);
+            VALUES (?, 'original', 'local', ?, ?, 'jpg', 'image/jpeg', 1024, 1920, 1080, ?, ?, ?, ?, 'passed', ?, ?, ?, ?, ?);
             """,
             (
                 wallpaper_id,
@@ -287,6 +292,8 @@ def seed_wallpaper(
                 f"hash-{slugify(title)}",
                 f"content-{slugify(title)}",
                 now_utc,
+                image_status,
+                failure_reason,
                 now_utc,
                 now_utc,
                 now_utc,
