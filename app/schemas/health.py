@@ -69,6 +69,19 @@ class ResourceDirectorySummary(BaseModel):
     total_resource_count: int
 
 
+class LatestRestoreVerificationStatus(BaseModel):
+    verification_id: str
+    snapshot_id: str
+    status: Literal["passed", "failed"]
+    verified_at_utc: str
+    deep_health_status: Literal["ok", "degraded", "fail"]
+    public_home_status_code: int
+    public_api_status_code: int
+    admin_api_status_code: int
+    resource_inspection_missing_count: int
+    record_path: str
+
+
 class DeepHealthResponse(BaseModel):
     status: Literal["ok", "degraded", "fail"]
     service: str
@@ -80,6 +93,7 @@ class DeepHealthResponse(BaseModel):
     disk_usage: list[DiskUsageStatus]
     latest_collection_task: LatestCollectionTaskStatus | None
     resource_directory: ResourceDirectorySummary
+    latest_restore_verification: LatestRestoreVerificationStatus | None
 
 
 class ResourceInspectionItem(BaseModel):

@@ -2,13 +2,13 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-25T13:55:53Z
+- 更新时间：2026-03-25T14:24:30Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
 ## 当前状态说明
 
-当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查与资源巡检闭环。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
+当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查与资源巡检闭环、阶段二 `T2.5` 的备份恢复脚本与恢复演练入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
 
 ## 1. 部署目标
 
@@ -171,8 +171,11 @@
 - 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
 - 手动采集任务消费命令：`make consume-collection-tasks`
 - 资源巡检命令：`make inspect-resources`
+- 备份命令：`make backup`
+- 恢复命令：`make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1`
 - 本地开发验证命令：`make verify`
 - 仓库内自动化部署验收命令：`make verify-deploy`
+- 仓库内恢复演练命令：`make verify-backup-restore`
 - 本地开发启动命令：`make run`
 - 健康检查接口：`GET /api/health/live`、`GET /api/health/ready`、`GET /api/health/deep`
 - 生产环境变量示例：`deploy/systemd/bingwall.env.example`
@@ -293,6 +296,23 @@
 - 数据库与图片目录备份应尽量保持同一时间点语义
 - 备份产物必须保留多个周期
 
+### 当前仓库实现
+
+- 备份入口：`scripts/run_backup.py`，统一入口：`make backup`
+- 备份产物默认落在 `BINGWALL_BACKUP_DIR` 对应目录下的单次快照目录，包含 `manifest.json`、`backup.log` 和 `artifacts/`
+- 数据库备份使用 Python `sqlite3.Connection.backup(...)` 执行一致性备份，不直接拷贝活跃数据库文件
+- 当前会同时归档正式资源目录、配置目录、日志目录，以及 Nginx / systemd / tmpfiles 部署配置
+
+建议先在目标机确认以下路径存在且权限正确：
+
+- 数据库文件
+- 正式资源目录
+- 配置目录
+- 日志目录
+- Nginx 配置文件
+- `systemd` 服务文件
+- `tmpfiles` 配置文件
+
 ## 9. 恢复要求
 
 恢复顺序：
@@ -303,6 +323,23 @@
 4. 启动应用
 5. 执行资源巡检
 6. 验证公开接口、后台接口和静态资源访问
+
+### 当前仓库实现
+
+- 恢复入口：`scripts/run_restore.py`，统一入口：`make restore`
+- 恢复默认要求显式传入 `--force` 才会覆盖已有数据库文件或非空目录
+- 恢复会生成独立 `restore.log` 和恢复记录 JSON，便于追踪执行时间、目标范围和结果摘要
+- `scripts/verify_t2_5.py` 与 `make verify-backup-restore` 可在隔离目录中执行一次完整恢复演练
+
+### 恢复手册（最小步骤）
+
+1. 执行 `make backup`，确认最新快照目录已生成 `manifest.json`
+2. 如需先做隔离演练，执行 `make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1`
+3. 如需原位恢复，执行 `./.venv/bin/python scripts/run_restore.py --snapshot /var/backups/bingwall/<snapshot> --database-path /var/lib/bingwall/data/bingwall.sqlite3 --public-dir /var/lib/bingwall/images/public --config-dir /etc/bingwall --log-dir /var/log/bingwall --backup-dir /var/backups/bingwall --nginx-config-path /etc/nginx/sites-available/bingwall.conf --systemd-service-path /etc/systemd/system/bingwall-api.service --tmpfiles-config-path /etc/tmpfiles.d/bingwall.conf --force`
+4. 恢复完成后启动或重启应用与代理服务
+5. 执行 `curl http://127.0.0.1/api/health/deep`
+6. 执行 `make inspect-resources`
+7. 验证 `curl http://127.0.0.1/`、`curl http://127.0.0.1/api/public/site-info` 和后台登录/后台列表接口
 
 ## 10. 上线前检查清单
 
@@ -339,11 +376,11 @@
 - cron 已加载
 - 健康检查可访问
 - 首次备份可执行
+- 首次恢复演练可执行
 - 首次手动采集已验证
 
 ## 11. 当前已知缺口
 
-- 尚无备份脚本
 - 尚未完成目标机 cron 安装与计划配置
 
 补充说明：

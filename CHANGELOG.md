@@ -1,5 +1,48 @@
 # CHANGELOG
 
+## 2026-03-25T14:24:30Z
+
+### 变更内容
+
+- 新增 [app/services/backup_restore.py](app/services/backup_restore.py)、[scripts/run_backup.py](scripts/run_backup.py) 与 [scripts/run_restore.py](scripts/run_restore.py)，实现 SQLite 一致性备份、正式资源目录/配置目录/日志目录归档，以及 Nginx / `systemd` / `tmpfiles` 配置备份与恢复
+- 新增 [scripts/verify_t2_5.py](scripts/verify_t2_5.py) 与 [tests/integration/test_backup_restore.py](tests/integration/test_backup_restore.py)，把“备份 -> 恢复 -> 公开页面/公开 API/后台 API/深度健康检查/资源巡检验证”落成自动化恢复演练
+- 更新 [app/schemas/health.py](app/schemas/health.py) 与 [app/services/health.py](app/services/health.py)，让 `/api/health/deep` 返回最近一次恢复验证记录摘要
+- 更新 [Makefile](Makefile)，新增 `make backup`、`make restore` 与 `make verify-backup-restore`，并把新的运维脚本纳入 `make typecheck`
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步 `T2.5` 完成状态、恢复手册、命令入口、健康检查契约和后续优先级
+
+### 变更原因
+
+- 完成阶段二 `T2.5`，把“备份、恢复、恢复演练、恢复记录可追踪”从设计约束推进为可运行实现
+- 继续保持单机保守方案，复用现有 SQLite、本地文件系统、FastAPI 和运维脚本，不引入对象存储、外部备份服务或额外依赖
+- 让恢复结果可通过健康检查和自动化演练直接验证，避免只有脚本、没有验收链路
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增运行入口：`make backup`、`make restore`、`make verify-backup-restore`
+- 变更时间：`2026-03-25T14:24:30Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖备份恢复脚本、深度健康检查响应、运维命令入口和相关文档
+- 新的备份产物会同时覆盖数据库、正式资源目录、配置目录、日志目录以及 Nginx / `systemd` / `tmpfiles` 部署配置
+- 恢复演练成功后，`/api/health/deep` 可返回最近一次恢复验证记录摘要，便于追踪最近一次演练结果
+- 不涉及数据库结构变更、公开业务规则变更、后台业务流程变更、目标机 `cron` 真实安装配置或阶段三扩展能力
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m ruff check .`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_backup.py scripts/run_restore.py scripts/run_resource_inspection.py scripts/verify_t2_5.py`
+- 执行 `make verify`
+- 执行 `./.venv/bin/python scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除备份恢复 service / 脚本 / 测试，回退 `/api/health/deep` 的恢复验证字段、`make backup` / `make restore` / `make verify-backup-restore` 和相关文档更新，或执行 `git revert` 回退本次提交
+- 若环境中已生成新的备份快照、恢复记录或恢复验证记录，回滚前应先确认这些产物是否需要保留归档，避免误删最近一次演练证据
+- 回滚后仓库将恢复到“已具备健康检查与资源巡检，但尚未提供备份恢复闭环和恢复演练记录”的状态
+
 ## 2026-03-25T13:55:53Z
 
 ### 变更内容

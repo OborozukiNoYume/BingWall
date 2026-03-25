@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+import json
 import logging
 import os
 from pathlib import Path
@@ -16,11 +17,13 @@ from app.schemas.health import DeepHealthResponse
 from app.schemas.health import DirectoryHealthStatus
 from app.schemas.health import DiskUsageStatus
 from app.schemas.health import HealthDependencyStatus
+from app.schemas.health import LatestRestoreVerificationStatus
 from app.schemas.health import LatestCollectionTaskStatus
 from app.schemas.health import ReadyHealthResponse
 from app.schemas.health import ResourceDirectorySummary
 from app.schemas.health import ResourceInspectionItem
 from app.schemas.health import ResourceInspectionSummary
+from app.services.backup_restore import RESTORE_VERIFICATION_DIR_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +65,7 @@ class HealthService:
         disk_usage = self._build_disk_usage()
         latest_task = self._build_latest_collection_task()
         resource_directory = self._build_resource_directory_summary()
+        latest_restore_verification = self._build_latest_restore_verification()
 
         overall_status: DeepStatus = "ok"
         if ready.status == "fail" or any(item.status == "fail" for item in disk_usage):
@@ -80,6 +84,7 @@ class HealthService:
             disk_usage=disk_usage,
             latest_collection_task=latest_task,
             resource_directory=resource_directory,
+            latest_restore_verification=latest_restore_verification,
         )
 
     def _check_configuration(self) -> HealthDependencyStatus:
@@ -206,6 +211,31 @@ class HealthService:
             failed_resource_count=int(row["failed_resource_count"] or 0),
             total_resource_count=int(row["total_resource_count"] or 0),
         )
+
+    def _build_latest_restore_verification(self) -> LatestRestoreVerificationStatus | None:
+        records_dir = self.settings.backup_dir / RESTORE_VERIFICATION_DIR_NAME
+        if not records_dir.is_dir():
+            return None
+
+        latest_record: tuple[datetime, LatestRestoreVerificationStatus] | None = None
+        for record_path in sorted(records_dir.glob("*.json")):
+            try:
+                payload = json.loads(record_path.read_text(encoding="utf-8"))
+                payload["record_path"] = str(record_path)
+                record = LatestRestoreVerificationStatus.model_validate(payload)
+                verified_at = datetime.fromisoformat(
+                    record.verified_at_utc.replace("Z", "+00:00")
+                ).astimezone(UTC)
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                logger.warning("Skip invalid restore verification record path=%s", record_path)
+                continue
+
+            if latest_record is None or verified_at > latest_record[0]:
+                latest_record = (verified_at, record)
+
+        if latest_record is None:
+            return None
+        return latest_record[1]
 
 
 class ResourceInspectionService:

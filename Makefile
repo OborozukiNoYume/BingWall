@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing consume-collection-tasks inspect-resources run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing consume-collection-tasks inspect-resources backup restore verify-backup-restore run clean
 
 MARKET ?= en-US
 COUNT ?= 1
@@ -21,7 +21,7 @@ lint:
 	$(VENV_PYTHON) -m ruff check .
 
 typecheck:
-	$(VENV_PYTHON) -m mypy app tests scripts/run_resource_inspection.py
+	$(VENV_PYTHON) -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py
 
 test:
 	$(VENV_PYTHON) -m pytest
@@ -42,6 +42,16 @@ consume-collection-tasks:
 
 inspect-resources:
 	$(VENV_PYTHON) scripts/run_resource_inspection.py
+
+backup:
+	$(VENV_PYTHON) scripts/run_backup.py
+
+restore:
+	@if [ -z "$(SNAPSHOT)" ]; then echo "SNAPSHOT is required, e.g. make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1"; exit 1; fi
+	@if [ -n "$(TARGET_ROOT)" ]; then $(VENV_PYTHON) scripts/run_restore.py --snapshot "$(SNAPSHOT)" --target-root "$(TARGET_ROOT)" $(if $(FORCE),--force,); else $(VENV_PYTHON) scripts/run_restore.py --snapshot "$(SNAPSHOT)" $(if $(FORCE),--force,); fi
+
+verify-backup-restore:
+	$(VENV_PYTHON) scripts/verify_t2_5.py
 
 run:
 	$(VENV_PYTHON) -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
