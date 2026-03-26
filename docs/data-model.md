@@ -287,7 +287,8 @@
 | `download_channel` | string | 是 | 下载入口来源，如 `public_detail` |
 | `client_ip_hash` | string | 否 | 客户端 IP 摘要 |
 | `user_agent` | string | 否 | 客户端标识摘要 |
-| `result_status` | string | 是 | 登记结果，如 `redirected`、`blocked` |
+| `result_status` | string | 是 | 登记结果，如 `redirected`、`blocked`、`degraded` |
+| `redirect_url` | string | 否 | 本次登记返回给客户端的静态资源地址 |
 | `occurred_at_utc` | datetime | 是 | 发生时间 |
 | `created_at_utc` | datetime | 是 | 创建时间 |
 
@@ -383,6 +384,8 @@
 
 - `(wallpaper_id, occurred_at_utc)` 内容下载趋势索引
 - `(resource_id, occurred_at_utc)` 资源版本下载索引
+- `(result_status, occurred_at_utc)` 下载结果趋势索引
+- `(market_code, occurred_at_utc)` 地区维度统计索引
 
 ## 实施注意事项
 

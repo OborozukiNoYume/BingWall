@@ -651,25 +651,84 @@
 ```json
 {
   "wallpaper_id": 1,
-  "resource_id": 10,
   "download_channel": "public_detail"
 }
 ```
+
+补充说明：
+
+- `resource_id` 当前实现为可选字段；若客户端不传，服务端会按当前公开详情实际可下载资源自动解析
+- 当前 `download_channel` 固定使用 `public_detail`
 
 响应数据结构（`data` 字段）：
 
 ```json
 {
   "redirect_url": "/images/bing/2026/03/en-US/example.jpg",
-  "event_id": 5001
+  "event_id": 5001,
+  "recorded": true,
+  "result_status": "redirected"
 }
 ```
 
 约束：
 
 - 下载登记接口只负责记录事件与返回跳转地址，不直接传输大文件
-- 登记失败时应返回明确错误码，或在降级策略下记录日志后继续返回静态资源地址
+- 当内容不可下载时，接口应返回明确错误码，并把结果记为 `blocked`
+- 当登记写库失败但已解析出静态资源地址时，允许返回 `recorded = false`、`result_status = degraded` 并记录降级日志
 - 下载统计不得暴露客户端原始 IP
+
+#### 后台下载统计
+
+- 方法：`GET`
+- 路径：`/api/admin/download-stats`
+
+查询参数：
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `days` | integer | 否 | 统计窗口天数，当前支持 `1` 到 `90` |
+| `top_limit` | integer | 否 | 热门内容返回数量，当前支持 `1` 到 `20` |
+
+响应数据结构（`data` 字段）：
+
+```json
+{
+  "summary": {
+    "total_events": 18,
+    "redirected_events": 15,
+    "blocked_events": 2,
+    "degraded_events": 1,
+    "unique_wallpapers": 6,
+    "unique_markets": 3,
+    "latest_occurred_at_utc": "2026-03-26T14:30:00Z"
+  },
+  "top_wallpapers": [
+    {
+      "wallpaper_id": 12,
+      "title": "Spring Hills",
+      "market_code": "en-US",
+      "wallpaper_date": "2026-03-26",
+      "download_count": 5
+    }
+  ],
+  "daily_trends": [
+    {
+      "trend_date": "2026-03-26",
+      "total_events": 4,
+      "redirected_events": 3,
+      "blocked_events": 1,
+      "degraded_events": 0
+    }
+  ]
+}
+```
+
+约束：
+
+- 后台统计只聚合下载登记事件，不统计真实静态服务器日志
+- 热门内容当前按 `redirected` 成功登记次数排序
+- 趋势按 UTC 日期聚合
 
 ## 下载策略约定
 

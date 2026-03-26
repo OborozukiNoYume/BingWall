@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 2026-03-26T14:38:59Z
+
+### 变更内容
+
+- 新增 [app/repositories/migrations/versions/V0005__download_events.sql](app/repositories/migrations/versions/V0005__download_events.sql)、[app/repositories/download_repository.py](app/repositories/download_repository.py)、[app/services/downloads.py](app/services/downloads.py) 与 [app/schemas/admin_downloads.py](app/schemas/admin_downloads.py)，落地下载登记表、公开下载目标解析、后台下载统计聚合和对应 schema
+- 更新 [app/api/public/routes.py](app/api/public/routes.py)、[app/api/admin/routes.py](app/api/admin/routes.py)、[app/schemas/public.py](app/schemas/public.py)、[app/web/routes.py](app/web/routes.py)、[web/public/assets/site.js](web/public/assets/site.js) 与 [web/admin/assets/admin.js](web/admin/assets/admin.js)，新增 `POST /api/public/download-events`、`GET /api/admin/download-stats`、`/admin/download-stats`，并把公开详情页下载按钮改为“先登记，再跳转静态资源”
+- 更新 [tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)、[tests/integration/test_public_api.py](tests/integration/test_public_api.py)、[tests/integration/test_download_statistics.py](tests/integration/test_download_statistics.py)、[tests/integration/test_admin_frontend.py](tests/integration/test_admin_frontend.py) 与 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，覆盖迁移、公开下载登记、后台统计接口以及前后台页面壳引用
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/data-model.md](docs/data-model.md) 与 [docs/api-conventions.md](docs/api-conventions.md)，同步 `T3.5` 完成状态、接口契约、数据字段、验证方式和后续优先级
+
+### 变更原因
+
+- 完成阶段三 `T3.5`，把“下载登记 + 后台趋势统计”的设计约束推进为可运行实现
+- 继续保持最保守范围，复用现有 FastAPI、SQLite、原生前端和静态资源链路，不让应用服务承担大文件主传输
+- 让下载行为可追踪、可聚合、可在后台观测，同时保留 `T3.4` 已有的本地与 OSS / CDN 静态资源兼容能力
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增数据库迁移：`V0005__download_events.sql`
+- 变更时间：`2026-03-26T14:38:59Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开详情下载按钮行为、下载登记落库、后台下载统计接口与页面、迁移校验和相关文档
+- 公开下载现在先通过 `/api/public/download-events` 登记，再跳转到 `/images/*` 或 OSS / CDN 静态资源地址；真实文件传输主流量仍不经过应用服务
+- 后台现在可通过 `/api/admin/download-stats` 和 `/admin/download-stats` 查看最近 7 / 30 / 90 天的总量、热门内容和按日趋势
+- 本次不包含 Nginx 下载日志采集、对象存储上传、地区偏好分析、来源对比分析或搜索能力实现
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_sqlite_migrations.py tests/integration/test_public_api.py tests/integration/test_download_statistics.py tests/integration/test_admin_frontend.py tests/integration/test_public_frontend.py`
+- 执行 `make format`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除下载登记迁移、下载 repository / service / schema、公开和后台统计接口、前后台页面接入与相关测试，或执行 `git revert` 回退本次提交
+- 若环境中已经写入 `download_events` 数据，回滚前应确认是否需要保留这些统计明细，避免清理后丢失已观测到的下载趋势数据
+- 回滚后仓库将恢复到“公开详情直接给出静态下载地址、后台尚未提供下载统计、`T3.5` 仍停留在设计预留状态”的状态
+
 ## 2026-03-26T14:04:36Z
 
 ### 变更内容

@@ -17,6 +17,7 @@ from app.core.config import get_settings
 from app.repositories.admin_auth_repository import AdminAuthRepository
 from app.repositories.admin_collection_repository import AdminCollectionRepository
 from app.repositories.admin_content_repository import AdminContentRepository
+from app.repositories.download_repository import DownloadRepository
 from app.schemas.admin_collection import AdminCollectionLogListData
 from app.schemas.admin_collection import AdminCollectionLogListQuery
 from app.schemas.admin_collection import AdminCollectionTaskCreateData
@@ -29,6 +30,8 @@ from app.schemas.admin_auth import AdminLoginData
 from app.schemas.admin_auth import AdminLoginRequest
 from app.schemas.admin_auth import AdminLogoutData
 from app.schemas.admin_auth import AdminSessionContext
+from app.schemas.admin_downloads import AdminDownloadStatsData
+from app.schemas.admin_downloads import AdminDownloadStatsQuery
 from app.schemas.admin_content import AdminAuditLogListData
 from app.schemas.admin_content import AdminAuditLogListQuery
 from app.schemas.admin_content import AdminTagCreateRequest
@@ -48,6 +51,7 @@ from app.schemas.common import SuccessEnvelope
 from app.services.admin_collection import AdminCollectionService
 from app.services.admin_auth import AdminAuthService
 from app.services.admin_content import AdminContentService
+from app.services.downloads import DownloadService
 from app.services.resource_locator import ResourceLocator
 
 logger = logging.getLogger(__name__)
@@ -122,6 +126,27 @@ def get_admin_collection_service(
         repository,
         session_secret=settings.security_session_secret.get_secret_value(),
         settings=settings,
+    )
+
+
+def get_download_repository(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Iterator[DownloadRepository]:
+    repository = DownloadRepository(settings.database_path)
+    try:
+        yield repository
+    finally:
+        repository.close()
+
+
+def get_download_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[DownloadRepository, Depends(get_download_repository)],
+) -> DownloadService:
+    return DownloadService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+        session_secret=settings.security_session_secret.get_secret_value(),
     )
 
 
@@ -496,3 +521,24 @@ def list_admin_collection_logs(
         data=data.model_dump(),
         pagination=pagination.model_dump(),
     )
+
+
+@router.get(
+    "/download-stats",
+    response_model=SuccessEnvelope[AdminDownloadStatsData],
+    responses=ERROR_RESPONSES,
+)
+def get_admin_download_stats(
+    request: Request,
+    query: Annotated[AdminDownloadStatsQuery, Depends()],
+    _: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[DownloadService, Depends(get_download_service)],
+) -> dict[str, object]:
+    data = service.get_admin_download_stats(query=query)
+    logger.info(
+        "Admin download stats served: days=%s top_limit=%s total_events=%s",
+        query.days,
+        query.top_limit,
+        data.summary.total_events,
+    )
+    return build_success_response(request=request, data=data.model_dump())

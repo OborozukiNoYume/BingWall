@@ -48,6 +48,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (pageName === "admin-download-stats") {
+    await renderDownloadStatsPage(session);
+    return;
+  }
+
   if (pageName === "admin-tags") {
     await renderTagManagementPage(session);
     return;
@@ -1156,6 +1161,211 @@ async function renderAuditPage(session) {
   }
 }
 
+async function renderDownloadStatsPage(session) {
+  setLoadingState("正在读取下载统计...");
+
+  try {
+    const state = readDownloadStatsState();
+    const payload = await fetchAdmin(
+      `/api/admin/download-stats?${buildDownloadStatsParams(state).toString()}`,
+      { token: session.session_token },
+    );
+    renderDownloadStatsView(payload, state);
+  } catch (error) {
+    handleAdminError(error);
+  }
+}
+
+function renderDownloadStatsView(payload, state) {
+  const summary = payload.summary || payload.data?.summary || {};
+  const topWallpapers = Array.isArray(payload.top_wallpapers || payload.data?.top_wallpapers)
+    ? payload.top_wallpapers || payload.data.top_wallpapers
+    : [];
+  const dailyTrends = Array.isArray(payload.daily_trends || payload.data?.daily_trends)
+    ? payload.daily_trends || payload.data.daily_trends
+    : [];
+
+  adminRoot.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h2>后台下载统计</h2>
+        <p class="muted-copy">只统计下载登记事件，真实文件仍由静态资源链路提供，不经过应用服务传大文件。</p>
+      </div>
+      <p class="meta-pill">最近 ${escapeHtml(state.days || "7")} 天</p>
+    </div>
+    <form class="admin-form" id="download-stats-form">
+      <div class="filter-grid">
+        <div class="field-group">
+          <label for="download-days">统计窗口</label>
+          <select id="download-days" name="days">
+            <option value="7">最近 7 天</option>
+            <option value="30">最近 30 天</option>
+            <option value="90">最近 90 天</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label for="download-top-limit">热门内容数量</label>
+          <select id="download-top-limit" name="top_limit">
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+          </select>
+        </div>
+      </div>
+      <div class="button-row">
+        <button class="primary-button" type="submit">刷新统计</button>
+        <button class="ghost-button" id="reset-download-stats" type="button">恢复默认</button>
+      </div>
+    </form>
+    <section class="stats-grid">
+      <article class="stats-card">
+        <span class="muted-inline">下载事件总数</span>
+        <strong>${escapeHtml(summary.total_events || 0)}</strong>
+      </article>
+      <article class="stats-card">
+        <span class="muted-inline">成功跳转</span>
+        <strong>${escapeHtml(summary.redirected_events || 0)}</strong>
+      </article>
+      <article class="stats-card">
+        <span class="muted-inline">已拦截</span>
+        <strong>${escapeHtml(summary.blocked_events || 0)}</strong>
+      </article>
+      <article class="stats-card">
+        <span class="muted-inline">登记降级</span>
+        <strong>${escapeHtml(summary.degraded_events || 0)}</strong>
+      </article>
+      <article class="stats-card">
+        <span class="muted-inline">涉及内容数</span>
+        <strong>${escapeHtml(summary.unique_wallpapers || 0)}</strong>
+      </article>
+      <article class="stats-card">
+        <span class="muted-inline">最近一次事件</span>
+        <strong>${escapeHtml(summary.latest_occurred_at_utc || "暂无记录")}</strong>
+      </article>
+    </section>
+    <div class="detail-grid">
+      <section class="table-card detail-card-wide">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>热门内容</th>
+                <th>地区</th>
+                <th>日期</th>
+                <th>成功下载数</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="download-top-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="table-card detail-card-wide">
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>日期</th>
+                <th>总事件</th>
+                <th>成功跳转</th>
+                <th>已拦截</th>
+                <th>登记降级</th>
+              </tr>
+            </thead>
+            <tbody id="download-trend-table-body"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  `;
+
+  const form = document.querySelector("#download-stats-form");
+  const topTableBody = document.querySelector("#download-top-table-body");
+  const trendTableBody = document.querySelector("#download-trend-table-body");
+  if (
+    !(form instanceof HTMLFormElement) ||
+    !(topTableBody instanceof HTMLElement) ||
+    !(trendTableBody instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  assignFormValue(form, "days", state.days);
+  assignFormValue(form, "top_limit", state.top_limit);
+
+  if (topWallpapers.length === 0) {
+    topTableBody.innerHTML = `
+      <tr>
+        <td colspan="5">
+          <div class="notice-card">
+            <h3>当前时间窗口内没有成功下载记录</h3>
+            <p>可以先通过公开详情页触发下载登记，再回来查看热门内容。</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    topTableBody.innerHTML = topWallpapers
+      .map(
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.title)}</td>
+            <td>${escapeHtml(item.market_code)}</td>
+            <td>${escapeHtml(item.wallpaper_date)}</td>
+            <td>${escapeHtml(item.download_count)}</td>
+            <td><a class="mini-button" href="/admin/wallpapers/${encodeURIComponent(String(item.wallpaper_id))}">查看详情</a></td>
+          </tr>
+        `,
+      )
+      .join("");
+  }
+
+  if (dailyTrends.length === 0) {
+    trendTableBody.innerHTML = `
+      <tr>
+        <td colspan="5">
+          <div class="notice-card">
+            <h3>当前没有趋势数据</h3>
+            <p>下载登记事件产生后，这里会按天展示成功、拦截和降级趋势。</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    trendTableBody.innerHTML = dailyTrends
+      .map(
+        (item) => `
+          <tr>
+            <td>${escapeHtml(item.trend_date)}</td>
+            <td>${escapeHtml(item.total_events)}</td>
+            <td>${escapeHtml(item.redirected_events)}</td>
+            <td>${escapeHtml(item.blocked_events)}</td>
+            <td>${escapeHtml(item.degraded_events)}</td>
+          </tr>
+        `,
+      )
+      .join("");
+  }
+
+  form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    redirectTo(
+      `/admin/download-stats?${buildDownloadStatsParams({
+        days: stringValue(formData.get("days")) || "7",
+        top_limit: stringValue(formData.get("top_limit")) || "5",
+      }).toString()}`,
+    );
+  });
+
+  const resetButton = document.querySelector("#reset-download-stats");
+  if (resetButton instanceof HTMLButtonElement) {
+    resetButton.addEventListener("click", () => {
+      redirectTo("/admin/download-stats?days=7&top_limit=5");
+    });
+  }
+}
+
 function renderAuditView(payload, state) {
   const items = Array.isArray(payload.data.items) ? payload.data.items : [];
   const pagination = payload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
@@ -1691,6 +1901,14 @@ function readTagState() {
   };
 }
 
+function readDownloadStatsState() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    days: params.get("days") || "7",
+    top_limit: params.get("top_limit") || "5",
+  };
+}
+
 function readLogState() {
   const params = new URLSearchParams(window.location.search);
   return {
@@ -1744,6 +1962,13 @@ function buildTagParams(state) {
   const params = new URLSearchParams();
   setOptionalParam(params, "status", state.status);
   setOptionalParam(params, "tag_category", state.tag_category);
+  return params;
+}
+
+function buildDownloadStatsParams(state) {
+  const params = new URLSearchParams();
+  params.set("days", state.days || "7");
+  params.set("top_limit", state.top_limit || "5");
   return params;
 }
 

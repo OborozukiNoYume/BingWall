@@ -9,7 +9,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
 
     applied = migrate_database(database_path)
 
-    assert [migration.version for migration in applied] == [1, 2, 3, 4]
+    assert [migration.version for migration in applied] == [1, 2, 3, 4, 5]
 
     connection = sqlite3.connect(database_path)
     try:
@@ -44,6 +44,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "audit_logs",
         "collection_task_items",
         "collection_tasks",
+        "download_events",
         "image_resources",
         "schema_migrations",
         "tags",
@@ -57,6 +58,10 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "idx_collection_task_items_task_occurred",
         "idx_collection_tasks_status_created",
         "idx_collection_tasks_trigger_created",
+        "idx_download_events_market_occurred",
+        "idx_download_events_resource_occurred",
+        "idx_download_events_result_occurred",
+        "idx_download_events_wallpaper_occurred",
         "idx_image_resources_content_hash",
         "idx_image_resources_source_url_hash",
         "idx_image_resources_status_processed",
@@ -80,7 +85,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
     first_run = migrate_database(database_path)
     second_run = migrate_database(database_path)
 
-    assert [migration.version for migration in first_run] == [1, 2, 3, 4]
+    assert [migration.version for migration in first_run] == [1, 2, 3, 4, 5]
     assert second_run == []
 
     connection = sqlite3.connect(database_path)
@@ -100,6 +105,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
         (2, "admin_sessions"),
         (3, "tags"),
         (4, "image_resource_variants"),
+        (5, "download_events"),
     ]
 
 

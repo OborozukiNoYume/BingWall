@@ -4,12 +4,12 @@
 
 BingWall 是一个围绕 Bing 壁纸构建的图片服务系统。一期目标不是做单一下载脚本，而是建设一个可持续采集、可管理、可对外服务、可扩展演进的内容系统。
 
-当前仓库已完成阶段一、阶段二闭环，并已落地阶段三 `T3.1` 标签体系与 `T3.2` 多来源采集；核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
+当前仓库已完成阶段一、阶段二闭环，并已落地阶段三 `T3.1` 标签体系、`T3.2` 多来源采集、`T3.3` 资源派生版本、`T3.4` OSS / CDN 兼容资源定位与 `T3.5` 下载统计；核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
 
 ## 当前状态
 
-- 项目阶段：阶段三进行中，`T3.1`、`T3.2`、`T3.3`、`T3.4` 已完成；运维侧仍需补齐目标机 `cron` 安装与计划配置
-- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 与 NASA APOD 多来源采集及资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环、`T3.1` 标签体系、`T3.2` 多来源采集、`T3.3` 资源派生版本、`T3.4` OSS / CDN 兼容资源定位
+- 项目阶段：阶段三进行中，`T3.1`、`T3.2`、`T3.3`、`T3.4`、`T3.5` 已完成；运维侧仍需补齐目标机 `cron` 安装与计划配置
+- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 与 NASA APOD 多来源采集及资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环、`T3.1` 标签体系、`T3.2` 多来源采集、`T3.3` 资源派生版本、`T3.4` OSS / CDN 兼容资源定位、`T3.5` 下载登记与后台统计
 - 当前文档状态：系统设计、模块说明、数据模型、API 约定、部署运行说明、项目状态与阶段 TODO 已同步到当前实现
 - 已确认运行时基线：`Python 3.14.2`、`Node.js 24.13.0`
 
@@ -169,6 +169,12 @@ make verify-deploy
 - 当资源记录的 `storage_backend = local` 时，接口仍返回 `/images/<relative_path>`；当 `storage_backend = oss` 时，接口返回配置好的 OSS / CDN 公网地址
 - 已补齐本地与 OSS 并存测试，确保迁移期间旧本地资源继续可访问，且公开接口不暴露服务器磁盘路径
 
+当前 `T3.5` 已补齐内容：
+
+- `V0005__download_events.sql`、`app/repositories/download_repository.py` 与 `app/services/downloads.py`，落地下载登记表、下载跳转目标解析、降级日志和后台统计聚合
+- `/api/public/download-events` 公开下载登记接口，以及 `/api/admin/download-stats` 后台统计接口；公开详情页下载按钮已改为“先登记、再跳转静态资源”
+- `/admin/download-stats` 后台页面，支持查看最近 7 / 30 / 90 天下载总量、热门内容和按日趋势
+
 公开 API 最小验证示例：
 
 ```bash
@@ -178,6 +184,9 @@ curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_
 curl http://127.0.0.1:8000/api/public/wallpaper-filters
 curl http://127.0.0.1:8000/api/public/tags
 curl http://127.0.0.1:8000/api/public/wallpapers/1
+curl -X POST http://127.0.0.1:8000/api/public/download-events \
+  -H 'Content-Type: application/json' \
+  -d '{"wallpaper_id":1,"download_channel":"public_detail"}'
 ```
 
 公开前端最小验证示例：
@@ -245,6 +254,14 @@ curl -H 'Authorization: Bearer <session_token>' \
   http://127.0.0.1:8000/api/admin/collection-tasks/1
 curl -H 'Authorization: Bearer <session_token>' \
   "http://127.0.0.1:8000/api/admin/logs?task_id=1&error_type=failed"
+```
+
+下载统计最小验证示例：
+
+```bash
+curl http://127.0.0.1:8000/admin/download-stats
+curl -H 'Authorization: Bearer <session_token>' \
+  "http://127.0.0.1:8000/api/admin/download-stats?days=7&top_limit=5"
 ```
 
 健康检查与资源巡检最小验证示例：

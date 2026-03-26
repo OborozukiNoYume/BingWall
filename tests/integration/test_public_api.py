@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 import sqlite3
+from typing import cast
 
 from fastapi.testclient import TestClient
 
@@ -159,6 +160,70 @@ def test_public_api_supports_local_and_oss_resource_urls_in_parallel(tmp_path: P
         "https://cdn.example.com/bingwall/bing/2026/03/en-US/oss-visible--download.jpg"
     )
     assert str(tmp_path) not in detail_payload["data"]["preview_url"]
+
+
+def test_public_download_event_records_and_returns_redirect_url(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Download Visible",
+        include_download_resource=True,
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.post(
+            "/api/public/download-events",
+            json={"wallpaper_id": wallpaper_id, "download_channel": "public_detail"},
+            headers={"User-Agent": "pytest-browser"},
+        )
+
+    payload = response.json()
+    row = get_latest_download_event(database_path)
+    assert response.status_code == 200
+    assert payload["data"]["redirect_url"] == (
+        "/images/bing/2026/03/en-US/download-visible--download.jpg"
+    )
+    assert payload["data"]["recorded"] is True
+    assert payload["data"]["result_status"] == "redirected"
+    assert isinstance(payload["data"]["event_id"], int)
+    assert row is not None
+    assert row["wallpaper_id"] == wallpaper_id
+    assert row["request_id"] == payload["trace_id"]
+    assert row["download_channel"] == "public_detail"
+    assert row["result_status"] == "redirected"
+    assert row["redirect_url"] == payload["data"]["redirect_url"]
+    assert row["client_ip_hash"] is not None
+    assert row["user_agent"] is not None
+
+
+def test_public_download_event_records_blocked_event_for_non_downloadable_wallpaper(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Blocked Download",
+        is_downloadable=False,
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.post(
+            "/api/public/download-events",
+            json={"wallpaper_id": wallpaper_id, "download_channel": "public_detail"},
+        )
+
+    payload = response.json()
+    row = get_latest_download_event(database_path)
+    assert response.status_code == 409
+    assert payload["error_code"] == "PUBLIC_DOWNLOAD_NOT_ALLOWED"
+    assert row is not None
+    assert row["wallpaper_id"] == wallpaper_id
+    assert row["result_status"] == "blocked"
+    assert row["redirect_url"] is None
 
 
 def test_public_wallpaper_filters_and_site_info_only_return_public_options(tmp_path: Path) -> None:
@@ -649,5 +714,22 @@ def bind_wallpaper_tags(
                 (wallpaper_id, tag_id, now_utc, created_by),
             )
         connection.commit()
+    finally:
+        connection.close()
+
+
+def get_latest_download_event(database_path: Path) -> sqlite3.Row | None:
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        row = connection.execute(
+            """
+            SELECT *
+            FROM download_events
+            ORDER BY id DESC
+            LIMIT 1;
+            """
+        ).fetchone()
+        return cast(sqlite3.Row | None, row)
     finally:
         connection.close()

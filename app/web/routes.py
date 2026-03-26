@@ -133,6 +133,16 @@ def get_admin_collection_logs_page() -> HTMLResponse:
     )
 
 
+@router.get("/admin/download-stats", response_class=HTMLResponse)
+def get_admin_download_stats_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-download-stats",
+        page_title="BingWall Admin | 下载统计",
+        page_heading="下载统计",
+        page_summary="查看最近一段时间的下载登记总量、热门内容和趋势变化。",
+    )
+
+
 @router.get("/admin/audit-logs", response_class=HTMLResponse)
 def get_admin_audit_logs_page() -> HTMLResponse:
     return render_admin_page(
@@ -229,6 +239,7 @@ def render_admin_page(
           <a href="/admin/wallpapers">内容管理</a>
           <a href="/admin/tags">标签管理</a>
           <a href="/admin/tasks">采集任务</a>
+          <a href="/admin/download-stats">下载统计</a>
           <a href="/admin/logs">结构化日志</a>
           <a href="/admin/audit-logs">审计记录</a>
           <a href="/admin/login">登录</a>

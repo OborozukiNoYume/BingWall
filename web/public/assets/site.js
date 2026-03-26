@@ -101,7 +101,7 @@ async function renderDetailPage(id) {
   try {
     const detail = await fetchEnvelope(`/api/public/wallpapers/${encodeURIComponent(id)}`);
     const downloadBlock = detail.is_downloadable
-      ? `<a class="button" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer">下载原图</a>`
+      ? `<a class="button" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer" data-download-wallpaper-id="${escapeHtml(detail.id)}" data-download-channel="public_detail">下载原图</a>`
       : `<button class="button-secondary" type="button" disabled>当前不可下载</button>`;
 
     appRoot.innerHTML = `
@@ -131,6 +131,7 @@ async function renderDetailPage(id) {
         </aside>
       </div>
     `;
+    bindDownloadAction(detail);
   } catch (error) {
     if (error instanceof ApiError && error.status === 404) {
       setStatusCard({
@@ -144,6 +145,39 @@ async function renderDetailPage(id) {
 
     setServiceBusyState(error);
   }
+}
+
+function bindDownloadAction(detail) {
+  const downloadLink = document.querySelector("[data-download-wallpaper-id]");
+  if (!(downloadLink instanceof HTMLAnchorElement)) {
+    return;
+  }
+
+  downloadLink.addEventListener("click", async (event) => {
+    event.preventDefault();
+    const fallbackUrl = downloadLink.href;
+    const originalLabel = downloadLink.textContent || "下载原图";
+    downloadLink.textContent = "正在登记下载...";
+    downloadLink.setAttribute("aria-busy", "true");
+
+    try {
+      const response = await fetchDownloadEvent({
+        wallpaper_id: Number(detail.id),
+        download_channel: "public_detail",
+      });
+      openDownloadTarget(response.redirect_url);
+    } catch (error) {
+      console.error(error);
+      if (error instanceof ApiError && (error.status === 404 || error.status === 409 || error.status === 422)) {
+        window.alert(error.message);
+      } else {
+        openDownloadTarget(fallbackUrl);
+      }
+    } finally {
+      downloadLink.textContent = originalLabel;
+      downloadLink.removeAttribute("aria-busy");
+    }
+  });
 }
 
 function renderListView({ filters, listPayload, state }) {
@@ -412,6 +446,22 @@ async function fetchEnvelope(url) {
   return payload.data;
 }
 
+async function fetchDownloadEvent(payload) {
+  const response = await fetch("/api/public/download-events", {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+  const data = await response.json();
+  if (!response.ok || data.success !== true) {
+    throw new ApiError(response.status, data.message || "下载登记失败");
+  }
+  return data.data;
+}
+
 function setLoadingState(copy) {
   if (!(appRoot instanceof HTMLElement)) {
     return;
@@ -485,6 +535,13 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
+}
+
+function openDownloadTarget(url) {
+  const popup = window.open(url, "_blank", "noopener,noreferrer");
+  if (popup === null) {
+    window.location.assign(url);
+  }
 }
 
 class ApiError extends Error {

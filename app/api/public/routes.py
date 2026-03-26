@@ -15,12 +15,16 @@ from app.core.config import get_settings
 from app.repositories.public_repository import PublicRepository
 from app.schemas.common import ErrorEnvelope
 from app.schemas.common import SuccessEnvelope
+from app.schemas.public import PublicDownloadEventData
+from app.schemas.public import PublicDownloadEventRequest
 from app.schemas.public import PublicSiteInfoData
 from app.schemas.public import PublicTagListData
 from app.schemas.public import PublicWallpaperDetailData
 from app.schemas.public import PublicWallpaperFiltersData
 from app.schemas.public import PublicWallpaperListData
 from app.schemas.public import PublicWallpaperListQuery
+from app.repositories.download_repository import DownloadRepository
+from app.services.downloads import DownloadService
 from app.services.public_catalog import PublicCatalogService
 from app.services.resource_locator import ResourceLocator
 
@@ -30,6 +34,7 @@ router = APIRouter(prefix="/api/public", tags=["public"])
 
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     404: {"model": ErrorEnvelope},
+    409: {"model": ErrorEnvelope},
     422: {"model": ErrorEnvelope},
 }
 
@@ -38,6 +43,16 @@ def get_public_repository(
     settings: Annotated[Settings, Depends(get_settings)],
 ) -> Iterator[PublicRepository]:
     repository = PublicRepository(settings.database_path)
+    try:
+        yield repository
+    finally:
+        repository.close()
+
+
+def get_download_repository(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Iterator[DownloadRepository]:
+    repository = DownloadRepository(settings.database_path)
     try:
         yield repository
     finally:
@@ -152,4 +167,35 @@ def get_public_site_info(
         default_market_code=settings.collect_bing_default_market,
     )
     logger.info("Public site info served.")
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.post(
+    "/download-events",
+    response_model=SuccessEnvelope[PublicDownloadEventData],
+    responses=ERROR_RESPONSES,
+)
+def create_public_download_event(
+    payload: PublicDownloadEventRequest,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[DownloadRepository, Depends(get_download_repository)],
+) -> dict[str, object]:
+    service = DownloadService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+        session_secret=settings.security_session_secret.get_secret_value(),
+    )
+    data = service.register_public_download(
+        payload=payload,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info(
+        "Public download event served: wallpaper_id=%s recorded=%s result_status=%s",
+        payload.wallpaper_id,
+        data.recorded,
+        data.result_status,
+    )
     return build_success_response(request=request, data=data.model_dump())

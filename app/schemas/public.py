@@ -61,6 +61,23 @@ class PublicWallpaperDetailData(BaseModel):
     source_name: str
 
 
+PublicDownloadChannel = Literal["public_detail"]
+PublicDownloadResultStatus = Literal["redirected", "degraded"]
+
+
+class PublicDownloadEventRequest(BaseModel):
+    wallpaper_id: int = Field(ge=1)
+    resource_id: int | None = Field(default=None, ge=1)
+    download_channel: PublicDownloadChannel
+
+
+class PublicDownloadEventData(BaseModel):
+    redirect_url: str
+    event_id: int | None
+    recorded: bool
+    result_status: PublicDownloadResultStatus
+
+
 class PublicMarketFilterOption(BaseModel):
     code: str
     label: str
