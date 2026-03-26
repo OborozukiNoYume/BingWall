@@ -61,6 +61,8 @@ class PublicRepository:
                 w.wallpaper_date,
                 COALESCE(thumbnail_resource.relative_path, original_resource.relative_path)
                     AS relative_path,
+                COALESCE(thumbnail_resource.storage_backend, original_resource.storage_backend)
+                    AS storage_backend,
                 COALESCE(original_resource.width, w.origin_width) AS width,
                 COALESCE(original_resource.height, w.origin_height) AS height
             FROM wallpapers AS w
@@ -107,8 +109,12 @@ class PublicRepository:
                 w.source_name,
                 COALESCE(preview_resource.relative_path, original_resource.relative_path)
                     AS preview_relative_path,
+                COALESCE(preview_resource.storage_backend, original_resource.storage_backend)
+                    AS preview_storage_backend,
                 COALESCE(download_resource.relative_path, original_resource.relative_path)
                     AS download_relative_path,
+                COALESCE(download_resource.storage_backend, original_resource.storage_backend)
+                    AS download_storage_backend,
                 COALESCE(download_resource.width, original_resource.width, w.origin_width) AS width,
                 COALESCE(download_resource.height, original_resource.height, w.origin_height)
                     AS height

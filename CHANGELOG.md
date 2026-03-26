@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-26T14:04:36Z
+
+### 变更内容
+
+- 新增 [app/services/resource_locator.py](app/services/resource_locator.py)，把资源定位从固定 `/images/<relative_path>` 抽象为统一定位器，支持 `storage_backend = local` 与 `storage_backend = oss` 两类地址生成，并对相对路径做越界校验
+- 更新 [app/core/config.py](app/core/config.py)、[app/api/public/routes.py](app/api/public/routes.py)、[app/api/admin/routes.py](app/api/admin/routes.py)、[app/services/public_catalog.py](app/services/public_catalog.py)、[app/services/admin_content.py](app/services/admin_content.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py) 与 [app/repositories/admin_content_repository.py](app/repositories/admin_content_repository.py)，让公开列表、公开详情、后台列表和后台详情按资源记录中的 `storage_backend` 生成本地或 OSS / CDN 地址
+- 更新 [.env.example](.env.example)、[deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)、[README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/data-model.md](docs/data-model.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，补齐 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 配置、迁移期目录语义、备份边界和 `T3.4` 完成状态
+- 新增 [tests/unit/test_resource_locator.py](tests/unit/test_resource_locator.py)，并更新 [tests/unit/test_config.py](tests/unit/test_config.py)、[tests/integration/test_public_api.py](tests/integration/test_public_api.py)、[tests/integration/test_admin_content.py](tests/integration/test_admin_content.py) 与 [tests/integration/test_admin_auth.py](tests/integration/test_admin_auth.py)，覆盖本地 / OSS 地址生成、配置加载、公开接口并存访问和后台接口兼容
+
+### 变更原因
+
+- 完成阶段三 `T3.4`，把“资源定位兼容本地与 OSS/CDN、迁移期允许新旧资源共存”的设计要求推进为可运行实现
+- 保持最保守范围，只抽象资源定位和公开地址生成，不提前引入对象存储 SDK、不改现有本地下载入库链路、不改变 Nginx `/images/` 本地服务方式
+- 确保历史本地资源继续可访问，同时为后续逐步把资源切到 OSS / CDN 留出稳定接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增配置项：`BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
+- 变更时间：`2026-03-26T14:04:36Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开列表、公开详情、后台内容列表、后台内容详情、配置加载、部署文档和相关测试
+- `storage_backend = local` 的资源继续走 `/images/<relative_path>`；`storage_backend = oss` 的资源改为返回配置好的绝对公网地址
+- 本次不包含对象存储上传、对象存储 SDK 接入、CDN 刷新、备份导出 OSS 对象或 Nginx 配置结构变更
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除统一资源定位器，回退公开 / 后台接口的资源 URL 生成逻辑、配置项、测试与文档更新，或执行 `git revert` 回退本次提交
+- 若环境中已经写入 `storage_backend = oss` 的资源记录，回滚前应先确认是否需要把这些记录改回 `local` 或暂停公开访问，避免代码回退后仍存在无法生成地址的资源记录
+- 回滚后仓库将恢复到“公开与后台资源地址固定指向本地 `/images/`、`T3.4` 仍停留在设计预留状态”的状态
+
 ## 2026-03-26T13:42:52Z
 
 ### 变更内容

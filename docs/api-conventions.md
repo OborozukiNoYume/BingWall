@@ -209,6 +209,12 @@
 }
 ```
 
+说明：
+
+- `thumbnail_url`、`preview_url`、`download_url` 统一表示“可公开访问的资源地址”
+- 当资源来自本地正式目录时，地址表现为 `/images/<relative_path>`
+- 当资源来自 OSS/CDN 时，地址表现为配置好的绝对公网地址，例如 `https://cdn.example.com/bingwall/<relative_path>`
+
 ### 3. 公开筛选项
 
 - 方法：`GET`
@@ -668,6 +674,7 @@
 ## 下载策略约定
 
 - 一期默认使用静态资源直链
+- 阶段三 `T3.4` 起，静态资源直链既可以是 `/images/<relative_path>`，也可以是对象存储 / CDN 的绝对 URL
 - 若需要统计下载行为，可增加“下载登记接口 + 静态资源跳转”折中方案；推荐接口为 `POST /api/public/download-events`
 - 不应让应用服务成为大文件传输主链路
 

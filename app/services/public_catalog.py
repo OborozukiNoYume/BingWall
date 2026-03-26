@@ -18,6 +18,7 @@ from app.schemas.public import PublicWallpaperFiltersData
 from app.schemas.public import PublicWallpaperListData
 from app.schemas.public import PublicWallpaperListQuery
 from app.schemas.public import PublicWallpaperSummary
+from app.services.resource_locator import ResourceLocator
 
 MARKET_LABELS: dict[str, str] = {
     "de-DE": "Deutsch (Deutschland)",
@@ -30,8 +31,9 @@ MARKET_LABELS: dict[str, str] = {
 
 
 class PublicCatalogService:
-    def __init__(self, repository: PublicRepository) -> None:
+    def __init__(self, repository: PublicRepository, *, resource_locator: ResourceLocator) -> None:
         self.repository = repository
+        self.resource_locator = resource_locator
 
     def list_wallpapers(
         self, *, query: PublicWallpaperListQuery
@@ -63,8 +65,14 @@ class PublicCatalogService:
                 message="壁纸不存在或不可公开访问",
             )
 
-        preview_url = build_public_image_url(relative_path=str(row["preview_relative_path"]))
-        download_url = build_public_image_url(relative_path=str(row["download_relative_path"]))
+        preview_url = self.resource_locator.build_required_url(
+            storage_backend=_optional_text(row["preview_storage_backend"]),
+            relative_path=str(row["preview_relative_path"]),
+        )
+        download_url = self.resource_locator.build_required_url(
+            storage_backend=_optional_text(row["download_storage_backend"]),
+            relative_path=str(row["download_relative_path"]),
+        )
         return PublicWallpaperDetailData(
             id=int(row["id"]),
             title=present_title(row),
@@ -119,7 +127,10 @@ class PublicCatalogService:
             subtitle=_optional_text(row["subtitle"]) or _optional_text(row["copyright_text"]),
             market_code=str(row["market_code"]),
             wallpaper_date=str(row["wallpaper_date"]),
-            thumbnail_url=build_public_image_url(relative_path=str(row["relative_path"])),
+            thumbnail_url=self.resource_locator.build_required_url(
+                storage_backend=_optional_text(row["storage_backend"]),
+                relative_path=str(row["relative_path"]),
+            ),
             detail_url=f"/wallpapers/{wallpaper_id}",
         )
 
@@ -140,10 +151,6 @@ def present_title(row: Row) -> str:
     if copyright_text:
         return copyright_text
     return f"{row['source_name']} {row['wallpaper_date']}"
-
-
-def build_public_image_url(*, relative_path: str) -> str:
-    return f"/images/{relative_path.lstrip('/')}"
 
 
 def utc_now_isoformat() -> str:

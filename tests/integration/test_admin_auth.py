@@ -214,7 +214,7 @@ def test_admin_login_rejects_disabled_account(tmp_path: Path) -> None:
     assert payload["error_code"] == "ADMIN_AUTH_INVALID_CREDENTIALS"
 
 
-def build_client(tmp_path: Path) -> TestClient:
+def build_client(tmp_path: Path, *, oss_public_base_url: str | None = None) -> TestClient:
     clear_bingwall_env()
     os.environ["BINGWALL_APP_ENV"] = "test"
     os.environ["BINGWALL_APP_HOST"] = "127.0.0.1"
@@ -224,6 +224,8 @@ def build_client(tmp_path: Path) -> TestClient:
     os.environ["BINGWALL_STORAGE_TMP_DIR"] = str(tmp_path / "images" / "tmp")
     os.environ["BINGWALL_STORAGE_PUBLIC_DIR"] = str(tmp_path / "images" / "public")
     os.environ["BINGWALL_STORAGE_FAILED_DIR"] = str(tmp_path / "images" / "failed")
+    if oss_public_base_url is not None:
+        os.environ["BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL"] = oss_public_base_url
     os.environ["BINGWALL_BACKUP_DIR"] = str(tmp_path / "backups")
     os.environ["BINGWALL_SECURITY_SESSION_SECRET"] = "0123456789abcdef0123456789abcdef"
     os.environ["BINGWALL_SECURITY_SESSION_TTL_HOURS"] = "12"

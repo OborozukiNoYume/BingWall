@@ -67,6 +67,49 @@ def test_admin_wallpaper_list_and_detail_return_management_fields(tmp_path: Path
     assert detail_payload["data"]["recent_operations"] == []
 
 
+def test_admin_wallpaper_urls_support_oss_resources(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+    wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Admin OSS Visible",
+        original_storage_backend="oss",
+        thumbnail_storage_backend="oss",
+        preview_storage_backend="oss",
+    )
+
+    with build_client(tmp_path, oss_public_base_url="https://cdn.example.com/bingwall") as client:
+        session_token = login_admin(client)
+        list_response = client.get(
+            "/api/admin/wallpapers",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+        detail_response = client.get(
+            f"/api/admin/wallpapers/{wallpaper_id}",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+
+    list_payload = list_response.json()
+    detail_payload = detail_response.json()
+
+    assert list_response.status_code == 200
+    assert list_payload["data"]["items"][0]["preview_url"] == (
+        "https://cdn.example.com/bingwall/bing/2026/03/en-US/admin-oss-visible.jpg"
+    )
+
+    assert detail_response.status_code == 200
+    assert detail_payload["data"]["storage_backend"] == "oss"
+    assert detail_payload["data"]["preview_url"] == (
+        "https://cdn.example.com/bingwall/bing/2026/03/en-US/admin-oss-visible.jpg"
+    )
+
+
 def test_admin_status_change_updates_public_visibility_and_creates_audit_logs(
     tmp_path: Path,
 ) -> None:

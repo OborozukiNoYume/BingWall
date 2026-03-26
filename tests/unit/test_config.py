@@ -16,6 +16,7 @@ def set_valid_env() -> None:
     os.environ["BINGWALL_STORAGE_TMP_DIR"] = "./var/images/tmp"
     os.environ["BINGWALL_STORAGE_PUBLIC_DIR"] = "./var/images/public"
     os.environ["BINGWALL_STORAGE_FAILED_DIR"] = "./var/images/failed"
+    os.environ["BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL"] = "https://cdn.example.com/bingwall"
     os.environ["BINGWALL_BACKUP_DIR"] = "./var/backups"
     os.environ["BINGWALL_COLLECT_BING_ENABLED"] = "true"
     os.environ["BINGWALL_COLLECT_BING_DEFAULT_MARKET"] = "en-US"
@@ -55,6 +56,7 @@ def test_settings_load_valid_configuration() -> None:
     assert settings.app_port == 8000
     assert settings.collect_bing_default_market == "en-US"
     assert settings.collect_bing_max_download_retries == 3
+    assert str(settings.storage_oss_public_base_url) == "https://cdn.example.com/bingwall"
     assert settings.security_session_ttl_hours == 12
 
     clear_bingwall_env()

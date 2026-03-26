@@ -35,6 +35,7 @@ from app.schemas.admin_content import AdminWallpaperSummary
 from app.schemas.admin_content import TagStatus
 from app.schemas.common import Pagination
 from app.services.admin_auth import build_request_source
+from app.services.resource_locator import ResourceLocator
 
 ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
     "draft": {"enabled", "deleted"},
@@ -45,9 +46,16 @@ ALLOWED_STATUS_TRANSITIONS: dict[str, set[str]] = {
 
 
 class AdminContentService:
-    def __init__(self, repository: AdminContentRepository, *, session_secret: str) -> None:
+    def __init__(
+        self,
+        repository: AdminContentRepository,
+        *,
+        session_secret: str,
+        resource_locator: ResourceLocator,
+    ) -> None:
         self.repository = repository
         self.session_secret = session_secret
+        self.resource_locator = resource_locator
 
     def list_wallpapers(
         self, *, query: AdminWallpaperListQuery
@@ -79,6 +87,7 @@ class AdminContentService:
         )
         tag_rows = self.repository.list_wallpaper_tags(wallpaper_id=wallpaper_id)
         relative_path = optional_text(row["relative_path"])
+        storage_backend = optional_text(row["storage_backend"])
         return AdminWallpaperDetailData(
             id=int(row["id"]),
             title=present_title(row),
@@ -99,9 +108,12 @@ class AdminContentService:
             origin_width=optional_int(row["origin_width"]),
             origin_height=optional_int(row["origin_height"]),
             resource_relative_path=relative_path,
-            preview_url=build_image_url(relative_path=relative_path),
+            preview_url=self.resource_locator.build_url(
+                storage_backend=storage_backend,
+                relative_path=relative_path,
+            ),
             resource_type=optional_text(row["resource_type"]),
-            storage_backend=optional_text(row["storage_backend"]),
+            storage_backend=storage_backend,
             mime_type=optional_text(row["mime_type"]),
             file_size_bytes=optional_int(row["file_size_bytes"]),
             width=optional_int(row["width"]),
@@ -432,6 +444,7 @@ class AdminContentService:
 
     def _build_wallpaper_summary(self, row: Row) -> AdminWallpaperSummary:
         relative_path = optional_text(row["relative_path"])
+        storage_backend = optional_text(row["storage_backend"])
         return AdminWallpaperSummary(
             id=int(row["id"]),
             title=present_title(row),
@@ -444,7 +457,10 @@ class AdminContentService:
             image_status=parse_image_status(row["image_status"]),
             is_public=bool(row["is_public"]),
             is_downloadable=bool(row["is_downloadable"]),
-            preview_url=build_image_url(relative_path=relative_path),
+            preview_url=self.resource_locator.build_url(
+                storage_backend=storage_backend,
+                relative_path=relative_path,
+            ),
             width=optional_int(row["width"]),
             height=optional_int(row["height"]),
             failure_reason=optional_text(row["failure_reason"]),
@@ -534,12 +550,6 @@ def present_title(row: Row) -> str:
     if copyright_text:
         return copyright_text
     return f"{row['source_name']} {row['wallpaper_date']}"
-
-
-def build_image_url(*, relative_path: str | None) -> str | None:
-    if relative_path is None:
-        return None
-    return f"/images/{relative_path.lstrip('/')}"
 
 
 def optional_text(value: object) -> str | None:

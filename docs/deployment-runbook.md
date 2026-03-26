@@ -72,6 +72,11 @@
 
 当前仓库提供的 `deploy/systemd/bingwall.tmpfiles.conf` 已按上述口径写出目录模板。
 
+补充说明：
+
+- 当 `storage_backend = local` 时，资源仍写入 `/var/lib/bingwall/images/public`
+- 当 `storage_backend = oss` 时，数据库中的 `relative_path` 应继续保持与本地目录一致的相对路径语义，便于迁移期间本地与 OSS 共存
+
 ## 4. 配置要求
 
 ### 必备配置项
@@ -227,6 +232,7 @@
 - 统一创建数据库、图片、日志、备份和配置目录
 - 正式资源目录使用 `bingwall:www-data` 和 `2750`
 - 临时目录、失败目录、数据库目录不对 Nginx 开放
+- 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
 
 #### `deploy/nginx/bingwall.conf`
 
@@ -234,6 +240,7 @@
 - `/` 代理公开页面
 - `/assets/` 直接读取前端静态资源
 - `/images/` 直接读取正式资源目录，不暴露磁盘真实路径给浏览器
+- `storage_backend = oss` 的资源不经过本地 `/images/` 路由，由公开接口直接返回 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL/<relative_path>` 形式的地址
 
 ### 定时任务
 
@@ -277,6 +284,7 @@
 
 - SQLite 数据库文件
 - 图片正式资源目录
+- 对象存储桶或 CDN 源站中的同路径对象（若已启用 OSS）
 - 配置文件
 - 应用日志和审计日志
 - `systemd` 和 Nginx 配置
@@ -295,6 +303,7 @@
 - SQLite 备份必须采用一致性方式
 - 数据库与图片目录备份应尽量保持同一时间点语义
 - 备份产物必须保留多个周期
+- 若已启用 `storage_backend = oss`，应用侧备份脚本只覆盖本地目录和配置，不会自动导出对象存储桶；对象存储快照需由云平台或独立备份策略负责
 
 ### 当前仓库实现
 

@@ -112,6 +112,55 @@ def test_public_wallpaper_detail_distinguishes_preview_and_download_resources(
     )
 
 
+def test_public_api_supports_local_and_oss_resource_urls_in_parallel(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Local Visible",
+    )
+    oss_wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-25",
+        market_code="en-US",
+        title="OSS Visible",
+        include_download_resource=True,
+        original_storage_backend="oss",
+        thumbnail_storage_backend="oss",
+        preview_storage_backend="oss",
+        download_storage_backend="oss",
+    )
+
+    with build_client(tmp_path, oss_public_base_url="https://cdn.example.com/bingwall") as client:
+        list_response = client.get("/api/public/wallpapers?page=1&page_size=20")
+        detail_response = client.get(f"/api/public/wallpapers/{oss_wallpaper_id}")
+
+    list_payload = list_response.json()
+    detail_payload = detail_response.json()
+
+    assert list_response.status_code == 200
+    assert [item["title"] for item in list_payload["data"]["items"]] == [
+        "OSS Visible",
+        "Local Visible",
+    ]
+    assert list_payload["data"]["items"][0]["thumbnail_url"] == (
+        "https://cdn.example.com/bingwall/bing/2026/03/en-US/oss-visible--thumbnail.jpg"
+    )
+    assert list_payload["data"]["items"][1]["thumbnail_url"] == (
+        "/images/bing/2026/03/en-US/local-visible--thumbnail.jpg"
+    )
+
+    assert detail_response.status_code == 200
+    assert detail_payload["data"]["preview_url"] == (
+        "https://cdn.example.com/bingwall/bing/2026/03/en-US/oss-visible--preview.jpg"
+    )
+    assert detail_payload["data"]["download_url"] == (
+        "https://cdn.example.com/bingwall/bing/2026/03/en-US/oss-visible--download.jpg"
+    )
+    assert str(tmp_path) not in detail_payload["data"]["preview_url"]
+
+
 def test_public_wallpaper_filters_and_site_info_only_return_public_options(tmp_path: Path) -> None:
     database_path = prepare_database(tmp_path)
     visible_wallpaper_id = seed_wallpaper(
@@ -275,7 +324,7 @@ def test_public_wallpaper_endpoints_return_uniform_errors_for_invalid_or_hidden_
     }
 
 
-def build_client(tmp_path: Path) -> TestClient:
+def build_client(tmp_path: Path, *, oss_public_base_url: str | None = None) -> TestClient:
     clear_bingwall_env()
     os.environ["BINGWALL_APP_ENV"] = "test"
     os.environ["BINGWALL_APP_HOST"] = "127.0.0.1"
@@ -285,6 +334,8 @@ def build_client(tmp_path: Path) -> TestClient:
     os.environ["BINGWALL_STORAGE_TMP_DIR"] = str(tmp_path / "images" / "tmp")
     os.environ["BINGWALL_STORAGE_PUBLIC_DIR"] = str(tmp_path / "images" / "public")
     os.environ["BINGWALL_STORAGE_FAILED_DIR"] = str(tmp_path / "images" / "failed")
+    if oss_public_base_url is not None:
+        os.environ["BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL"] = oss_public_base_url
     os.environ["BINGWALL_BACKUP_DIR"] = str(tmp_path / "backups")
     os.environ["BINGWALL_SECURITY_SESSION_SECRET"] = "0123456789abcdef0123456789abcdef"
     os.environ["BINGWALL_SECURITY_SESSION_TTL_HOURS"] = "12"
@@ -314,6 +365,10 @@ def seed_wallpaper(
     publish_start_at_utc: str = "2000-01-01T00:00:00Z",
     publish_end_at_utc: str | None = "2100-01-01T00:00:00Z",
     include_download_resource: bool = False,
+    original_storage_backend: str = "local",
+    thumbnail_storage_backend: str | None = None,
+    preview_storage_backend: str | None = None,
+    download_storage_backend: str | None = None,
 ) -> int:
     connection = sqlite3.connect(database_path)
     try:
@@ -399,10 +454,11 @@ def seed_wallpaper(
                 created_at_utc,
                 updated_at_utc
             )
-            VALUES (?, 'original', 'local', ?, ?, 'jpg', 'image/jpeg', 1024, 1920, 1080, ?, ?, ?, ?, 'passed', ?, ?, ?, ?, ?);
+            VALUES (?, 'original', ?, ?, ?, 'jpg', 'image/jpeg', 1024, 1920, 1080, ?, ?, ?, ?, 'passed', ?, ?, ?, ?, ?);
             """,
             (
                 wallpaper_id,
+                original_storage_backend,
                 original_relative_path,
                 f"{slug}.jpg",
                 f"https://www.bing.com/{slug}.jpg",
@@ -424,6 +480,7 @@ def seed_wallpaper(
             connection=connection,
             wallpaper_id=wallpaper_id,
             resource_type="thumbnail",
+            storage_backend=thumbnail_storage_backend or original_storage_backend,
             relative_path=f"bing/2026/03/{market_code}/{slug}--thumbnail.jpg",
             file_size_bytes=128,
             width=480,
@@ -436,6 +493,7 @@ def seed_wallpaper(
             connection=connection,
             wallpaper_id=wallpaper_id,
             resource_type="preview",
+            storage_backend=preview_storage_backend or original_storage_backend,
             relative_path=f"bing/2026/03/{market_code}/{slug}--preview.jpg",
             file_size_bytes=512,
             width=1600,
@@ -449,6 +507,7 @@ def seed_wallpaper(
                 connection=connection,
                 wallpaper_id=wallpaper_id,
                 resource_type="download",
+                storage_backend=download_storage_backend or original_storage_backend,
                 relative_path=f"bing/2026/03/{market_code}/{slug}--download.jpg",
                 file_size_bytes=1024,
                 width=1920,
@@ -476,6 +535,7 @@ def _seed_variant_resource(
     connection: sqlite3.Connection,
     wallpaper_id: int,
     resource_type: str,
+    storage_backend: str,
     relative_path: str,
     file_size_bytes: int,
     width: int,
@@ -508,11 +568,12 @@ def _seed_variant_resource(
             created_at_utc,
             updated_at_utc
         )
-        VALUES (?, ?, 'local', ?, ?, 'jpg', 'image/jpeg', ?, ?, ?, NULL, NULL, ?, ?, 'passed', ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, 'jpg', 'image/jpeg', ?, ?, ?, NULL, NULL, ?, ?, 'passed', ?, ?, ?, ?, ?);
         """,
         (
             wallpaper_id,
             resource_type,
+            storage_backend,
             relative_path,
             Path(relative_path).name,
             file_size_bytes,

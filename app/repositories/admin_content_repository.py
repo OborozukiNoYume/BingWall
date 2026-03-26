@@ -51,6 +51,7 @@ class AdminContentRepository:
                 w.updated_at_utc,
                 r.image_status,
                 r.relative_path,
+                r.storage_backend,
                 COALESCE(r.width, w.origin_width) AS width,
                 COALESCE(r.height, w.origin_height) AS height,
                 r.failure_reason

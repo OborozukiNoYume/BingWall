@@ -22,6 +22,7 @@ from app.schemas.public import PublicWallpaperFiltersData
 from app.schemas.public import PublicWallpaperListData
 from app.schemas.public import PublicWallpaperListQuery
 from app.services.public_catalog import PublicCatalogService
+from app.services.resource_locator import ResourceLocator
 
 logger = logging.getLogger(__name__)
 
@@ -51,9 +52,13 @@ def get_public_repository(
 def list_public_wallpapers(
     request: Request,
     query: Annotated[PublicWallpaperListQuery, Depends()],
+    settings: Annotated[Settings, Depends(get_settings)],
     repository: Annotated[PublicRepository, Depends(get_public_repository)],
 ) -> dict[str, object]:
-    service = PublicCatalogService(repository)
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
     data, pagination = service.list_wallpapers(query=query)
     logger.info(
         "Public wallpaper list served: market=%s page=%s page_size=%s total=%s",
@@ -77,9 +82,13 @@ def list_public_wallpapers(
 def get_public_wallpaper_detail(
     wallpaper_id: int,
     request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
     repository: Annotated[PublicRepository, Depends(get_public_repository)],
 ) -> dict[str, object]:
-    service = PublicCatalogService(repository)
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
     data = service.get_wallpaper_detail(wallpaper_id=wallpaper_id)
     logger.info("Public wallpaper detail served: wallpaper_id=%s", wallpaper_id)
     return build_success_response(request=request, data=data.model_dump())
@@ -92,9 +101,13 @@ def get_public_wallpaper_detail(
 )
 def get_public_wallpaper_filters(
     request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
     repository: Annotated[PublicRepository, Depends(get_public_repository)],
 ) -> dict[str, object]:
-    service = PublicCatalogService(repository)
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
     data = service.get_filters()
     logger.info("Public wallpaper filters served: market_count=%s", len(data.markets))
     return build_success_response(request=request, data=data.model_dump())
@@ -107,9 +120,13 @@ def get_public_wallpaper_filters(
 )
 def list_public_tags(
     request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
     repository: Annotated[PublicRepository, Depends(get_public_repository)],
 ) -> dict[str, object]:
-    service = PublicCatalogService(repository)
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
     data = service.list_tags()
     logger.info("Public tags served: count=%s", len(data.items))
     return build_success_response(request=request, data=data.model_dump())
@@ -125,7 +142,10 @@ def get_public_site_info(
     settings: Annotated[Settings, Depends(get_settings)],
     repository: Annotated[PublicRepository, Depends(get_public_repository)],
 ) -> dict[str, object]:
-    service = PublicCatalogService(repository)
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
     data = service.get_site_info(
         site_name=settings.site_name,
         site_description=settings.site_description,

@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     storage_tmp_dir: Path
     storage_public_dir: Path
     storage_failed_dir: Path
+    storage_oss_public_base_url: AnyHttpUrl | None = None
     backup_dir: Path
     collect_bing_enabled: bool = True
     collect_bing_default_market: str = Field(default="en-US", min_length=2)

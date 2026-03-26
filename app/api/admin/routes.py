@@ -48,6 +48,7 @@ from app.schemas.common import SuccessEnvelope
 from app.services.admin_collection import AdminCollectionService
 from app.services.admin_auth import AdminAuthService
 from app.services.admin_content import AdminContentService
+from app.services.resource_locator import ResourceLocator
 
 logger = logging.getLogger(__name__)
 
@@ -99,6 +100,7 @@ def get_admin_content_service(
     return AdminContentService(
         repository,
         session_secret=settings.security_session_secret.get_secret_value(),
+        resource_locator=ResourceLocator.from_settings(settings),
     )
 
 
