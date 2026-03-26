@@ -48,6 +48,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (pageName === "admin-tags") {
+    await renderTagManagementPage(session);
+    return;
+  }
+
   if (pageName === "admin-task-detail" && taskId) {
     await renderTaskDetailPage(session, taskId);
     return;
@@ -303,17 +308,24 @@ async function renderWallpaperDetailPage(session, id) {
   setLoadingState("正在读取后台内容详情...");
 
   try {
-    const detail = await fetchAdmin(`/api/admin/wallpapers/${encodeURIComponent(id)}`, {
-      token: session.session_token,
-    });
-    renderWallpaperDetailView(session, detail.data);
+    const [detail, tagsPayload] = await Promise.all([
+      fetchAdmin(`/api/admin/wallpapers/${encodeURIComponent(id)}`, {
+        token: session.session_token,
+      }),
+      fetchAdmin("/api/admin/tags", {
+        token: session.session_token,
+      }),
+    ]);
+    renderWallpaperDetailView(session, detail.data, tagsPayload.data.items || []);
   } catch (error) {
     handleAdminError(error);
   }
 }
 
-function renderWallpaperDetailView(session, detail) {
+function renderWallpaperDetailView(session, detail, availableTags) {
   const recentOperations = Array.isArray(detail.recent_operations) ? detail.recent_operations : [];
+  const currentTags = Array.isArray(detail.tags) ? detail.tags : [];
+  const tagOptions = Array.isArray(availableTags) ? availableTags : [];
 
   adminRoot.innerHTML = `
     <div class="panel-head">
@@ -377,6 +389,51 @@ function renderWallpaperDetailView(session, detail) {
           ${renderDetailRow("原始图片", detail.origin_image_url || "无")}
         </dl>
       </article>
+      <article class="detail-card">
+        <div class="panel-head">
+          <div>
+            <h3>标签绑定</h3>
+            <p class="muted-copy">这里通过 <code>/api/admin/wallpapers/${escapeHtml(String(detail.id))}/tags</code> 提交绑定关系。</p>
+          </div>
+          <a class="inline-link" href="/admin/tags">前往标签管理</a>
+        </div>
+        <div class="notice-card">
+          <h4>当前已绑定标签</h4>
+          <p>${currentTags.length === 0 ? "当前没有绑定标签。" : currentTags.map((item) => `${item.tag_name} (${item.tag_key})`).join(" / ")}</p>
+        </div>
+        ${
+          tagOptions.length === 0
+            ? `<div class="notice-card notice-card-warning"><h4>还没有可维护标签</h4><p>请先去标签管理页创建标签，再回来为内容绑定。</p></div>`
+            : `
+              <form class="admin-form" id="wallpaper-tag-form">
+                <div class="tag-chip-grid">
+                  ${tagOptions
+                    .map((tag) => {
+                      const checked = currentTags.some((item) => Number(item.id) === Number(tag.id));
+                      const disabledCopy = tag.status === "disabled" ? "（已停用，仅后台可见）" : "";
+                      return `
+                        <label class="tag-chip">
+                          <input type="checkbox" name="tag_ids" value="${escapeHtml(String(tag.id))}" ${checked ? "checked" : ""} />
+                          <span>
+                            <strong>${escapeHtml(tag.tag_name)}</strong>
+                            <em>${escapeHtml(tag.tag_key)}${escapeHtml(disabledCopy)}</em>
+                          </span>
+                        </label>
+                      `;
+                    })
+                    .join("")}
+                </div>
+                <div class="field-group">
+                  <label for="tag-operator-reason">绑定原因</label>
+                  <input id="tag-operator-reason" name="operator_reason" type="text" placeholder="例如：补充主题标签" required />
+                </div>
+                <div class="button-row">
+                  <button class="primary-button" type="submit">保存标签绑定</button>
+                </div>
+              </form>
+            `
+        }
+      </article>
       <article class="detail-card detail-card-wide">
         <h3>最近操作记录</h3>
         ${recentOperations.length === 0 ? `<div class="notice-card"><h4>暂无最近操作</h4><p>该内容尚未产生后台状态变更记录。</p></div>` : renderRecentOperationList(recentOperations)}
@@ -390,6 +447,214 @@ function renderWallpaperDetailView(session, detail) {
   }
 
   bindWallpaperStatusActions(session, feedback);
+  bindWallpaperTagActions(session, feedback, detail.id);
+}
+
+async function renderTagManagementPage(session) {
+  setLoadingState("正在读取标签列表...");
+
+  try {
+    const state = readTagState();
+    const payload = await fetchAdmin(`/api/admin/tags?${buildTagParams(state).toString()}`, {
+      token: session.session_token,
+    });
+    renderTagManagementView(session, payload, state);
+  } catch (error) {
+    handleAdminError(error);
+  }
+}
+
+function renderTagManagementView(session, payload, state) {
+  const items = Array.isArray(payload.data.items) ? payload.data.items : [];
+
+  adminRoot.innerHTML = `
+    <div class="panel-head">
+      <div>
+        <h2>标签维护</h2>
+        <p class="muted-copy">标签定义统一保存在 <code>tags</code> 表中，内容绑定保存在 <code>wallpaper_tags</code> 表中。</p>
+      </div>
+      <p class="meta-pill">共 ${items.length} 个标签</p>
+    </div>
+    <section class="detail-grid">
+      <article class="detail-card">
+        <h3>创建 / 更新标签</h3>
+        <form class="admin-form" id="tag-form">
+          <input type="hidden" name="tag_id" />
+          <div class="filter-grid">
+            <div class="field-group">
+              <label for="tag-key">稳定键</label>
+              <input id="tag-key" name="tag_key" type="text" placeholder="例如 theme_landscape" required />
+            </div>
+            <div class="field-group">
+              <label for="tag-name">标签名</label>
+              <input id="tag-name" name="tag_name" type="text" placeholder="例如 风景" required />
+            </div>
+            <div class="field-group">
+              <label for="tag-category">分类</label>
+              <input id="tag-category" name="tag_category" type="text" placeholder="例如 theme" />
+            </div>
+            <div class="field-group">
+              <label for="tag-status">状态</label>
+              <select id="tag-status" name="status">
+                <option value="enabled">enabled</option>
+                <option value="disabled">disabled</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="tag-sort-weight">排序权重</label>
+              <input id="tag-sort-weight" name="sort_weight" type="number" value="0" />
+            </div>
+            <div class="field-group">
+              <label for="tag-operator-reason">操作原因</label>
+              <input id="tag-operator-reason" name="operator_reason" type="text" placeholder="例如：新增公开主题标签" required />
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" type="submit">保存标签</button>
+            <button class="ghost-button" id="reset-tag-form" type="button">清空表单</button>
+          </div>
+        </form>
+        <div id="tag-form-feedback"></div>
+      </article>
+      <article class="detail-card">
+        <h3>标签筛选</h3>
+        <form class="admin-form" id="tag-filter-form">
+          <div class="filter-grid">
+            <div class="field-group">
+              <label for="tag-filter-status">状态</label>
+              <select id="tag-filter-status" name="status">
+                <option value="">全部</option>
+                <option value="enabled">enabled</option>
+                <option value="disabled">disabled</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="tag-filter-category">分类</label>
+              <input id="tag-filter-category" name="tag_category" type="text" placeholder="例如 theme" />
+            </div>
+          </div>
+          <div class="button-row">
+            <button class="primary-button" type="submit">刷新标签列表</button>
+            <button class="ghost-button" id="reset-tag-filters" type="button">重置筛选</button>
+          </div>
+        </form>
+      </article>
+    </section>
+    <section class="table-card">
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>标签</th>
+              <th>状态</th>
+              <th>分类</th>
+              <th>排序</th>
+              <th>内容数</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="tag-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+  `;
+
+  const form = document.querySelector("#tag-form");
+  const feedback = document.querySelector("#tag-form-feedback");
+  const filterForm = document.querySelector("#tag-filter-form");
+  const tableBody = document.querySelector("#tag-table-body");
+
+  if (
+    !(form instanceof HTMLFormElement) ||
+    !(feedback instanceof HTMLElement) ||
+    !(filterForm instanceof HTMLFormElement) ||
+    !(tableBody instanceof HTMLElement)
+  ) {
+    return;
+  }
+
+  assignFormValue(filterForm, "status", state.status);
+  assignFormValue(filterForm, "tag_category", state.tag_category);
+
+  if (items.length === 0) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="6">
+          <div class="notice-card">
+            <h3>当前没有匹配标签</h3>
+            <p>可以先创建标签，或者调整状态与分类筛选条件。</p>
+          </div>
+        </td>
+      </tr>
+    `;
+  } else {
+    tableBody.innerHTML = items.map((item) => renderTagRow(item)).join("");
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const tagId = stringValue(formData.get("tag_id"));
+    const isUpdate = Boolean(tagId);
+    const requestPayload = {
+      tag_key: stringValue(formData.get("tag_key")),
+      tag_name: stringValue(formData.get("tag_name")),
+      tag_category: stringValue(formData.get("tag_category")) || null,
+      status: stringValue(formData.get("status")) || "enabled",
+      sort_weight: Number(formData.get("sort_weight") || 0),
+      operator_reason: stringValue(formData.get("operator_reason")),
+    };
+
+    setNotice(feedback, isUpdate ? "正在更新标签..." : "正在创建标签...", "操作会写入审计日志，请稍候。");
+    try {
+      if (isUpdate) {
+        await fetchAdmin(`/api/admin/tags/${encodeURIComponent(tagId)}`, {
+          method: "PATCH",
+          token: session.session_token,
+          body: JSON.stringify(requestPayload),
+        });
+      } else {
+        await fetchAdmin("/api/admin/tags", {
+          method: "POST",
+          token: session.session_token,
+          body: JSON.stringify(requestPayload),
+        });
+      }
+      redirectTo(`/admin/tags?${buildTagParams(state).toString()}`);
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof ApiError ? error.message : "标签保存失败，请稍后重试。";
+      setNotice(feedback, "操作失败", message);
+    }
+  });
+
+  filterForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const formData = new FormData(filterForm);
+    const nextState = {
+      status: stringValue(formData.get("status")),
+      tag_category: stringValue(formData.get("tag_category")),
+    };
+    redirectTo(`/admin/tags?${buildTagParams(nextState).toString()}`);
+  });
+
+  const resetFormButton = document.querySelector("#reset-tag-form");
+  if (resetFormButton instanceof HTMLButtonElement) {
+    resetFormButton.addEventListener("click", () => {
+      form.reset();
+      assignFormValue(form, "tag_id", "");
+      assignFormValue(form, "sort_weight", "0");
+    });
+  }
+
+  const resetFilterButton = document.querySelector("#reset-tag-filters");
+  if (resetFilterButton instanceof HTMLButtonElement) {
+    resetFilterButton.addEventListener("click", () => {
+      redirectTo("/admin/tags");
+    });
+  }
+
+  bindTagEditActions(items);
 }
 
 async function renderTaskListPage(session) {
@@ -902,6 +1167,7 @@ function renderAuditView(payload, state) {
           <select id="target-type" name="target_type">
             <option value="">全部</option>
             <option value="wallpaper">wallpaper</option>
+            <option value="tag">tag</option>
             <option value="collection_task">collection_task</option>
             <option value="admin_session">admin_session</option>
           </select>
@@ -1050,6 +1316,40 @@ function bindWallpaperStatusActions(session, feedback) {
   });
 }
 
+function bindWallpaperTagActions(session, feedback, wallpaperIdValue) {
+  const form = document.querySelector("#wallpaper-tag-form");
+  if (!(form instanceof HTMLFormElement)) {
+    return;
+  }
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const selectedIds = formData.getAll("tag_ids").map((value) => Number(value)).filter((value) => Number.isInteger(value) && value > 0);
+    const operatorReason = stringValue(formData.get("operator_reason"));
+    if (!operatorReason) {
+      setNotice(feedback, "缺少原因", "请填写本次标签绑定原因。");
+      return;
+    }
+
+    setNotice(feedback, "正在保存标签绑定...", "提交后会写入审计日志，并立即影响后台详情与公开筛选。");
+    try {
+      await fetchAdmin(`/api/admin/wallpapers/${encodeURIComponent(String(wallpaperIdValue))}/tags`, {
+        method: "PUT",
+        token: session.session_token,
+        body: JSON.stringify({
+          tag_ids: selectedIds,
+          operator_reason: operatorReason,
+        }),
+      });
+      redirectTo(window.location.pathname + window.location.search);
+    } catch (error) {
+      console.error(error);
+      const message = error instanceof ApiError ? error.message : "标签绑定保存失败，请稍后重试。";
+      setNotice(feedback, "保存失败", message);
+    }
+  });
+}
+
 function bindTaskRetryActions(session, feedbackNode = null) {
   document.querySelectorAll("[data-task-retry]").forEach((button) => {
     if (!(button instanceof HTMLButtonElement)) {
@@ -1082,6 +1382,34 @@ function bindTaskRetryActions(session, feedbackNode = null) {
           window.alert(message);
         }
       }
+    });
+  });
+}
+
+function bindTagEditActions(items) {
+  document.querySelectorAll("[data-tag-edit]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    button.addEventListener("click", () => {
+      const targetId = Number(button.dataset.tagEdit);
+      const tag = items.find((item) => Number(item.id) === targetId);
+      const form = document.querySelector("#tag-form");
+      const feedback = document.querySelector("#tag-form-feedback");
+      if (!tag || !(form instanceof HTMLFormElement)) {
+        return;
+      }
+      assignFormValue(form, "tag_id", String(tag.id));
+      assignFormValue(form, "tag_key", tag.tag_key);
+      assignFormValue(form, "tag_name", tag.tag_name);
+      assignFormValue(form, "tag_category", tag.tag_category || "");
+      assignFormValue(form, "status", tag.status);
+      assignFormValue(form, "sort_weight", String(tag.sort_weight));
+      assignFormValue(form, "operator_reason", `更新标签 ${tag.tag_key}`);
+      if (feedback instanceof HTMLElement) {
+        setNotice(feedback, "已载入标签", `正在编辑标签 ${tag.tag_name} (${tag.tag_key})。修改后提交即可更新。`);
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
     });
   });
 }
@@ -1157,6 +1485,29 @@ function renderTaskRow(item) {
           <a class="inline-link" href="/admin/tasks/${escapeHtml(String(item.id))}">详情</a>
           <a class="inline-link" href="/admin/logs?task_id=${escapeHtml(String(item.id))}">日志</a>
           ${renderRetryButton(item)}
+        </div>
+      </td>
+    </tr>
+  `;
+}
+
+function renderTagRow(item) {
+  return `
+    <tr>
+      <td>
+        <div class="table-title">
+          <strong>${escapeHtml(item.tag_name)}</strong>
+          <span><code>${escapeHtml(item.tag_key)}</code></span>
+        </div>
+      </td>
+      <td><span class="status-badge">${escapeHtml(item.status)}</span></td>
+      <td>${escapeHtml(item.tag_category || "未分类")}</td>
+      <td>${escapeHtml(String(item.sort_weight))}</td>
+      <td>${escapeHtml(String(item.wallpaper_count))}</td>
+      <td>
+        <div class="button-row">
+          <button class="mini-button" type="button" data-tag-edit="${escapeHtml(String(item.id))}">编辑</button>
+          <a class="inline-link" href="/admin/audit-logs?target_type=tag&target_id=${escapeHtml(String(item.id))}">审计</a>
         </div>
       </td>
     </tr>
@@ -1284,6 +1635,8 @@ function buildPageHref(basePath, state, page) {
   let params = buildWallpaperListParams(nextState);
   if (basePath.includes("/admin/audit-logs")) {
     params = buildAuditParams(nextState);
+  } else if (basePath === "/admin/tags") {
+    params = buildTagParams(nextState);
   } else if (basePath === "/admin/tasks") {
     params = buildTaskParams(nextState);
   } else if (basePath === "/admin/logs") {
@@ -1315,6 +1668,14 @@ function readTaskListState() {
     created_to_utc: toDatetimeLocalValue(params.get("created_to_utc")),
     page: params.get("page") || "1",
     page_size: params.get("page_size") || "20",
+  };
+}
+
+function readTagState() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    status: params.get("status") || "",
+    tag_category: params.get("tag_category") || "",
   };
 }
 
@@ -1364,6 +1725,13 @@ function buildTaskParams(state) {
   setOptionalParam(params, "source_type", state.source_type);
   setOptionalParam(params, "created_from_utc", toUtcQueryValue(state.created_from_utc));
   setOptionalParam(params, "created_to_utc", toUtcQueryValue(state.created_to_utc));
+  return params;
+}
+
+function buildTagParams(state) {
+  const params = new URLSearchParams();
+  setOptionalParam(params, "status", state.status);
+  setOptionalParam(params, "tag_category", state.tag_category);
   return params;
 }
 

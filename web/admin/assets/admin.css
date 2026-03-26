@@ -210,6 +210,36 @@ pre {
   color: var(--ink-soft);
 }
 
+.tag-chip-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tag-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: rgba(255, 255, 255, 0.82);
+  padding: 12px 14px;
+}
+
+.tag-chip input {
+  margin-top: 3px;
+}
+
+.tag-chip span {
+  display: grid;
+}
+
+.tag-chip em {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  font-style: normal;
+}
+
 .checkbox-row input {
   inline-size: 18px;
   block-size: 18px;
@@ -403,6 +433,7 @@ pre {
 
 @media (max-width: 960px) {
   .filter-grid,
+  .tag-chip-grid,
   .detail-grid,
   .stats-grid {
     grid-template-columns: 1fr;

@@ -31,9 +31,16 @@ from app.schemas.admin_auth import AdminLogoutData
 from app.schemas.admin_auth import AdminSessionContext
 from app.schemas.admin_content import AdminAuditLogListData
 from app.schemas.admin_content import AdminAuditLogListQuery
+from app.schemas.admin_content import AdminTagCreateRequest
+from app.schemas.admin_content import AdminTagData
+from app.schemas.admin_content import AdminTagListData
+from app.schemas.admin_content import AdminTagListQuery
+from app.schemas.admin_content import AdminTagUpdateRequest
 from app.schemas.admin_content import AdminWallpaperDetailData
 from app.schemas.admin_content import AdminWallpaperListData
 from app.schemas.admin_content import AdminWallpaperListQuery
+from app.schemas.admin_content import AdminWallpaperTagBindingData
+from app.schemas.admin_content import AdminWallpaperTagBindingRequest
 from app.schemas.admin_content import AdminWallpaperStatusUpdateData
 from app.schemas.admin_content import AdminWallpaperStatusUpdateRequest
 from app.schemas.common import ErrorEnvelope
@@ -247,6 +254,34 @@ def update_admin_wallpaper_status(
     return build_success_response(request=request, data=data.model_dump())
 
 
+@router.put(
+    "/wallpapers/{wallpaper_id}/tags",
+    response_model=SuccessEnvelope[AdminWallpaperTagBindingData],
+    responses=ERROR_RESPONSES,
+)
+def update_admin_wallpaper_tags(
+    wallpaper_id: int,
+    payload: AdminWallpaperTagBindingRequest,
+    request: Request,
+    session: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminContentService, Depends(get_admin_content_service)],
+) -> dict[str, object]:
+    data = service.update_wallpaper_tags(
+        wallpaper_id=wallpaper_id,
+        payload=payload,
+        session=session,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info(
+        "Admin wallpaper tags updated: wallpaper_id=%s tag_count=%s",
+        wallpaper_id,
+        len(data.tags),
+    )
+    return build_success_response(request=request, data=data.model_dump())
+
+
 @router.get(
     "/audit-logs",
     response_model=SuccessEnvelope[AdminAuditLogListData],
@@ -271,6 +306,73 @@ def list_admin_audit_logs(
         data=data.model_dump(),
         pagination=pagination.model_dump(),
     )
+
+
+@router.get(
+    "/tags",
+    response_model=SuccessEnvelope[AdminTagListData],
+    responses=ERROR_RESPONSES,
+)
+def list_admin_tags(
+    request: Request,
+    query: Annotated[AdminTagListQuery, Depends()],
+    _: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminContentService, Depends(get_admin_content_service)],
+) -> dict[str, object]:
+    data = service.list_tags(query=query)
+    logger.info(
+        "Admin tags served: status=%s category=%s count=%s",
+        query.status,
+        query.tag_category,
+        len(data.items),
+    )
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.post(
+    "/tags",
+    response_model=SuccessEnvelope[AdminTagData],
+    responses=ERROR_RESPONSES,
+)
+def create_admin_tag(
+    payload: AdminTagCreateRequest,
+    request: Request,
+    session: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminContentService, Depends(get_admin_content_service)],
+) -> dict[str, object]:
+    data = service.create_tag(
+        payload=payload,
+        session=session,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info("Admin tag created: tag_id=%s tag_key=%s", data.tag.id, data.tag.tag_key)
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.patch(
+    "/tags/{tag_id}",
+    response_model=SuccessEnvelope[AdminTagData],
+    responses=ERROR_RESPONSES,
+)
+def update_admin_tag(
+    tag_id: int,
+    payload: AdminTagUpdateRequest,
+    request: Request,
+    session: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminContentService, Depends(get_admin_content_service)],
+) -> dict[str, object]:
+    data = service.update_tag(
+        tag_id=tag_id,
+        payload=payload,
+        session=session,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info("Admin tag updated: tag_id=%s tag_key=%s", tag_id, data.tag.tag_key)
+    return build_success_response(request=request, data=data.model_dump())
 
 
 @router.post(

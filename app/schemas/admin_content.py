@@ -11,7 +11,8 @@ from pydantic import field_validator
 
 ContentStatus = Literal["draft", "enabled", "disabled", "deleted"]
 ImageStatus = Literal["pending", "ready", "failed"]
-AdminTargetType = Literal["wallpaper", "admin_session", "collection_task"]
+TagStatus = Literal["enabled", "disabled"]
+AdminTargetType = Literal["wallpaper", "admin_session", "collection_task", "tag"]
 
 
 class AdminWallpaperListQuery(BaseModel):
@@ -56,6 +57,15 @@ class AdminWallpaperSummary(BaseModel):
 
 class AdminWallpaperListData(BaseModel):
     items: list[AdminWallpaperSummary]
+
+
+class AdminWallpaperTagSummary(BaseModel):
+    id: int
+    tag_key: str
+    tag_name: str
+    tag_category: str | None
+    status: TagStatus
+    sort_weight: int
 
 
 class AdminAuditLogSummary(BaseModel):
@@ -108,6 +118,7 @@ class AdminWallpaperDetailData(BaseModel):
     deleted_at_utc: str | None
     created_at_utc: str
     updated_at_utc: str
+    tags: list[AdminWallpaperTagSummary]
     recent_operations: list[AdminAuditLogSummary]
 
 
@@ -146,3 +157,86 @@ class AdminAuditLogListQuery(BaseModel):
 
 class AdminAuditLogListData(BaseModel):
     items: list[AdminAuditLogSummary]
+
+
+class AdminTagListQuery(BaseModel):
+    status: TagStatus | None = None
+    tag_category: str | None = Field(default=None, min_length=1, max_length=64)
+
+
+class AdminTagSummary(BaseModel):
+    id: int
+    tag_key: str
+    tag_name: str
+    tag_category: str | None
+    status: TagStatus
+    sort_weight: int
+    wallpaper_count: int
+    created_at_utc: str
+    updated_at_utc: str
+
+
+class AdminTagListData(BaseModel):
+    items: list[AdminTagSummary]
+
+
+class AdminTagCreateRequest(BaseModel):
+    tag_key: str = Field(min_length=1, max_length=64)
+    tag_name: str = Field(min_length=1, max_length=64)
+    tag_category: str | None = Field(default=None, max_length=64)
+    status: TagStatus = "enabled"
+    sort_weight: int = 0
+    operator_reason: str = Field(min_length=1, max_length=200)
+
+
+class AdminTagUpdateRequest(BaseModel):
+    tag_key: str | None = Field(default=None, min_length=1, max_length=64)
+    tag_name: str | None = Field(default=None, min_length=1, max_length=64)
+    tag_category: str | None = Field(default=None, max_length=64)
+    status: TagStatus | None = None
+    sort_weight: int | None = None
+    operator_reason: str = Field(min_length=1, max_length=200)
+
+    @field_validator("tag_category")
+    @classmethod
+    def normalize_tag_category(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @field_validator("tag_key")
+    @classmethod
+    def normalize_tag_key(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
+    @field_validator("tag_name")
+    @classmethod
+    def normalize_tag_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return value.strip()
+
+
+class AdminTagData(BaseModel):
+    tag: AdminTagSummary
+
+
+class AdminWallpaperTagBindingRequest(BaseModel):
+    tag_ids: list[int] = Field(default_factory=list)
+    operator_reason: str = Field(min_length=1, max_length=200)
+
+    @field_validator("tag_ids")
+    @classmethod
+    def validate_tag_ids(cls, value: list[int]) -> list[int]:
+        unique_ids = list(dict.fromkeys(value))
+        if any(tag_id < 1 for tag_id in unique_ids):
+            raise ValueError("tag_ids must contain positive integers")
+        return unique_ids
+
+
+class AdminWallpaperTagBindingData(BaseModel):
+    wallpaper_id: int
+    tags: list[AdminWallpaperTagSummary]

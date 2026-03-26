@@ -12,6 +12,7 @@ from tests.integration.test_admin_auth import build_client
 from tests.integration.test_admin_auth import prepare_database
 from tests.integration.test_admin_auth import seed_admin_user
 from tests.integration.test_public_api import seed_wallpaper
+from tests.integration.test_public_api import seed_tag
 
 
 def test_admin_wallpaper_list_and_detail_return_management_fields(tmp_path: Path) -> None:
@@ -228,6 +229,147 @@ def test_admin_audit_log_query_supports_time_range_filters(tmp_path: Path) -> No
     created_values = [item["created_at_utc"] for item in payload["data"]["items"]]
     assert "2026-03-24T12:00:00Z" in created_values
     assert "2026-03-24T10:00:00Z" not in created_values
+
+
+def test_admin_tag_create_update_and_wallpaper_binding_workflow(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+    wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Tagged Wallpaper",
+    )
+    existing_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-ocean",
+        tag_name="海洋",
+    )
+
+    with build_client(tmp_path) as client:
+        session_token = login_admin(client)
+        create_response = client.post(
+            "/api/admin/tags",
+            headers={"Authorization": f"Bearer {session_token}"},
+            json={
+                "tag_key": "theme-sunset",
+                "tag_name": "日落",
+                "tag_category": "theme",
+                "status": "enabled",
+                "sort_weight": 8,
+                "operator_reason": "新增主题标签",
+            },
+        )
+        created_tag_id = create_response.json()["data"]["tag"]["id"]
+        update_response = client.patch(
+            f"/api/admin/tags/{created_tag_id}",
+            headers={"Authorization": f"Bearer {session_token}"},
+            json={
+                "tag_name": "晚霞",
+                "status": "disabled",
+                "operator_reason": "调整公开标签",
+            },
+        )
+        bind_response = client.put(
+            f"/api/admin/wallpapers/{wallpaper_id}/tags",
+            headers={"Authorization": f"Bearer {session_token}"},
+            json={
+                "tag_ids": [existing_tag_id, created_tag_id],
+                "operator_reason": "补充内容标签",
+            },
+        )
+        tags_response = client.get(
+            "/api/admin/tags",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+        detail_response = client.get(
+            f"/api/admin/wallpapers/{wallpaper_id}",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+        public_filter_response = client.get("/api/public/wallpaper-filters")
+
+    create_payload = create_response.json()
+    update_payload = update_response.json()
+    bind_payload = bind_response.json()
+    tags_payload = tags_response.json()
+    detail_payload = detail_response.json()
+    public_filter_payload = public_filter_response.json()
+
+    assert create_response.status_code == 200
+    assert create_payload["data"]["tag"]["tag_key"] == "theme-sunset"
+    assert create_payload["data"]["tag"]["wallpaper_count"] == 0
+
+    assert update_response.status_code == 200
+    assert update_payload["data"]["tag"]["tag_name"] == "晚霞"
+    assert update_payload["data"]["tag"]["status"] == "disabled"
+
+    assert bind_response.status_code == 200
+    assert bind_payload["data"]["wallpaper_id"] == wallpaper_id
+    assert [item["tag_key"] for item in bind_payload["data"]["tags"]] == [
+        "theme-sunset",
+        "theme-ocean",
+    ]
+
+    assert tags_response.status_code == 200
+    assert [item["tag_key"] for item in tags_payload["data"]["items"]] == [
+        "theme-sunset",
+        "theme-ocean",
+    ]
+    assert tags_payload["data"]["items"][0]["wallpaper_count"] == 1
+
+    assert detail_response.status_code == 200
+    assert [item["tag_key"] for item in detail_payload["data"]["tags"]] == [
+        "theme-sunset",
+        "theme-ocean",
+    ]
+    assert detail_payload["data"]["recent_operations"][0]["action_type"] == "wallpaper_tags_updated"
+
+    assert public_filter_response.status_code == 200
+    assert public_filter_payload["data"]["tags"] == [
+        {
+            "id": existing_tag_id,
+            "tag_key": "theme-ocean",
+            "tag_name": "海洋",
+            "tag_category": None,
+        }
+    ]
+
+
+def test_admin_tag_create_rejects_duplicate_tag_key(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+    seed_tag(
+        database_path=database_path,
+        tag_key="theme-river",
+        tag_name="河流",
+    )
+
+    with build_client(tmp_path) as client:
+        session_token = login_admin(client)
+        response = client.post(
+            "/api/admin/tags",
+            headers={"Authorization": f"Bearer {session_token}"},
+            json={
+                "tag_key": "theme-river",
+                "tag_name": "重复河流",
+                "tag_category": "theme",
+                "status": "enabled",
+                "sort_weight": 0,
+                "operator_reason": "测试重复键",
+            },
+        )
+
+    payload = response.json()
+    assert response.status_code == 409
+    assert payload["error_code"] == "CONTENT_TAG_KEY_CONFLICT"
 
 
 def login_admin(client: TestClient) -> str:

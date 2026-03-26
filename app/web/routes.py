@@ -102,6 +102,16 @@ def get_admin_collection_tasks_page() -> HTMLResponse:
     )
 
 
+@router.get("/admin/tags", response_class=HTMLResponse)
+def get_admin_tags_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-tags",
+        page_title="BingWall Admin | 标签管理",
+        page_heading="标签管理",
+        page_summary="维护标签定义、启停状态和排序权重，并为内容详情页提供可绑定标签集合。",
+    )
+
+
 @router.get("/admin/tasks/{task_id}", response_class=HTMLResponse)
 def get_admin_collection_task_detail_page(task_id: int) -> HTMLResponse:
     return render_admin_page(
@@ -217,6 +227,7 @@ def render_admin_page(
         </div>
         <nav class="admin-nav" aria-label="后台导航">
           <a href="/admin/wallpapers">内容管理</a>
+          <a href="/admin/tags">标签管理</a>
           <a href="/admin/tasks">采集任务</a>
           <a href="/admin/logs">结构化日志</a>
           <a href="/admin/audit-logs">审计记录</a>

@@ -89,7 +89,7 @@ def test_public_wallpaper_detail_returns_null_download_url_when_not_downloadable
 
 def test_public_wallpaper_filters_and_site_info_only_return_public_options(tmp_path: Path) -> None:
     database_path = prepare_database(tmp_path)
-    seed_wallpaper(
+    visible_wallpaper_id = seed_wallpaper(
         database_path=database_path,
         wallpaper_date="2026-03-24",
         market_code="en-US",
@@ -108,25 +108,114 @@ def test_public_wallpaper_filters_and_site_info_only_return_public_options(tmp_p
         title="Hidden deleted",
         content_status="deleted",
     )
+    enabled_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-forest",
+        tag_name="森林",
+    )
+    disabled_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-hidden",
+        tag_name="隐藏标签",
+        status="disabled",
+    )
+    bind_wallpaper_tags(
+        database_path=database_path,
+        wallpaper_id=visible_wallpaper_id,
+        tag_ids=[enabled_tag_id, disabled_tag_id],
+    )
 
     with build_client(tmp_path) as client:
         filters_response = client.get("/api/public/wallpaper-filters")
+        tags_response = client.get("/api/public/tags")
         site_info_response = client.get("/api/public/site-info")
 
     filters_payload = filters_response.json()
+    tags_payload = tags_response.json()
     site_info_payload = site_info_response.json()
     assert filters_response.status_code == 200
     assert filters_payload["data"]["markets"] == [
         {"code": "en-US", "label": "English (United States)"},
         {"code": "fr-FR", "label": "Français (France)"},
     ]
+    assert filters_payload["data"]["tags"] == [
+        {
+            "id": enabled_tag_id,
+            "tag_key": "theme-forest",
+            "tag_name": "森林",
+            "tag_category": None,
+        }
+    ]
     assert filters_payload["data"]["sort_options"] == [{"value": "date_desc", "label": "最新优先"}]
+    assert tags_response.status_code == 200
+    assert tags_payload["data"]["items"] == [
+        {
+            "id": enabled_tag_id,
+            "tag_key": "theme-forest",
+            "tag_name": "森林",
+            "tag_category": None,
+        }
+    ]
     assert site_info_response.status_code == 200
     assert site_info_payload["data"] == {
         "site_name": "BingWall",
         "site_description": "Bing 壁纸图片服务",
         "default_market_code": "en-US",
     }
+
+
+def test_public_wallpaper_list_supports_enabled_tag_filter(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    sea_wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Sea Visible",
+    )
+    mountain_wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-23",
+        market_code="en-US",
+        title="Mountain Visible",
+    )
+    theme_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-sea",
+        tag_name="海洋",
+    )
+    location_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="location-us",
+        tag_name="美国",
+    )
+    disabled_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-disabled",
+        tag_name="停用标签",
+        status="disabled",
+    )
+    bind_wallpaper_tags(
+        database_path=database_path,
+        wallpaper_id=sea_wallpaper_id,
+        tag_ids=[theme_tag_id, location_tag_id, disabled_tag_id],
+    )
+    bind_wallpaper_tags(
+        database_path=database_path,
+        wallpaper_id=mountain_wallpaper_id,
+        tag_ids=[location_tag_id],
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers?tag_keys=theme-sea,location-us")
+        hidden_response = client.get("/api/public/wallpapers?tag_keys=theme-disabled")
+
+    payload = response.json()
+    hidden_payload = hidden_response.json()
+    assert response.status_code == 200
+    assert payload["pagination"]["total"] == 1
+    assert payload["data"]["items"][0]["title"] == "Sea Visible"
+    assert hidden_response.status_code == 200
+    assert hidden_payload["pagination"]["total"] == 0
 
 
 def test_public_wallpaper_endpoints_return_uniform_errors_for_invalid_or_hidden_items(
@@ -315,3 +404,66 @@ def seed_wallpaper(
 
 def slugify(value: str) -> str:
     return value.lower().replace(" ", "-")
+
+
+def seed_tag(
+    *,
+    database_path: Path,
+    tag_key: str,
+    tag_name: str,
+    tag_category: str | None = None,
+    status: str = "enabled",
+    sort_weight: int = 0,
+) -> int:
+    connection = sqlite3.connect(database_path)
+    try:
+        now_utc = datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        cursor = connection.execute(
+            """
+            INSERT INTO tags (
+                tag_key,
+                tag_name,
+                tag_category,
+                status,
+                sort_weight,
+                created_at_utc,
+                updated_at_utc
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?);
+            """,
+            (tag_key, tag_name, tag_category, status, sort_weight, now_utc, now_utc),
+        )
+        if cursor.lastrowid is None:
+            raise RuntimeError("Failed to create tag test record.")
+        connection.commit()
+        return int(cursor.lastrowid)
+    finally:
+        connection.close()
+
+
+def bind_wallpaper_tags(
+    *,
+    database_path: Path,
+    wallpaper_id: int,
+    tag_ids: list[int],
+    created_by: str = "pytest",
+) -> None:
+    connection = sqlite3.connect(database_path)
+    try:
+        now_utc = datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        for tag_id in tag_ids:
+            connection.execute(
+                """
+                INSERT INTO wallpaper_tags (
+                    wallpaper_id,
+                    tag_id,
+                    created_at_utc,
+                    created_by
+                )
+                VALUES (?, ?, ?, ?);
+                """,
+                (wallpaper_id, tag_id, now_utc, created_by),
+            )
+        connection.commit()
+    finally:
+        connection.close()

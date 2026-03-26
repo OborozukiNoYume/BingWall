@@ -1,16 +1,34 @@
 from typing import Literal
+import re
 
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import field_validator
 
 
 class PublicWallpaperListQuery(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
     market_code: str | None = Field(default=None, min_length=2, max_length=32)
+    tag_keys: str | None = Field(default=None, max_length=500)
     resolution_min_width: int | None = Field(default=None, ge=1)
     resolution_min_height: int | None = Field(default=None, ge=1)
     sort: Literal["date_desc"] = "date_desc"
+
+    @field_validator("tag_keys")
+    @classmethod
+    def normalize_tag_keys(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        parts = [item.strip() for item in value.split(",") if item.strip()]
+        if not parts:
+            return None
+        invalid = [
+            item for item in parts if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{0,63}", item) is None
+        ]
+        if invalid:
+            raise ValueError("tag_keys contains invalid tag key")
+        return ",".join(parts)
 
 
 class PublicWallpaperSummary(BaseModel):
@@ -53,8 +71,16 @@ class PublicSortFilterOption(BaseModel):
     label: str
 
 
+class PublicTagFilterOption(BaseModel):
+    id: int
+    tag_key: str
+    tag_name: str
+    tag_category: str | None
+
+
 class PublicWallpaperFiltersData(BaseModel):
     markets: list[PublicMarketFilterOption]
+    tags: list[PublicTagFilterOption]
     sort_options: list[PublicSortFilterOption]
 
 
@@ -62,3 +88,7 @@ class PublicSiteInfoData(BaseModel):
     site_name: str
     site_description: str
     default_market_code: str
+
+
+class PublicTagListData(BaseModel):
+    items: list[PublicTagFilterOption]

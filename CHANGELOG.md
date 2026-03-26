@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 2026-03-26T12:30:40Z
+
+### 变更内容
+
+- 新增 [app/repositories/migrations/versions/V0003__tags.sql](app/repositories/migrations/versions/V0003__tags.sql)，落地 `tags` 与 `wallpaper_tags` 两张标签相关表，并补齐标签状态排序索引和标签反查索引
+- 更新 [app/schemas/public.py](app/schemas/public.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/api/public/routes.py](app/api/public/routes.py)，为公开列表新增 `tag_keys` 逗号分隔标签筛选参数，并新增 `/api/public/tags`
+- 更新 [app/schemas/admin_content.py](app/schemas/admin_content.py)、[app/repositories/admin_content_repository.py](app/repositories/admin_content_repository.py)、[app/services/admin_content.py](app/services/admin_content.py) 与 [app/api/admin/routes.py](app/api/admin/routes.py)，新增后台标签列表、创建、更新和内容标签绑定接口，并为标签操作补齐审计日志
+- 更新 [app/web/routes.py](app/web/routes.py)、[web/admin/assets/admin.js](web/admin/assets/admin.js)、[web/admin/assets/admin.css](web/admin/assets/admin.css)、[web/public/assets/site.js](web/public/assets/site.js) 与 [web/public/assets/site.css](web/public/assets/site.css)，新增 `/admin/tags` 标签管理页、内容详情页标签绑定入口，以及公开列表页标签筛选交互
+- 更新 [tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)、[tests/integration/test_public_api.py](tests/integration/test_public_api.py)、[tests/integration/test_admin_content.py](tests/integration/test_admin_content.py)、[tests/integration/test_admin_frontend.py](tests/integration/test_admin_frontend.py) 与 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，覆盖标签迁移、后台创建更新、标签绑定、公开筛选和前端页面壳
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/data-model.md](docs/data-model.md)，同步 `T3.1` 完成状态、接口契约、当前阶段和后续优先级
+
+### 变更原因
+
+- 完成阶段三 `T3.1`，把“标签定义、后台维护、内容绑定、公开筛选”从预留设计推进为可运行实现
+- 保持最保守范围，复用现有 SQLite、FastAPI 和原生前端页面，不提前展开搜索、多来源、OSS/CDN 或新的前端框架
+- 让后台标签变更、内容标签绑定与公开筛选共享同一套数据关系，避免后台与公开端对标签口径不一致
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增数据库迁移：`V0003__tags.sql`
+- 变更时间：`2026-03-26T12:30:40Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖标签数据结构、公开列表筛选、公开标签接口、后台标签维护、内容详情页标签绑定和相关审计日志
+- 公开列表现在支持 `tag_keys` 逗号分隔参数；当传入多个标签时，当前实现按“同时命中这些标签”处理
+- 停用标签不会再出现在公开筛选项中，但后台仍可查看其历史绑定关系
+- 不涉及多来源采集、搜索能力、资源派生、OSS/CDN、下载统计、部署方式或运行时版本调整
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除标签迁移、回退公开/后台标签接口、页面交互、测试与文档更新，或执行 `git revert` 回退本次提交
+- 若目标环境数据库已应用 `V0003__tags.sql`，回滚前应先确认是否需要保留 `tags` / `wallpaper_tags` 现有数据，避免误删已维护的内容标签关系
+- 回滚后仓库将恢复到“已完成阶段二闭环，但标签体系仍停留在文档预留状态”的状态
+
 ## 2026-03-25T14:24:30Z
 
 ### 变更内容

@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-25T14:24:30Z
+- 更新时间：2026-03-26T12:30:40Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：公开接口与后台接口的统一契约说明
 
@@ -161,6 +161,7 @@
 | `page` | integer | 否 | 页码 |
 | `page_size` | integer | 否 | 每页数量 |
 | `market_code` | string | 否 | 地区筛选 |
+| `tag_keys` | string | 否 | 标签稳定键列表，使用半角逗号分隔；多标签按“同时命中”处理 |
 | `resolution_min_width` | integer | 否 | 最小宽度 |
 | `resolution_min_height` | integer | 否 | 最小高度 |
 | `sort` | string | 否 | 一期建议支持 `date_desc` |
@@ -221,6 +222,14 @@
     {
       "code": "en-US",
       "label": "English (United States)"
+    }
+  ],
+  "tags": [
+    {
+      "id": 1,
+      "tag_key": "theme_forest",
+      "tag_name": "森林",
+      "tag_category": "theme"
     }
   ],
   "sort_options": [
@@ -539,7 +548,7 @@
 
 ## 阶段三扩展接口预留
 
-以下接口不属于一期最低交付，但其路径和语义应在设计阶段先固定，避免后续字段和权限边界反复变化。
+以下接口中，标签相关能力已在 `T3.1` 落地；其余阶段三接口仍作为后续扩展预留。
 
 ### 标签查询与维护
 
@@ -547,6 +556,21 @@
 
 - 方法：`GET`
 - 路径：`/api/public/tags`
+
+响应数据结构（`data` 字段）：
+
+```json
+{
+  "items": [
+    {
+      "id": 1,
+      "tag_key": "theme_forest",
+      "tag_name": "森林",
+      "tag_category": "theme"
+    }
+  ]
+}
+```
 
 约束：
 
@@ -558,14 +582,33 @@
 - 方法：`GET`
 - 路径：`/api/admin/tags`
 
+请求参数：
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `status` | string | 否 | 标签状态，支持 `enabled`、`disabled` |
+| `tag_category` | string | 否 | 标签分类精确筛选 |
+
 #### 后台标签创建与更新
 
 - 方法：`POST` / `PATCH`
 - 路径：`/api/admin/tags`、`/api/admin/tags/{tag_id}`
 
+请求体字段：
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| `tag_key` | string | 创建必填 | 稳定机器键，当前实现会统一转为小写 |
+| `tag_name` | string | 创建必填 | 展示名称 |
+| `tag_category` | string | 否 | 标签分类 |
+| `status` | string | 否 | 标签状态，支持 `enabled`、`disabled` |
+| `sort_weight` | integer | 否 | 排序权重，值越大越靠前 |
+| `operator_reason` | string | 是 | 后台操作原因，会写入审计日志 |
+
 约束：
 
 - `tag_key` 必须唯一
+- `tag_key` 仅允许稳定 ASCII 字符，支持字母、数字、下划线和连字符
 - 停用标签后不得继续出现在公开筛选项中
 
 #### 后台内容标签绑定

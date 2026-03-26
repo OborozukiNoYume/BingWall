@@ -106,6 +106,31 @@ class PublicRepository:
         ).fetchall()
         return [str(row["market_code"]) for row in rows]
 
+    def list_visible_tags(self, *, current_time_utc: str) -> list[sqlite3.Row]:
+        filters, parameters = self._build_visibility_filters(
+            query=PublicWallpaperListQuery(),
+            current_time_utc=current_time_utc,
+        )
+        rows = self.connection.execute(
+            f"""
+            SELECT DISTINCT
+                t.id,
+                t.tag_key,
+                t.tag_name,
+                t.tag_category,
+                t.sort_weight
+            FROM tags AS t
+            INNER JOIN wallpaper_tags AS wt ON wt.tag_id = t.id
+            INNER JOIN wallpapers AS w ON w.id = wt.wallpaper_id
+            INNER JOIN image_resources AS r ON r.id = w.default_resource_id
+            WHERE {filters}
+              AND t.status = 'enabled'
+            ORDER BY t.sort_weight DESC, t.tag_name ASC, t.id ASC;
+            """,
+            parameters,
+        ).fetchall()
+        return list(rows)
+
     def _build_visibility_filters(
         self, *, query: PublicWallpaperListQuery, current_time_utc: str
     ) -> tuple[str, tuple[str | int, ...]]:
@@ -127,4 +152,37 @@ class PublicRepository:
         if query.resolution_min_height is not None:
             clauses.append("COALESCE(r.height, w.origin_height, 0) >= ?")
             parameters.append(query.resolution_min_height)
+        tag_clauses, tag_parameters = self._build_tag_filter(query=query)
+        clauses.extend(tag_clauses)
+        parameters.extend(tag_parameters)
         return " AND ".join(clauses), tuple(parameters)
+
+    def _build_tag_filter(self, *, query: PublicWallpaperListQuery) -> tuple[list[str], list[str]]:
+        tag_keys = _parse_tag_keys(query.tag_keys)
+        if not tag_keys:
+            return [], []
+
+        clauses: list[str] = []
+        parameters: list[str] = []
+        for index, tag_key in enumerate(tag_keys):
+            clauses.append(
+                f"""
+                EXISTS (
+                    SELECT 1
+                    FROM wallpaper_tags AS wt_{index}
+                    INNER JOIN tags AS t_{index} ON t_{index}.id = wt_{index}.tag_id
+                    WHERE wt_{index}.wallpaper_id = w.id
+                      AND t_{index}.status = 'enabled'
+                      AND t_{index}.tag_key = ?
+                )
+                """
+            )
+            parameters.append(tag_key)
+        return clauses, parameters
+
+
+def _parse_tag_keys(raw_value: str | None) -> list[str]:
+    if raw_value is None:
+        return []
+    parts = [item.strip() for item in raw_value.split(",") if item.strip()]
+    return list(dict.fromkeys(parts))

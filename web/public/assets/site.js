@@ -148,10 +148,12 @@ async function renderDetailPage(id) {
 
 function renderListView({ filters, listPayload, state }) {
   const markets = Array.isArray(filters.markets) ? filters.markets : [];
+  const tags = Array.isArray(filters.tags) ? filters.tags : [];
   const items = Array.isArray(listPayload.data.items) ? listPayload.data.items : [];
   const pagination = listPayload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
   const page = Number(pagination.page || 1);
   const totalPages = Number(pagination.total_pages || 0);
+  const selectedTagKeys = parseTagKeys(state.tag_keys);
 
   appRoot.innerHTML = `
     <div class="section-head">
@@ -186,6 +188,25 @@ function renderListView({ filters, listPayload, state }) {
             <option value="40">40</option>
           </select>
         </div>
+      </div>
+      <div class="field">
+        <label>标签</label>
+        ${
+          tags.length === 0
+            ? `<div class="status-card"><p class="status-copy">当前没有可公开筛选的标签。</p></div>`
+            : `<div class="tag-filter-grid">
+                ${tags
+                  .map(
+                    (tag) => `
+                      <label class="tag-filter-chip">
+                        <input type="checkbox" name="tag_keys" value="${escapeHtml(tag.tag_key)}" ${selectedTagKeys.includes(tag.tag_key) ? "checked" : ""} />
+                        <span>${escapeHtml(tag.tag_name)}</span>
+                      </label>
+                    `,
+                  )
+                  .join("")}
+              </div>`
+        }
       </div>
       <div class="button-row">
         <button class="button" type="submit">刷新结果</button>
@@ -224,6 +245,7 @@ function renderListView({ filters, listPayload, state }) {
     const formData = new FormData(filterForm);
     const nextState = {
       market_code: stringOrNull(formData.get("market_code")),
+      tag_keys: formData.getAll("tag_keys").map((value) => stringOrNull(value)).filter(Boolean).join(","),
       resolution_min_width: stringOrNull(formData.get("resolution_min_width")),
       resolution_min_height: stringOrNull(formData.get("resolution_min_height")),
       page_size: stringOrNull(formData.get("page_size")) || "20",
@@ -236,7 +258,7 @@ function renderListView({ filters, listPayload, state }) {
   const resetButton = document.querySelector("#reset-filters");
   if (resetButton instanceof HTMLButtonElement) {
     resetButton.addEventListener("click", async () => {
-      await refreshListState({ page: "1", page_size: "20", sort: "date_desc" });
+      await refreshListState({ page: "1", page_size: "20", sort: "date_desc", tag_keys: "" });
     });
   }
 
@@ -327,6 +349,9 @@ async function fetchListPayload(state) {
   if (state.market_code) {
     params.set("market_code", state.market_code);
   }
+  if (state.tag_keys) {
+    params.set("tag_keys", state.tag_keys);
+  }
   if (state.resolution_min_width) {
     params.set("resolution_min_width", state.resolution_min_width);
   }
@@ -348,6 +373,7 @@ function readListState() {
   const params = new URLSearchParams(window.location.search);
   return {
     market_code: params.get("market_code") || "",
+    tag_keys: params.get("tag_keys") || "",
     resolution_min_width: params.get("resolution_min_width") || "",
     resolution_min_height: params.get("resolution_min_height") || "",
     page: params.get("page") || "1",
@@ -361,6 +387,13 @@ function assignListFormValues(form, state) {
   setFieldValue(form, "resolution_min_width", state.resolution_min_width);
   setFieldValue(form, "resolution_min_height", state.resolution_min_height);
   setFieldValue(form, "page_size", state.page_size || "20");
+  const selectedTagKeys = parseTagKeys(state.tag_keys);
+  form.querySelectorAll('input[name="tag_keys"]').forEach((node) => {
+    if (!(node instanceof HTMLInputElement)) {
+      return;
+    }
+    node.checked = selectedTagKeys.includes(node.value);
+  });
 }
 
 function setFieldValue(form, name, value) {
@@ -433,6 +466,16 @@ function stringOrNull(value) {
     return "";
   }
   return value.trim();
+}
+
+function parseTagKeys(value) {
+  if (!value) {
+    return [];
+  }
+  return String(value)
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 function escapeHtml(value) {

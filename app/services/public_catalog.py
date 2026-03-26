@@ -11,6 +11,8 @@ from app.schemas.common import Pagination
 from app.schemas.public import PublicMarketFilterOption
 from app.schemas.public import PublicSiteInfoData
 from app.schemas.public import PublicSortFilterOption
+from app.schemas.public import PublicTagFilterOption
+from app.schemas.public import PublicTagListData
 from app.schemas.public import PublicWallpaperDetailData
 from app.schemas.public import PublicWallpaperFiltersData
 from app.schemas.public import PublicWallpaperListData
@@ -82,6 +84,7 @@ class PublicCatalogService:
         market_codes = self.repository.list_visible_market_codes(
             current_time_utc=utc_now_isoformat()
         )
+        tag_rows = self.repository.list_visible_tags(current_time_utc=utc_now_isoformat())
         return PublicWallpaperFiltersData(
             markets=[
                 PublicMarketFilterOption(
@@ -90,6 +93,7 @@ class PublicCatalogService:
                 )
                 for market_code in market_codes
             ],
+            tags=[self._build_public_tag_option(row) for row in tag_rows],
             sort_options=[PublicSortFilterOption(value="date_desc", label="最新优先")],
         )
 
@@ -102,6 +106,10 @@ class PublicCatalogService:
             default_market_code=default_market_code,
         )
 
+    def list_tags(self) -> PublicTagListData:
+        rows = self.repository.list_visible_tags(current_time_utc=utc_now_isoformat())
+        return PublicTagListData(items=[self._build_public_tag_option(row) for row in rows])
+
     def _build_wallpaper_summary(self, row: Row) -> PublicWallpaperSummary:
         wallpaper_id = int(row["id"])
         return PublicWallpaperSummary(
@@ -112,6 +120,14 @@ class PublicCatalogService:
             wallpaper_date=str(row["wallpaper_date"]),
             thumbnail_url=build_public_image_url(relative_path=str(row["relative_path"])),
             detail_url=f"/wallpapers/{wallpaper_id}",
+        )
+
+    def _build_public_tag_option(self, row: Row) -> PublicTagFilterOption:
+        return PublicTagFilterOption(
+            id=int(row["id"]),
+            tag_key=str(row["tag_key"]),
+            tag_name=str(row["tag_name"]),
+            tag_category=_optional_text(row["tag_category"]),
         )
 
 

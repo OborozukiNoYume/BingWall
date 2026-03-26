@@ -16,6 +16,7 @@ from app.repositories.public_repository import PublicRepository
 from app.schemas.common import ErrorEnvelope
 from app.schemas.common import SuccessEnvelope
 from app.schemas.public import PublicSiteInfoData
+from app.schemas.public import PublicTagListData
 from app.schemas.public import PublicWallpaperDetailData
 from app.schemas.public import PublicWallpaperFiltersData
 from app.schemas.public import PublicWallpaperListData
@@ -96,6 +97,21 @@ def get_public_wallpaper_filters(
     service = PublicCatalogService(repository)
     data = service.get_filters()
     logger.info("Public wallpaper filters served: market_count=%s", len(data.markets))
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/tags",
+    response_model=SuccessEnvelope[PublicTagListData],
+    responses=ERROR_RESPONSES,
+)
+def list_public_tags(
+    request: Request,
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(repository)
+    data = service.list_tags()
+    logger.info("Public tags served: count=%s", len(data.items))
     return build_success_response(request=request, data=data.model_dump())
 
 

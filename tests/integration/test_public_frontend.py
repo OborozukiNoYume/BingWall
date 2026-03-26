@@ -48,6 +48,7 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert 'fetchEnvelope("/api/public/site-info")' in asset_response.text
     assert "/api/public/wallpaper-filters" in asset_response.text
     assert "/api/public/wallpapers?page=1&page_size=6&sort=date_desc" in asset_response.text
+    assert "tag_keys" in asset_response.text
     assert "内容不存在" in asset_response.text
     assert "服务繁忙" in asset_response.text
     assert "sqlite" not in asset_response.text.lower()
@@ -55,6 +56,7 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert css_response.status_code == 200
     assert ".card-grid" in css_response.text
     assert ".detail-layout" in css_response.text
+    assert ".tag-filter-grid" in css_response.text
 
 
 def test_public_frontend_can_serve_public_images_from_storage_directory(tmp_path: Path) -> None:

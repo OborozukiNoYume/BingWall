@@ -4,12 +4,12 @@
 
 BingWall 是一个围绕 Bing 壁纸构建的图片服务系统。一期目标不是做单一下载脚本，而是建设一个可持续采集、可管理、可对外服务、可扩展演进的内容系统。
 
-当前仓库已完成阶段一公开链路闭环，核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
+当前仓库已完成阶段一、阶段二闭环，并已落地阶段三 `T3.1` 标签体系；核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
 
 ## 当前状态
 
-- 项目阶段：阶段二已完成，`T2.5` 已完成，下一优先级为目标机 `cron` 安装与计划配置
-- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 采集与资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环
+- 项目阶段：阶段三已启动，`T3.1` 已完成；运维侧仍需补齐目标机 `cron` 安装与计划配置
+- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 采集与资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环、`T3.1` 标签体系
 - 当前文档状态：系统设计、模块说明、数据模型、API 约定、部署运行说明、项目状态与阶段 TODO 已同步到当前实现
 - 已确认运行时基线：`Python 3.14.2`、`Node.js 24.13.0`
 
@@ -90,7 +90,7 @@ make verify-deploy
 - SQLite 版本化迁移基线与核心表结构
 - 空库初始化与重复执行迁移能力
 - Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动
-- `/api/public/wallpapers`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/site-info` 四个公开接口
+- `/api/public/wallpapers`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 五个公开接口
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
 - 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据
 - `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面
@@ -140,12 +140,22 @@ make verify-deploy
 - `/api/health/deep` 已新增最近一次恢复验证记录摘要，便于追踪最近一次恢复演练是否通过
 - 备份产物会生成 `manifest.json` 与独立 `backup.log`；恢复过程会生成独立 `restore.log`、恢复记录和恢复验证记录
 
+当前 `T3.1` 已补齐内容：
+
+- `app/repositories/migrations/versions/V0003__tags.sql`，落地 `tags` 与 `wallpaper_tags` 两张标签相关表和索引
+- `/api/public/tags`、公开列表 `tag_keys` 标签筛选参数，以及公开筛选项中的标签输出
+- `/api/admin/tags`、`/api/admin/tags/{tag_id}` 与 `/api/admin/wallpapers/{wallpaper_id}/tags` 后台接口
+- `/admin/tags` 标签管理页，以及 `/admin/wallpapers/{id}` 内容详情页中的标签绑定入口
+- 标签创建、更新、绑定的审计日志写入，以及多标签绑定、停用标签隐藏和公开筛选联动测试
+
 公开 API 最小验证示例：
 
 ```bash
 curl http://127.0.0.1:8000/api/public/site-info
 curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc"
+curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&tag_keys=theme_forest,location_asia"
 curl http://127.0.0.1:8000/api/public/wallpaper-filters
+curl http://127.0.0.1:8000/api/public/tags
 curl http://127.0.0.1:8000/api/public/wallpapers/1
 ```
 
@@ -173,6 +183,7 @@ curl -X POST http://127.0.0.1:8000/api/admin/auth/logout \
 ```bash
 curl http://127.0.0.1:8000/admin/login
 curl http://127.0.0.1:8000/admin/wallpapers
+curl http://127.0.0.1:8000/admin/tags
 curl -H 'Authorization: Bearer <session_token>' \
   "http://127.0.0.1:8000/api/admin/wallpapers?content_status=draft&page=1&page_size=20"
 curl -H 'Authorization: Bearer <session_token>' \
@@ -183,6 +194,16 @@ curl -X POST http://127.0.0.1:8000/api/admin/wallpapers/1/status \
   -d '{"target_status":"enabled","operator_reason":"人工审核通过"}'
 curl -H 'Authorization: Bearer <session_token>' \
   "http://127.0.0.1:8000/api/admin/audit-logs?target_type=wallpaper&target_id=1"
+curl -H 'Authorization: Bearer <session_token>' \
+  http://127.0.0.1:8000/api/admin/tags
+curl -X POST http://127.0.0.1:8000/api/admin/tags \
+  -H 'Authorization: Bearer <session_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"tag_key":"theme_forest","tag_name":"森林","tag_category":"theme","status":"enabled","sort_weight":10,"operator_reason":"新增公开标签"}'
+curl -X PUT http://127.0.0.1:8000/api/admin/wallpapers/1/tags \
+  -H 'Authorization: Bearer <session_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"tag_ids":[1,2],"operator_reason":"补充内容标签"}'
 ```
 
 后台任务观测最小验证示例：
