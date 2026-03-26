@@ -21,8 +21,17 @@ class AdminWallpaperListQuery(BaseModel):
     content_status: ContentStatus | None = None
     image_status: ImageStatus | None = None
     market_code: str | None = Field(default=None, min_length=2, max_length=32)
+    keyword: str | None = Field(default=None, max_length=100)
     created_from_utc: datetime | None = None
     created_to_utc: datetime | None = None
+
+    @field_validator("keyword")
+    @classmethod
+    def normalize_keyword(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
     @field_validator("created_to_utc")
     @classmethod

@@ -10,10 +10,19 @@ class PublicWallpaperListQuery(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)
     market_code: str | None = Field(default=None, min_length=2, max_length=32)
+    keyword: str | None = Field(default=None, max_length=100)
     tag_keys: str | None = Field(default=None, max_length=500)
     resolution_min_width: int | None = Field(default=None, ge=1)
     resolution_min_height: int | None = Field(default=None, ge=1)
     sort: Literal["date_desc"] = "date_desc"
+
+    @field_validator("keyword")
+    @classmethod
+    def normalize_keyword(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
 
     @field_validator("tag_keys")
     @classmethod

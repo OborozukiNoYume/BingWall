@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from tests.integration.test_admin_auth import build_client
 from tests.integration.test_admin_auth import prepare_database
 from tests.integration.test_admin_auth import seed_admin_user
+from tests.integration.test_public_api import bind_wallpaper_tags
 from tests.integration.test_public_api import seed_wallpaper
 from tests.integration.test_public_api import seed_tag
 
@@ -413,6 +414,77 @@ def test_admin_tag_create_rejects_duplicate_tag_key(tmp_path: Path) -> None:
     payload = response.json()
     assert response.status_code == 409
     assert payload["error_code"] == "CONTENT_TAG_KEY_CONFLICT"
+
+
+def test_admin_wallpaper_list_supports_keyword_and_status_search(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+    visible_wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Aurora Public",
+        description="北极光公开样本",
+    )
+    disabled_wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-23",
+        market_code="en-US",
+        title="Aurora Hidden",
+        description="北极光后台样本",
+        content_status="disabled",
+        is_public=False,
+    )
+    aurora_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-aurora",
+        tag_name="极光",
+    )
+    bind_wallpaper_tags(
+        database_path=database_path,
+        wallpaper_id=visible_wallpaper_id,
+        tag_ids=[aurora_tag_id],
+    )
+    bind_wallpaper_tags(
+        database_path=database_path,
+        wallpaper_id=disabled_wallpaper_id,
+        tag_ids=[aurora_tag_id],
+    )
+
+    with build_client(tmp_path) as client:
+        session_token = login_admin(client)
+        public_response = client.get("/api/public/wallpapers?keyword=极光")
+        admin_response = client.get(
+            "/api/admin/wallpapers?keyword=极光",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+        disabled_response = client.get(
+            "/api/admin/wallpapers?keyword=极光&content_status=disabled",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+
+    public_payload = public_response.json()
+    admin_payload = admin_response.json()
+    disabled_payload = disabled_response.json()
+
+    assert public_response.status_code == 200
+    assert public_payload["pagination"]["total"] == 1
+    assert [item["title"] for item in public_payload["data"]["items"]] == ["Aurora Public"]
+
+    assert admin_response.status_code == 200
+    assert admin_payload["pagination"]["total"] == 2
+    assert {item["title"] for item in admin_payload["data"]["items"]} == {
+        "Aurora Public",
+        "Aurora Hidden",
+    }
+
+    assert disabled_response.status_code == 200
+    assert disabled_payload["pagination"]["total"] == 1
+    assert disabled_payload["data"]["items"][0]["title"] == "Aurora Hidden"
 
 
 def login_admin(client: TestClient) -> str:

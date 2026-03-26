@@ -529,6 +529,29 @@ class AdminContentRepository:
         if query.market_code is not None:
             clauses.append("w.market_code = ?")
             parameters.append(query.market_code)
+        if query.keyword is not None:
+            keyword = build_like_pattern(query.keyword)
+            clauses.append(
+                """
+                (
+                    w.title LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR w.subtitle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR w.description LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR w.copyright_text LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR EXISTS (
+                        SELECT 1
+                        FROM wallpaper_tags AS wt_search
+                        INNER JOIN tags AS t_search ON t_search.id = wt_search.tag_id
+                        WHERE wt_search.wallpaper_id = w.id
+                          AND (
+                              t_search.tag_key LIKE ? ESCAPE '\\' COLLATE NOCASE
+                              OR t_search.tag_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                          )
+                    )
+                )
+                """
+            )
+            parameters.extend([keyword, keyword, keyword, keyword, keyword, keyword])
         if query.created_from_utc is not None:
             clauses.append("w.created_at_utc >= ?")
             parameters.append(datetime_to_utc_string(query.created_from_utc))
@@ -574,3 +597,8 @@ class AdminContentRepository:
 def datetime_to_utc_string(value: datetime) -> str:
     normalized = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
     return normalized.astimezone(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def build_like_pattern(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"

@@ -92,9 +92,9 @@ make verify-deploy
 - SQLite 版本化迁移基线与核心表结构
 - 空库初始化与重复执行迁移能力
 - Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动
-- `/api/public/wallpapers`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 五个公开接口
+- `/api/public/wallpapers`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 六个公开接口
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
-- 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据
+- 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword` 与 `tag_keys` 组合查询
 - `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面
 - `web/public/assets/site.css` 与 `web/public/assets/site.js` 页面静态资源
 - 前端页面只通过公开 API 获取业务数据，并在空结果、内容不存在、服务繁忙时显示明确提示
@@ -114,7 +114,7 @@ make verify-deploy
 当前 `T2.2` 已补齐内容：
 
 - `/api/admin/wallpapers`、`/api/admin/wallpapers/{wallpaper_id}`、`/api/admin/wallpapers/{wallpaper_id}/status`、`/api/admin/audit-logs` 后台接口
-- 后台内容列表、详情、状态切换和审计查询 schema / repository / service
+- 后台内容列表、详情、状态切换和审计查询 schema / repository / service；内容列表支持 `keyword + 状态` 联合检索
 - 启用、禁用和逻辑删除的状态流转校验，以及每次状态变更的审计日志写入
 - `/admin/login`、`/admin`、`/admin/wallpapers/{id}`、`/admin/audit-logs` 后台页面
 - `web/admin/assets/admin.js` 与 `web/admin/assets/admin.css` 后台静态资源，页面仅通过后台 API 工作
@@ -175,11 +175,19 @@ make verify-deploy
 - `/api/public/download-events` 公开下载登记接口，以及 `/api/admin/download-stats` 后台统计接口；公开详情页下载按钮已改为“先登记、再跳转静态资源”
 - `/admin/download-stats` 后台页面，支持查看最近 7 / 30 / 90 天下载总量、热门内容和按日趋势
 
+当前 `T3.6` 已补齐内容：
+
+- `/api/public/wallpapers` 新增 `keyword` 查询参数，当前匹配标题、简述、版权说明、描述和启用标签，且可与 `market_code`、`tag_keys`、分辨率条件组合使用
+- `/api/admin/wallpapers` 新增 `keyword` 查询参数，支持与 `content_status`、`image_status`、地区和创建时间联合检索，便于解释公开端和后台端结果差异
+- `/wallpapers` 与 `/admin/wallpapers` 页面已新增关键词输入框，并继续只通过现有公开 / 后台 API 取数
+- 已补齐关键词搜索集成测试、前后台页面资产断言与代表性样本响应时间验证；当前本地样本中公开搜索约 `0.0043` 秒、后台搜索约 `0.0058` 秒
+
 公开 API 最小验证示例：
 
 ```bash
 curl http://127.0.0.1:8000/api/public/site-info
 curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc"
+curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&keyword=forest"
 curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&tag_keys=theme_forest,location_asia"
 curl http://127.0.0.1:8000/api/public/wallpaper-filters
 curl http://127.0.0.1:8000/api/public/tags
@@ -193,7 +201,7 @@ curl -X POST http://127.0.0.1:8000/api/public/download-events \
 
 ```bash
 curl http://127.0.0.1:8000/
-curl "http://127.0.0.1:8000/wallpapers?page=1&market_code=en-US"
+curl "http://127.0.0.1:8000/wallpapers?page=1&market_code=en-US&keyword=forest"
 curl http://127.0.0.1:8000/wallpapers/1
 ```
 
@@ -212,10 +220,10 @@ curl -X POST http://127.0.0.1:8000/api/admin/auth/logout \
 
 ```bash
 curl http://127.0.0.1:8000/admin/login
-curl http://127.0.0.1:8000/admin/wallpapers
+curl "http://127.0.0.1:8000/admin/wallpapers?keyword=forest"
 curl http://127.0.0.1:8000/admin/tags
 curl -H 'Authorization: Bearer <session_token>' \
-  "http://127.0.0.1:8000/api/admin/wallpapers?content_status=draft&page=1&page_size=20"
+  "http://127.0.0.1:8000/api/admin/wallpapers?content_status=draft&page=1&page_size=20&keyword=forest"
 curl -H 'Authorization: Bearer <session_token>' \
   http://127.0.0.1:8000/api/admin/wallpapers/1
 curl -X POST http://127.0.0.1:8000/api/admin/wallpapers/1/status \

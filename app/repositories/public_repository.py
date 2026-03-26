@@ -213,10 +213,42 @@ class PublicRepository:
         if query.resolution_min_height is not None:
             clauses.append("COALESCE(original_resource.height, w.origin_height, 0) >= ?")
             parameters.append(query.resolution_min_height)
+        keyword_clauses, keyword_parameters = self._build_keyword_filter(query=query)
+        clauses.extend(keyword_clauses)
+        parameters.extend(keyword_parameters)
         tag_clauses, tag_parameters = self._build_tag_filter(query=query)
         clauses.extend(tag_clauses)
         parameters.extend(tag_parameters)
         return " AND ".join(clauses), tuple(parameters)
+
+    def _build_keyword_filter(
+        self, *, query: PublicWallpaperListQuery
+    ) -> tuple[list[str], list[str]]:
+        if query.keyword is None:
+            return [], []
+        keyword = _build_like_pattern(query.keyword)
+        clauses = [
+            """
+            (
+                w.title LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR w.subtitle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR w.description LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR w.copyright_text LIKE ? ESCAPE '\\' COLLATE NOCASE
+                OR EXISTS (
+                    SELECT 1
+                    FROM wallpaper_tags AS wt_search
+                    INNER JOIN tags AS t_search ON t_search.id = wt_search.tag_id
+                    WHERE wt_search.wallpaper_id = w.id
+                      AND t_search.status = 'enabled'
+                      AND (
+                          t_search.tag_key LIKE ? ESCAPE '\\' COLLATE NOCASE
+                          OR t_search.tag_name LIKE ? ESCAPE '\\' COLLATE NOCASE
+                      )
+                )
+            )
+            """
+        ]
+        return clauses, [keyword, keyword, keyword, keyword, keyword, keyword]
 
     def _build_tag_filter(self, *, query: PublicWallpaperListQuery) -> tuple[list[str], list[str]]:
         tag_keys = _parse_tag_keys(query.tag_keys)
@@ -247,3 +279,8 @@ def _parse_tag_keys(raw_value: str | None) -> list[str]:
         return []
     parts = [item.strip() for item in raw_value.split(",") if item.strip()]
     return list(dict.fromkeys(parts))
+
+
+def _build_like_pattern(value: str) -> str:
+    escaped = value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    return f"%{escaped}%"

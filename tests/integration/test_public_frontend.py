@@ -49,6 +49,7 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert "/api/public/wallpaper-filters" in asset_response.text
     assert "/api/public/wallpapers?page=1&page_size=6&sort=date_desc" in asset_response.text
     assert "/api/public/download-events" in asset_response.text
+    assert 'params.set("keyword", state.keyword)' in asset_response.text
     assert "tag_keys" in asset_response.text
     assert "内容不存在" in asset_response.text
     assert "服务繁忙" in asset_response.text

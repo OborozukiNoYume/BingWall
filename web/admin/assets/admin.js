@@ -181,6 +181,10 @@ function renderWallpaperListView(session, payload, state) {
     <form class="admin-form" id="wallpaper-filter-form">
       <div class="filter-grid">
         <div class="field-group">
+          <label for="keyword">关键词</label>
+          <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" />
+        </div>
+        <div class="field-group">
           <label for="content-status">内容状态</label>
           <select id="content-status" name="content_status">
             <option value="">全部</option>
@@ -262,6 +266,7 @@ function renderWallpaperListView(session, payload, state) {
   assignFormValue(filterForm, "content_status", state.content_status);
   assignFormValue(filterForm, "image_status", state.image_status);
   assignFormValue(filterForm, "market_code", state.market_code);
+  assignFormValue(filterForm, "keyword", state.keyword);
   assignFormValue(filterForm, "created_from_utc", state.created_from_utc);
   assignFormValue(filterForm, "created_to_utc", state.created_to_utc);
   assignFormValue(filterForm, "page_size", state.page_size);
@@ -288,6 +293,7 @@ function renderWallpaperListView(session, payload, state) {
     event.preventDefault();
     const formData = new FormData(filterForm);
     const nextState = {
+      keyword: stringValue(formData.get("keyword")),
       content_status: stringValue(formData.get("content_status")),
       image_status: stringValue(formData.get("image_status")),
       market_code: stringValue(formData.get("market_code")),
@@ -1870,6 +1876,7 @@ function buildPageHref(basePath, state, page) {
 function readWallpaperListState() {
   const params = new URLSearchParams(window.location.search);
   return {
+    keyword: params.get("keyword") || "",
     content_status: params.get("content_status") || "",
     image_status: params.get("image_status") || "",
     market_code: params.get("market_code") || "",
@@ -1938,6 +1945,7 @@ function buildWallpaperListParams(state) {
   const params = new URLSearchParams();
   params.set("page", state.page || "1");
   params.set("page_size", state.page_size || "20");
+  setOptionalParam(params, "keyword", state.keyword);
   setOptionalParam(params, "content_status", state.content_status);
   setOptionalParam(params, "image_status", state.image_status);
   setOptionalParam(params, "market_code", state.market_code);

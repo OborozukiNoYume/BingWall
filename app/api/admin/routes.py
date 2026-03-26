@@ -224,10 +224,11 @@ def list_admin_wallpapers(
 ) -> dict[str, object]:
     data, pagination = service.list_wallpapers(query=query)
     logger.info(
-        "Admin wallpaper list served: content_status=%s image_status=%s market=%s page=%s",
+        "Admin wallpaper list served: content_status=%s image_status=%s market=%s keyword=%s page=%s",
         query.content_status,
         query.image_status,
         query.market_code,
+        query.keyword,
         query.page,
     )
     return build_success_response(

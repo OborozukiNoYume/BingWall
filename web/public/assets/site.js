@@ -200,6 +200,10 @@ function renderListView({ filters, listPayload, state }) {
     <form class="filter-form" id="wallpaper-filter-form">
       <div class="filter-grid">
         <div class="field">
+          <label for="keyword">关键词</label>
+          <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" />
+        </div>
+        <div class="field">
           <label for="market-code">地区</label>
           <select id="market-code" name="market_code">
             <option value="">全部地区</option>
@@ -278,6 +282,7 @@ function renderListView({ filters, listPayload, state }) {
     event.preventDefault();
     const formData = new FormData(filterForm);
     const nextState = {
+      keyword: stringOrNull(formData.get("keyword")),
       market_code: stringOrNull(formData.get("market_code")),
       tag_keys: formData.getAll("tag_keys").map((value) => stringOrNull(value)).filter(Boolean).join(","),
       resolution_min_width: stringOrNull(formData.get("resolution_min_width")),
@@ -292,7 +297,13 @@ function renderListView({ filters, listPayload, state }) {
   const resetButton = document.querySelector("#reset-filters");
   if (resetButton instanceof HTMLButtonElement) {
     resetButton.addEventListener("click", async () => {
-      await refreshListState({ page: "1", page_size: "20", sort: "date_desc", tag_keys: "" });
+      await refreshListState({
+        keyword: "",
+        page: "1",
+        page_size: "20",
+        sort: "date_desc",
+        tag_keys: "",
+      });
     });
   }
 
@@ -383,6 +394,9 @@ async function fetchListPayload(state) {
   if (state.market_code) {
     params.set("market_code", state.market_code);
   }
+  if (state.keyword) {
+    params.set("keyword", state.keyword);
+  }
   if (state.tag_keys) {
     params.set("tag_keys", state.tag_keys);
   }
@@ -406,6 +420,7 @@ async function fetchListPayload(state) {
 function readListState() {
   const params = new URLSearchParams(window.location.search);
   return {
+    keyword: params.get("keyword") || "",
     market_code: params.get("market_code") || "",
     tag_keys: params.get("tag_keys") || "",
     resolution_min_width: params.get("resolution_min_width") || "",
@@ -417,6 +432,7 @@ function readListState() {
 }
 
 function assignListFormValues(form, state) {
+  setFieldValue(form, "keyword", state.keyword);
   setFieldValue(form, "market_code", state.market_code);
   setFieldValue(form, "resolution_min_width", state.resolution_min_width);
   setFieldValue(form, "resolution_min_height", state.resolution_min_height);

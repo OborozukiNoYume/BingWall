@@ -161,6 +161,7 @@
 | `page` | integer | 否 | 页码 |
 | `page_size` | integer | 否 | 每页数量 |
 | `market_code` | string | 否 | 地区筛选 |
+| `keyword` | string | 否 | 关键词搜索，当前匹配标题、简述、版权说明、描述以及启用标签的 `tag_key` / `tag_name` |
 | `tag_keys` | string | 否 | 标签稳定键列表，使用半角逗号分隔；多标签按“同时命中”处理 |
 | `resolution_min_width` | integer | 否 | 最小宽度 |
 | `resolution_min_height` | integer | 否 | 最小高度 |
@@ -328,8 +329,14 @@
 - 支持 `content_status`
 - 支持 `image_status`
 - 支持 `market_code`
+- 支持 `keyword`
 - 支持 `created_from_utc`
 - 支持 `created_to_utc`
+
+补充约定：
+
+- `keyword` 当前匹配标题、简述、版权说明、描述和已绑定标签的 `tag_key` / `tag_name`
+- 公开端和后台端使用同一组关键词来源，但公开端仍只返回满足公开状态规则的数据，后台端可继续结合 `content_status`、`image_status` 等筛选解释结果差异
 
 响应数据结构（`data.items[*]`）至少包含：
 

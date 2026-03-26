@@ -5,6 +5,7 @@ from datetime import datetime
 import os
 from pathlib import Path
 import sqlite3
+import time
 from typing import cast
 
 from fastapi.testclient import TestClient
@@ -357,6 +358,71 @@ def test_public_wallpaper_list_supports_enabled_tag_filter(tmp_path: Path) -> No
     assert hidden_payload["pagination"]["total"] == 0
 
 
+def test_public_wallpaper_list_supports_keyword_search_across_text_and_enabled_tags(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    visible_wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Morning Lake",
+        subtitle="薄雾清晨",
+        description="清晨的湖面与金色山影",
+        copyright_text="Morning Lake copyright",
+    )
+    hidden_wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-23",
+        market_code="en-US",
+        title="Morning Hidden",
+        description="清晨的隐藏内容",
+        content_status="disabled",
+        is_public=False,
+    )
+    enabled_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-dawn",
+        tag_name="晨曦",
+    )
+    disabled_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-secret",
+        tag_name="隐藏晨曦",
+        status="disabled",
+    )
+    bind_wallpaper_tags(
+        database_path=database_path,
+        wallpaper_id=visible_wallpaper_id,
+        tag_ids=[enabled_tag_id, disabled_tag_id],
+    )
+    bind_wallpaper_tags(
+        database_path=database_path,
+        wallpaper_id=hidden_wallpaper_id,
+        tag_ids=[enabled_tag_id],
+    )
+
+    with build_client(tmp_path) as client:
+        text_response = client.get("/api/public/wallpapers?keyword=金色山影")
+        tag_response = client.get("/api/public/wallpapers?keyword=晨曦")
+        hidden_tag_response = client.get("/api/public/wallpapers?keyword=隐藏晨曦")
+
+    text_payload = text_response.json()
+    tag_payload = tag_response.json()
+    hidden_tag_payload = hidden_tag_response.json()
+
+    assert text_response.status_code == 200
+    assert text_payload["pagination"]["total"] == 1
+    assert text_payload["data"]["items"][0]["title"] == "Morning Lake"
+
+    assert tag_response.status_code == 200
+    assert tag_payload["pagination"]["total"] == 1
+    assert tag_payload["data"]["items"][0]["title"] == "Morning Lake"
+
+    assert hidden_tag_response.status_code == 200
+    assert hidden_tag_payload["pagination"]["total"] == 0
+
+
 def test_public_wallpaper_endpoints_return_uniform_errors_for_invalid_or_hidden_items(
     tmp_path: Path,
 ) -> None:
@@ -387,6 +453,65 @@ def test_public_wallpaper_endpoints_return_uniform_errors_for_invalid_or_hidden_
         "data": None,
         "trace_id": hidden_payload["trace_id"],
     }
+
+
+def test_public_and_admin_keyword_search_complete_within_one_second_on_representative_samples(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    from tests.integration.test_admin_auth import seed_admin_user
+
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+    benchmark_tag_id = seed_tag(
+        database_path=database_path,
+        tag_key="theme-benchmark",
+        tag_name="性能样本",
+    )
+    for index in range(1, 31):
+        wallpaper_id = seed_wallpaper(
+            database_path=database_path,
+            wallpaper_date=f"2026-03-{index:02d}",
+            market_code="en-US" if index % 2 == 0 else "fr-FR",
+            title=f"Benchmark Sample {index}",
+            description=f"Representative search sample {index}",
+            content_status="enabled" if index <= 20 else "disabled",
+            is_public=index <= 20,
+        )
+        bind_wallpaper_tags(
+            database_path=database_path,
+            wallpaper_id=wallpaper_id,
+            tag_ids=[benchmark_tag_id],
+        )
+
+    with build_client(tmp_path) as client:
+        login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "correct-password"},
+        )
+        session_token = str(login_response.json()["data"]["session_token"])
+
+        public_started = time.perf_counter()
+        public_response = client.get("/api/public/wallpapers?keyword=Benchmark&page=1&page_size=20")
+        public_elapsed = time.perf_counter() - public_started
+
+        admin_started = time.perf_counter()
+        admin_response = client.get(
+            "/api/admin/wallpapers?keyword=Benchmark&page=1&page_size=20",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+        admin_elapsed = time.perf_counter() - admin_started
+
+    assert public_response.status_code == 200
+    assert public_response.json()["pagination"]["total"] == 20
+    assert public_elapsed < 1.0
+
+    assert admin_response.status_code == 200
+    assert admin_response.json()["pagination"]["total"] == 30
+    assert admin_elapsed < 1.0
 
 
 def build_client(tmp_path: Path, *, oss_public_base_url: str | None = None) -> TestClient:
@@ -421,6 +546,9 @@ def seed_wallpaper(
     wallpaper_date: str,
     market_code: str,
     title: str,
+    subtitle: str | None = None,
+    description: str | None = None,
+    copyright_text: str | None = None,
     content_status: str = "enabled",
     is_public: bool = True,
     is_downloadable: bool = True,
@@ -471,9 +599,9 @@ def seed_wallpaper(
                 market_code,
                 wallpaper_date,
                 title,
-                f"{title} subtitle",
-                f"{title} description",
-                f"{title} copyright",
+                subtitle or f"{title} subtitle",
+                description or f"{title} description",
+                copyright_text or f"{title} copyright",
                 "Bing",
                 content_status,
                 int(is_public),

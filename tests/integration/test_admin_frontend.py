@@ -83,6 +83,7 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     assert "/api/admin/auth/logout" in js_response.text
     assert "/api/admin/wallpapers" in js_response.text
     assert "/api/admin/wallpapers/" in js_response.text
+    assert 'setOptionalParam(params, "keyword", state.keyword)' in js_response.text
     assert "/api/admin/tags" in js_response.text
     assert "/api/admin/collection-tasks" in js_response.text
     assert "/api/admin/download-stats" in js_response.text

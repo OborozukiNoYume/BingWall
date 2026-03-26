@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-26T15:13:37Z
+
+### 变更内容
+
+- 更新 [app/schemas/public.py](app/schemas/public.py)、[app/schemas/admin_content.py](app/schemas/admin_content.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/repositories/admin_content_repository.py](app/repositories/admin_content_repository.py)、[app/api/public/routes.py](app/api/public/routes.py) 与 [app/api/admin/routes.py](app/api/admin/routes.py)，为公开列表和后台内容列表新增 `keyword` 参数，并把标题、简述、版权说明、描述和标签接入关键词匹配
+- 更新 [web/public/assets/site.js](web/public/assets/site.js) 与 [web/admin/assets/admin.js](web/admin/assets/admin.js)，为 `/wallpapers` 和 `/admin/wallpapers` 新增关键词输入框，支持与现有筛选条件组合查询，且继续只通过既有 API 取数
+- 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)、[tests/integration/test_admin_content.py](tests/integration/test_admin_content.py)、[tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py) 与 [tests/integration/test_admin_frontend.py](tests/integration/test_admin_frontend.py)，覆盖公开搜索、后台联合检索、前后台结果差异解释、页面资产引用和代表性样本响应时间验证
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/data-model.md](docs/data-model.md)，同步 `T3.6` 完成状态、搜索字段口径、验证样本与后续优先级
+
+### 变更原因
+
+- 完成阶段三 `T3.6`，把“在现有筛选基础上增加关键词搜索，并保持公开 / 后台状态规则可解释”的设计要求推进为可运行实现
+- 保持最保守范围，继续复用现有 FastAPI、SQLite、原生前端与现有列表接口，不引入全文检索引擎、新依赖或数据库结构变更
+- 让公开端和后台端共享同一组关键词来源，同时保留各自既有状态过滤规则，避免搜索结果口径割裂
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移或锁文件变更
+- 变更时间：`2026-03-26T15:13:37Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开列表接口、后台内容列表接口、公开列表页、后台内容管理页、关键词搜索测试与相关文档
+- 公开列表现在支持 `keyword` 与 `market_code`、`tag_keys`、分辨率条件组合查询；后台内容列表现在支持 `keyword` 与内容状态、资源状态、地区、创建时间联合检索
+- 当前关键词搜索口径为标题、简述、版权说明、描述和标签，其中公开端只匹配启用标签，后台端保留全部已绑定标签匹配能力
+- 本次不包含全文检索引擎接入、搜索高亮、联想提示、独立搜索接口或数据库结构调整
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_api.py tests/integration/test_admin_content.py tests/integration/test_public_frontend.py tests/integration/test_admin_frontend.py`
+- 代表性样本响应时间记录：30 条样本下，公开搜索 `keyword=Benchmark` 本地实测约 `0.0043` 秒；后台搜索 `keyword=Benchmark` 本地实测约 `0.0058` 秒
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除公开 / 后台列表的 `keyword` 参数、回退 repository 查询条件、前后台页面输入框、测试与文档更新，或执行 `git revert` 回退本次提交
+- 回滚后仓库将恢复到“仅支持结构化筛选和标签筛选、不支持关键词搜索、`T3.6` 仍停留在文档预留状态”的状态
+
 ## 2026-03-26T14:38:59Z
 
 ### 变更内容

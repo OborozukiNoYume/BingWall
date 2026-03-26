@@ -74,6 +74,7 @@
 - 非删除内容才能参与公开查询
 - 当 `content_status = enabled` 时，`resource_status` 必须为 `ready`
 - `resource_status` 由领域服务或巡检任务根据当前对外可用的资源记录同步刷新，不允许由公开接口直接写入
+- 当前关键词搜索基于 `title`、`subtitle`、`copyright_text`、`description` 与已绑定标签实现，不单独新增搜索索引表
 
 ## 2. 图片资源 `image_resources`
 
@@ -248,6 +249,7 @@
 
 - `tag_key` 全局唯一，且应使用稳定 ASCII 标识
 - `disabled` 标签不得继续出现在公开筛选项中
+- 当前公开关键词搜索只匹配启用标签；后台关键词搜索可匹配全部已绑定标签，用于解释公开与后台结果差异
 
 ## 9. 内容标签关联 `wallpaper_tags`
 
