@@ -40,7 +40,7 @@
 | 字段 | 类型建议 | 必填 | 说明 |
 |---|---|---|---|
 | `id` | integer / uuid | 是 | 主键 |
-| `source_type` | string | 是 | 来源类型，一期固定为 `bing` |
+| `source_type` | string | 是 | 来源类型，当前已支持 `bing`、`nasa_apod` |
 | `source_key` | string | 是 | 来源唯一键，用于追踪和去重 |
 | `market_code` | string | 是 | 地区代码，例如 `en-US` |
 | `wallpaper_date` | date | 是 | 壁纸所属日期 |

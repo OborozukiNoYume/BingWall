@@ -8,6 +8,7 @@ import json
 import logging
 from pathlib import Path
 import re
+from time import sleep
 from typing import Any
 from urllib.parse import parse_qs
 from urllib.parse import urlencode
@@ -23,6 +24,7 @@ from app.domain.collection import DownloadedImage
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.file_storage import FileStorage
 from app.services.bing_collection import BingCollectionService
+from app.services.source_collection import build_source_relative_path
 
 logger = logging.getLogger(__name__)
 
@@ -42,8 +44,11 @@ class BingClient:
             url=f"{BING_BASE_URL}{BING_METADATA_PATH}?{query}",
             headers={"User-Agent": "BingWall/0.1"},
         )
-        with urlopen(request, timeout=self.timeout_seconds) as response:
-            payload = json.loads(response.read().decode("utf-8"))
+        payload = read_json_with_retry(
+            request=request,
+            timeout_seconds=self.timeout_seconds,
+            attempts=2,
+        )
 
         images = payload.get("images")
         if not isinstance(images, list):
@@ -53,9 +58,11 @@ class BingClient:
 
     def download_image(self, image_url: str) -> DownloadedImage:
         request = Request(url=image_url, headers={"User-Agent": "BingWall/0.1"})
-        with urlopen(request, timeout=self.timeout_seconds) as response:
-            mime_type = response.headers.get_content_type()
-            content = response.read()
+        mime_type, content = read_binary_with_retry(
+            request=request,
+            timeout_seconds=self.timeout_seconds,
+            attempts=2,
+        )
         return DownloadedImage(content=content, mime_type=mime_type)
 
     def _map_image_payload(self, *, market_code: str, payload: dict[str, Any]) -> BingImageMetadata:
@@ -177,6 +184,65 @@ def normalize_optional_text(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def build_bing_relative_path(item: BingImageMetadata) -> str:
+    return build_source_relative_path(
+        source_type="bing",
+        market_code=item.market_code,
+        wallpaper_date=item.wallpaper_date,
+        source_key=item.source_key,
+        origin_image_url=item.origin_image_url,
+    )
+
+
+def read_json_with_retry(
+    *,
+    request: Request,
+    timeout_seconds: int,
+    attempts: int,
+) -> dict[str, Any]:
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            if not isinstance(payload, dict):
+                raise ValueError("metadata response must be a JSON object")
+            return payload
+        except Exception as exc:
+            last_error = exc
+            if attempt >= attempts:
+                break
+            sleep(0.5 * attempt)
+    if last_error is None:
+        raise RuntimeError("metadata request failed without a captured error")
+    raise RuntimeError(
+        f"metadata request failed after {attempts} attempts: {last_error}"
+    ) from last_error
+
+
+def read_binary_with_retry(
+    *,
+    request: Request,
+    timeout_seconds: int,
+    attempts: int,
+) -> tuple[str | None, bytes]:
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            with urlopen(request, timeout=timeout_seconds) as response:
+                return response.headers.get_content_type(), response.read()
+        except Exception as exc:
+            last_error = exc
+            if attempt >= attempts:
+                break
+            sleep(0.5 * attempt)
+    if last_error is None:
+        raise RuntimeError("binary request failed without a captured error")
+    raise RuntimeError(
+        f"binary request failed after {attempts} attempts: {last_error}"
+    ) from last_error
 
 
 if __name__ == "__main__":

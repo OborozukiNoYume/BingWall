@@ -4,8 +4,11 @@ import json
 from pathlib import Path
 import sqlite3
 
+from app.collectors.nasa_apod import NasaApodSourceAdapter
+from app.domain.collection import CollectedImageMetadata
 from app.domain.collection import BingImageMetadata
 from app.domain.collection import DownloadedImage
+from app.services.bing_collection import BingSourceAdapter
 from tests.integration.test_admin_auth import build_client
 from tests.integration.test_admin_auth import prepare_database
 from tests.integration.test_admin_auth import seed_admin_user
@@ -13,6 +16,7 @@ from tests.integration.test_admin_content import login_admin
 from tests.integration.test_bing_collection_service import FakeBingClient
 from tests.integration.test_bing_collection_service import JPEG_BYTES
 from tests.integration.test_bing_collection_service import make_metadata
+from app.services.source_collection import SourceCollectionService
 
 
 def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
@@ -129,6 +133,7 @@ def test_manual_collection_consumer_updates_task_detail_and_logs(tmp_path: Path)
 
     run_manual_consumer(
         tmp_path=tmp_path,
+        source_type="bing",
         metadata=[
             make_metadata(
                 market_code="en-US",
@@ -255,6 +260,67 @@ def test_admin_collection_retry_and_logs_query(tmp_path: Path) -> None:
     assert audit_row["target_type"] == "collection_task"
 
 
+def test_manual_collection_consumer_supports_nasa_apod_tasks(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+
+    with build_client(tmp_path) as client:
+        session_token = login_admin(client)
+        create_response = client.post(
+            "/api/admin/collection-tasks",
+            headers={"Authorization": f"Bearer {session_token}"},
+            json={
+                "source_type": "nasa_apod",
+                "market_code": "global",
+                "date_from": "2026-03-24",
+                "date_to": "2026-03-24",
+                "force_refresh": False,
+            },
+        )
+        task_id = create_response.json()["data"]["task_id"]
+
+    run_manual_consumer(
+        tmp_path=tmp_path,
+        source_type="nasa_apod",
+        metadata=[
+            make_nasa_metadata(
+                wallpaper_date="2026-03-24",
+                source_key="nasa_apod:global:2026-03-24:moonrise",
+                source_url="https://apod.nasa.gov/apod/image/2603/moonrise.jpg",
+            )
+        ],
+    )
+
+    with build_client(tmp_path) as client:
+        session_token = login_admin(client)
+        detail_response = client.get(
+            f"/api/admin/collection-tasks/{task_id}",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+        logs_response = client.get(
+            f"/api/admin/logs?task_id={task_id}",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+
+    detail_payload = detail_response.json()
+    logs_payload = logs_response.json()
+
+    assert create_response.status_code == 200
+    assert detail_response.status_code == 200
+    assert detail_payload["data"]["source_type"] == "nasa_apod"
+    assert detail_payload["data"]["market_code"] == "global"
+    assert detail_payload["data"]["task_status"] == "succeeded"
+    assert detail_payload["data"]["success_count"] == 1
+    assert logs_response.status_code == 200
+    assert logs_payload["pagination"]["total"] == 1
+    assert logs_payload["data"]["items"][0]["source_type"] == "nasa_apod"
+    assert logs_payload["data"]["items"][0]["result_status"] == "succeeded"
+
+
 def test_admin_collection_task_create_rejects_out_of_window_date_range(tmp_path: Path) -> None:
     database_path = prepare_database(tmp_path)
     seed_admin_user(
@@ -283,7 +349,12 @@ def test_admin_collection_task_create_rejects_out_of_window_date_range(tmp_path:
     assert "最近 8 天" in payload["message"]
 
 
-def run_manual_consumer(*, tmp_path: Path, metadata: list[BingImageMetadata]) -> None:
+def run_manual_consumer(
+    *,
+    tmp_path: Path,
+    source_type: str,
+    metadata: list[BingImageMetadata | CollectedImageMetadata],
+) -> None:
     from app.repositories.collection_repository import CollectionRepository
     from app.repositories.file_storage import FileStorage
     from app.services.admin_collection import ManualCollectionTaskConsumer
@@ -294,17 +365,33 @@ def run_manual_consumer(*, tmp_path: Path, metadata: list[BingImageMetadata]) ->
         public_dir=tmp_path / "images" / "public",
         failed_dir=tmp_path / "images" / "failed",
     )
+    downloads = [
+        DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
+        DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
+    ]
+    services: dict[str, SourceCollectionService] = {}
+    if source_type == "bing":
+        services["bing"] = SourceCollectionService(
+            repository=repository,
+            storage=storage,
+            adapter=BingSourceAdapter(
+                client=FakeBingClient(metadata=list(metadata), downloads=downloads)
+            ),
+            max_download_retries=2,
+        )
+    if source_type == "nasa_apod":
+        services["nasa_apod"] = SourceCollectionService(
+            repository=repository,
+            storage=storage,
+            adapter=NasaApodSourceAdapter(
+                client=FakeNasaApodClient(metadata=list(metadata), downloads=downloads)
+            ),
+            max_download_retries=2,
+        )
     consumer = ManualCollectionTaskConsumer(
         repository=repository,
-        storage=storage,
-        bing_client=FakeBingClient(
-            metadata=list(metadata),
-            downloads=[
-                DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
-                DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
-            ],
-        ),
-        max_download_retries=2,
+        services=services,
+        supported_source_types=(source_type,),
     )
     try:
         summary = consumer.consume_next_queued_task()
@@ -313,6 +400,64 @@ def run_manual_consumer(*, tmp_path: Path, metadata: list[BingImageMetadata]) ->
 
     assert summary is not None
     assert summary.task_status == "succeeded"
+
+
+class FakeNasaApodClient:
+    def __init__(
+        self,
+        *,
+        metadata: list[BingImageMetadata | CollectedImageMetadata],
+        downloads: list[DownloadedImage],
+    ) -> None:
+        self.metadata = metadata
+        self.downloads = downloads
+        self.download_calls = 0
+
+    def fetch_metadata(
+        self,
+        *,
+        market_code: str,
+        count: int,
+        date_from: object,
+        date_to: object,
+    ) -> list[CollectedImageMetadata]:
+        del market_code
+        del date_from
+        del date_to
+        return [item for item in self.metadata[:count] if isinstance(item, CollectedImageMetadata)]
+
+    def download_image(self, image_url: str) -> DownloadedImage:
+        del image_url
+        item = self.downloads[self.download_calls]
+        self.download_calls += 1
+        return item
+
+
+def make_nasa_metadata(
+    *,
+    wallpaper_date: str,
+    source_key: str,
+    source_url: str,
+) -> CollectedImageMetadata:
+    from datetime import date
+    import hashlib
+    import json
+
+    return CollectedImageMetadata(
+        market_code="global",
+        wallpaper_date=date.fromisoformat(wallpaper_date),
+        source_key=source_key,
+        title="Moonrise",
+        copyright_text="NASA",
+        origin_page_url=None,
+        origin_image_url=source_url,
+        source_url_hash=hashlib.sha256(source_url.encode("utf-8")).hexdigest(),
+        is_downloadable=True,
+        source_name="NASA APOD",
+        origin_width=None,
+        origin_height=None,
+        raw_extra_json=json.dumps({"source_key": source_key}, ensure_ascii=True),
+    )
 
 
 def seed_collection_task(

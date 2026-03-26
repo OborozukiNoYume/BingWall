@@ -397,8 +397,8 @@
 
 ```json
 {
-  "source_type": "bing",
-  "market_code": "en-US",
+  "source_type": "nasa_apod",
+  "market_code": "global",
   "date_from": "2026-03-22",
   "date_to": "2026-03-22",
   "force_refresh": false
@@ -416,9 +416,11 @@
 
 约束：
 
-- 当前实现仅支持 `source_type = bing`
+- 当前实现支持 `source_type = bing` 与 `source_type = nasa_apod`
 - `date_from` 与 `date_to` 必须满足 `date_from <= date_to`
-- 当前 Bing 手动采集仅支持最近 `8` 天内、且跨度不超过 `8` 天的日期范围
+- 当 `source_type = bing` 时，`market_code` 必须是类似 `en-US` 的地区编码
+- 当 `source_type = nasa_apod` 时，`market_code` 固定为 `global`
+- 当前 Bing 与 NASA APOD 手动采集都仅支持最近 `8` 天内、且跨度不超过 `8` 天的日期范围
 - 当前实现会记录 `force_refresh` 请求参数，但仍继续沿用一期既有去重规则，不直接覆盖已存在内容
 
 ### 10. 后台任务列表

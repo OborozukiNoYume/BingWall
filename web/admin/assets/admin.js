@@ -693,6 +693,7 @@ function renderTaskListView(session, payload, state) {
               <label for="task-source-type">来源类型</label>
               <select id="task-source-type" name="source_type">
                 <option value="bing">bing</option>
+                <option value="nasa_apod">nasa_apod</option>
               </select>
             </div>
             <div class="field-group">
@@ -747,6 +748,7 @@ function renderTaskListView(session, payload, state) {
               <select id="task-source-filter" name="source_type">
                 <option value="">全部</option>
                 <option value="bing">bing</option>
+                <option value="nasa_apod">nasa_apod</option>
               </select>
             </div>
             <div class="field-group">
@@ -798,13 +800,17 @@ function renderTaskListView(session, payload, state) {
   const filterForm = document.querySelector("#task-filter-form");
   const tableBody = document.querySelector("#task-table-body");
   const paginationNode = document.querySelector("#task-pagination");
+  const sourceSelect = document.querySelector("#task-source-type");
+  const marketInput = document.querySelector("#task-market-code");
 
   if (
     !(createForm instanceof HTMLFormElement) ||
     !(createFeedback instanceof HTMLElement) ||
     !(filterForm instanceof HTMLFormElement) ||
     !(tableBody instanceof HTMLElement) ||
-    !(paginationNode instanceof HTMLElement)
+    !(paginationNode instanceof HTMLElement) ||
+    !(sourceSelect instanceof HTMLSelectElement) ||
+    !(marketInput instanceof HTMLInputElement)
   ) {
     return;
   }
@@ -832,6 +838,12 @@ function renderTaskListView(session, payload, state) {
   }
 
   paginationNode.innerHTML = renderPaginationLinks("/admin/tasks", state, pagination.total_pages);
+
+  const syncMarketCode = () => {
+    marketInput.value = sourceSelect.value === "nasa_apod" ? "global" : "en-US";
+  };
+  syncMarketCode();
+  sourceSelect.addEventListener("change", syncMarketCode);
 
   createForm.addEventListener("submit", async (event) => {
     event.preventDefault();

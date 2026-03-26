@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing consume-collection-tasks inspect-resources backup restore verify-backup-restore run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod consume-collection-tasks inspect-resources backup restore verify-backup-restore run clean
 
 MARKET ?= en-US
 COUNT ?= 1
@@ -36,6 +36,9 @@ db-migrate:
 
 collect-bing:
 	$(VENV_PYTHON) -m app.collectors.bing --market $(MARKET) --count $(COUNT)
+
+collect-nasa-apod:
+	$(VENV_PYTHON) -m app.collectors.nasa_apod --market $(MARKET)
 
 consume-collection-tasks:
 	$(VENV_PYTHON) -m app.collectors.manual_tasks

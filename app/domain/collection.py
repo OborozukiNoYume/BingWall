@@ -3,7 +3,7 @@ from datetime import date
 
 
 @dataclass(frozen=True, slots=True)
-class BingImageMetadata:
+class CollectedImageMetadata:
     market_code: str
     wallpaper_date: date
     source_key: str
@@ -17,6 +17,9 @@ class BingImageMetadata:
     origin_width: int | None
     origin_height: int | None
     raw_extra_json: str
+
+
+BingImageMetadata = CollectedImageMetadata
 
 
 @dataclass(frozen=True, slots=True)

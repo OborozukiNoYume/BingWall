@@ -12,12 +12,13 @@ from pydantic import ValidationInfo
 from pydantic import field_validator
 from pydantic import model_validator
 
-CollectionSourceType = Literal["bing"]
+from app.domain.collection_sources import COLLECTION_SOURCE_MAX_MANUAL_DAYS
+from app.domain.collection_sources import CollectionSourceType
+from app.domain.collection_sources import normalize_market_code
+
 CollectionTaskStatus = Literal["queued", "running", "succeeded", "partially_failed", "failed"]
 CollectionTriggerType = Literal["manual", "admin", "cron"]
 CollectionItemResultStatus = Literal["succeeded", "duplicated", "failed"]
-
-BING_MANUAL_COLLECTION_MAX_DAYS = 8
 
 
 class AdminCollectionTaskCreateRequest(BaseModel):
@@ -29,13 +30,11 @@ class AdminCollectionTaskCreateRequest(BaseModel):
 
     @field_validator("market_code")
     @classmethod
-    def validate_market_code(cls, value: str) -> str:
-        normalized = value.strip()
-        if not normalized:
-            raise ValueError("地区不能为空")
-        if "-" not in normalized:
-            raise ValueError("地区格式不正确")
-        return normalized
+    def validate_market_code(cls, value: str, info: ValidationInfo) -> str:
+        source_type = info.data.get("source_type")
+        if source_type is None:
+            return value.strip()
+        return normalize_market_code(source_type=source_type, market_code=value)
 
     @model_validator(mode="after")
     def validate_date_range(self) -> AdminCollectionTaskCreateRequest:
@@ -43,19 +42,17 @@ class AdminCollectionTaskCreateRequest(BaseModel):
             raise ValueError("结束日期不能早于开始日期")
 
         requested_days = (self.date_to - self.date_from).days + 1
-        if requested_days > BING_MANUAL_COLLECTION_MAX_DAYS:
-            raise ValueError(
-                f"Bing 手动采集日期范围不能超过最近 {BING_MANUAL_COLLECTION_MAX_DAYS} 天"
-            )
+        max_days = COLLECTION_SOURCE_MAX_MANUAL_DAYS[self.source_type]
+        source_label = "Bing" if self.source_type == "bing" else "NASA APOD"
+        if requested_days > max_days:
+            raise ValueError(f"{source_label} 手动采集日期范围不能超过最近 {max_days} 天")
 
         today_utc = datetime.now(tz=UTC).date()
-        earliest_supported = today_utc - timedelta(days=BING_MANUAL_COLLECTION_MAX_DAYS - 1)
+        earliest_supported = today_utc - timedelta(days=max_days - 1)
         if self.date_to > today_utc:
             raise ValueError("结束日期不能晚于今天")
         if self.date_from < earliest_supported:
-            raise ValueError(
-                f"Bing 手动采集仅支持最近 {BING_MANUAL_COLLECTION_MAX_DAYS} 天内的日期"
-            )
+            raise ValueError(f"{source_label} 手动采集仅支持最近 {max_days} 天内的日期")
         return self
 
 

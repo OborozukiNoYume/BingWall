@@ -32,6 +32,11 @@ class Settings(BaseSettings):
     collect_bing_default_market: str = Field(default="en-US", min_length=2)
     collect_bing_timeout_seconds: int = Field(default=10, gt=0, le=120)
     collect_bing_max_download_retries: int = Field(default=3, ge=1, le=10)
+    collect_nasa_apod_enabled: bool = True
+    collect_nasa_apod_default_market: str = Field(default="global", min_length=2)
+    collect_nasa_apod_api_key: SecretStr = Field(default=SecretStr("DEMO_KEY"))
+    collect_nasa_apod_timeout_seconds: int = Field(default=10, gt=0, le=120)
+    collect_nasa_apod_max_download_retries: int = Field(default=3, ge=1, le=10)
     security_session_secret: SecretStr
     security_session_ttl_hours: int = Field(gt=0, le=24)
     log_level: LogLevel = "INFO"

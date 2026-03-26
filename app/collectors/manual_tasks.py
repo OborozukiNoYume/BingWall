@@ -4,11 +4,15 @@ import argparse
 import json
 
 from app.collectors.bing import BingClient
+from app.collectors.nasa_apod import NasaApodClient
+from app.collectors.nasa_apod import NasaApodSourceAdapter
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.file_storage import FileStorage
+from app.services.bing_collection import BingSourceAdapter
 from app.services.admin_collection import ManualCollectionTaskConsumer
+from app.services.source_collection import SourceCollectionService
 
 
 def parse_args() -> argparse.Namespace:
@@ -21,9 +25,6 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     settings = get_settings()
-    if not settings.collect_bing_enabled:
-        raise RuntimeError("Bing collection is disabled by configuration.")
-
     args = parse_args()
     configure_logging(settings.log_level)
 
@@ -33,12 +34,32 @@ def main() -> None:
         public_dir=settings.storage_public_dir,
         failed_dir=settings.storage_failed_dir,
     )
-    consumer = ManualCollectionTaskConsumer(
-        repository=repository,
-        storage=storage,
-        bing_client=BingClient(timeout_seconds=settings.collect_bing_timeout_seconds),
-        max_download_retries=settings.collect_bing_max_download_retries,
-    )
+    services: dict[str, SourceCollectionService] = {}
+    if settings.collect_bing_enabled:
+        services["bing"] = SourceCollectionService(
+            repository=repository,
+            storage=storage,
+            adapter=BingSourceAdapter(
+                client=BingClient(timeout_seconds=settings.collect_bing_timeout_seconds)
+            ),
+            max_download_retries=settings.collect_bing_max_download_retries,
+        )
+    if settings.collect_nasa_apod_enabled:
+        services["nasa_apod"] = SourceCollectionService(
+            repository=repository,
+            storage=storage,
+            adapter=NasaApodSourceAdapter(
+                client=NasaApodClient(
+                    api_key=settings.collect_nasa_apod_api_key.get_secret_value(),
+                    timeout_seconds=settings.collect_nasa_apod_timeout_seconds,
+                )
+            ),
+            max_download_retries=settings.collect_nasa_apod_max_download_retries,
+        )
+    if not services:
+        raise RuntimeError("No collection sources are enabled by configuration.")
+
+    consumer = ManualCollectionTaskConsumer(repository=repository, services=services)
 
     consumed: list[dict[str, object]] = []
     try:

@@ -176,6 +176,77 @@ class CollectionRepository:
             self.connection.rollback()
             raise
 
+    def claim_next_queued_task_for_sources(
+        self,
+        *,
+        source_types: tuple[str, ...],
+        claimed_at_utc: str,
+    ) -> sqlite3.Row | None:
+        if not source_types:
+            return None
+        placeholders = ", ".join("?" for _ in source_types)
+        self.connection.execute("BEGIN IMMEDIATE;")
+        try:
+            running_row = self.connection.execute(
+                f"""
+                SELECT id
+                FROM collection_tasks
+                WHERE source_type IN ({placeholders})
+                  AND task_status = 'running'
+                ORDER BY started_at_utc ASC, id ASC
+                LIMIT 1;
+                """,
+                source_types,
+            ).fetchone()
+            if running_row is not None:
+                self.connection.commit()
+                return None
+
+            queued_row = self.connection.execute(
+                f"""
+                SELECT *
+                FROM collection_tasks
+                WHERE source_type IN ({placeholders})
+                  AND task_status = 'queued'
+                ORDER BY created_at_utc ASC, id ASC
+                LIMIT 1;
+                """,
+                source_types,
+            ).fetchone()
+            if queued_row is None:
+                self.connection.commit()
+                return None
+
+            updated = self.connection.execute(
+                """
+                UPDATE collection_tasks
+                SET task_status = 'running',
+                    started_at_utc = ?,
+                    updated_at_utc = ?
+                WHERE id = ?
+                  AND task_status = 'queued';
+                """,
+                (claimed_at_utc, claimed_at_utc, int(queued_row["id"])),
+            )
+            if updated.rowcount != 1:
+                self.connection.commit()
+                return None
+
+            claimed_row = self.connection.execute(
+                """
+                SELECT *
+                FROM collection_tasks
+                WHERE id = ?
+                LIMIT 1;
+                """,
+                (int(queued_row["id"]),),
+            ).fetchone()
+            self.connection.commit()
+            return cast(sqlite3.Row | None, claimed_row)
+        except Exception:
+            self.connection.rollback()
+            raise
+
     def finish_collection_task(
         self,
         *,

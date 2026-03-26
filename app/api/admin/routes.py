@@ -119,6 +119,7 @@ def get_admin_collection_service(
     return AdminCollectionService(
         repository,
         session_secret=settings.security_session_secret.get_secret_value(),
+        settings=settings,
     )
 
 

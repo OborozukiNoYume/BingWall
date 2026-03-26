@@ -8,11 +8,16 @@ from sqlite3 import Row
 from typing import cast
 
 from app.api.errors import ApiError
+from app.core.config import Settings
 from app.domain.collection import CollectionRunSummary
+from app.domain.collection_sources import COLLECTION_SOURCE_DEFAULT_MARKETS
+from app.domain.collection_sources import COLLECTION_SOURCE_TYPES
+from app.domain.collection_sources import CollectionSourceType
 from app.repositories.admin_collection_repository import AdminCollectionRepository
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.collection_repository import TaskItemCreateInput
-from app.repositories.file_storage import FileStorage
+from app.services.source_collection import SourceCollectionService
+from app.services.source_collection import utc_now_isoformat
 from app.schemas.admin_auth import AdminSessionContext
 from app.schemas.admin_collection import AdminCollectionLogListData
 from app.schemas.admin_collection import AdminCollectionLogListQuery
@@ -30,15 +35,19 @@ from app.schemas.admin_collection import CollectionItemResultStatus
 from app.schemas.admin_collection import CollectionTaskStatus
 from app.schemas.common import Pagination
 from app.services.admin_auth import build_request_source
-from app.services.bing_collection import BingClientProtocol
-from app.services.bing_collection import BingCollectionService
-from app.services.bing_collection import utc_now_isoformat
 
 
 class AdminCollectionService:
-    def __init__(self, repository: AdminCollectionRepository, *, session_secret: str) -> None:
+    def __init__(
+        self,
+        repository: AdminCollectionRepository,
+        *,
+        session_secret: str,
+        settings: Settings,
+    ) -> None:
         self.repository = repository
         self.session_secret = session_secret
+        self.settings = settings
 
     def create_task(
         self,
@@ -49,6 +58,12 @@ class AdminCollectionService:
         client_ip: str | None,
         user_agent: str | None,
     ) -> AdminCollectionTaskCreateData:
+        if not is_collection_source_enabled(self.settings, payload.source_type):
+            raise ApiError(
+                status_code=409,
+                error_code="COLLECT_SOURCE_DISABLED",
+                message=f"{payload.source_type} 来源当前已关闭，不能创建采集任务",
+            )
         created_at_utc = utc_now_isoformat()
         snapshot = payload.model_dump(mode="json")
         task_id = self.repository.create_queued_task(
@@ -152,10 +167,18 @@ class AdminCollectionService:
                 message="只有失败或部分失败的任务允许重试",
             )
 
+        source_type = cast(CollectionSourceType, str(row["source_type"]))
+        if not is_collection_source_enabled(self.settings, source_type):
+            raise ApiError(
+                status_code=409,
+                error_code="COLLECT_SOURCE_DISABLED",
+                message=f"{source_type} 来源当前已关闭，不能创建重试任务",
+            )
+
         created_at_utc = utc_now_isoformat()
         new_task_id = self.repository.create_queued_task(
             task_type=str(row["task_type"]),
-            source_type=str(row["source_type"]),
+            source_type=source_type,
             trigger_type="admin",
             triggered_by=session.username,
             request_snapshot_json=str(row["request_snapshot_json"] or "{}"),
@@ -256,18 +279,16 @@ class ManualCollectionTaskConsumer:
         self,
         *,
         repository: CollectionRepository,
-        storage: FileStorage,
-        bing_client: BingClientProtocol,
-        max_download_retries: int,
+        services: dict[str, SourceCollectionService],
+        supported_source_types: tuple[str, ...] = COLLECTION_SOURCE_TYPES,
     ) -> None:
         self.repository = repository
-        self.storage = storage
-        self.bing_client = bing_client
-        self.max_download_retries = max_download_retries
+        self.services = services
+        self.supported_source_types = supported_source_types
 
     def consume_next_queued_task(self) -> CollectionRunSummary | None:
-        task_row = self.repository.claim_next_queued_task(
-            source_type="bing",
+        task_row = self.repository.claim_next_queued_task_for_sources(
+            source_types=self.supported_source_types,
             claimed_at_utc=utc_now_isoformat(),
         )
         if task_row is None:
@@ -279,27 +300,36 @@ class ManualCollectionTaskConsumer:
         if task_row is None:
             raise RuntimeError(f"Collection task {task_id} does not exist.")
 
+        source_type = str(task_row["source_type"])
+        service = self.services.get(source_type)
+        if service is None:
+            return self._mark_task_failed(
+                task_id=task_id,
+                failure_reason=f"Collection source is disabled or unsupported: {source_type}",
+            )
+
         try:
             snapshot = parse_task_snapshot(task_row)
-            if snapshot.source_type != "bing":
-                raise RuntimeError(f"Unsupported source type: {snapshot.source_type}")
             date_from = parse_iso_date(snapshot.date_from)
             date_to = parse_iso_date(snapshot.date_to)
-            if date_from is None or date_to is None:
-                raise RuntimeError("Queued Bing collection task is missing date range.")
-            count = (date_to - date_from).days + 1
+            count = snapshot.count
+            if count is None:
+                if date_from is not None and date_to is not None:
+                    count = (date_to - date_from).days + 1
+                else:
+                    count = 1
+            market_code = snapshot.market_code or COLLECTION_SOURCE_DEFAULT_MARKETS.get(
+                cast(CollectionSourceType, source_type),
+                "",
+            )
+            if not market_code:
+                raise RuntimeError(f"Queued {source_type} collection task is missing market_code.")
         except Exception as exc:
             return self._mark_task_failed(task_id=task_id, failure_reason=str(exc))
 
-        service = BingCollectionService(
-            repository=self.repository,
-            storage=self.storage,
-            bing_client=self.bing_client,
-            max_download_retries=self.max_download_retries,
-        )
         return service.collect_existing_task(
             task_id=task_id,
-            market_code=snapshot.market_code,
+            market_code=market_code,
             count=count,
             date_from=date_from,
             date_to=date_to,
@@ -339,9 +369,19 @@ class ManualCollectionTaskConsumer:
         )
 
 
+def is_collection_source_enabled(settings: Settings, source_type: CollectionSourceType) -> bool:
+    if source_type == "bing":
+        return settings.collect_bing_enabled
+    return settings.collect_nasa_apod_enabled
+
+
 def parse_task_snapshot(row: Row) -> AdminCollectionTaskSnapshot:
+    source_type = cast(CollectionSourceType, str(row["source_type"]))
     raw_payload = row["request_snapshot_json"]
-    snapshot_data = {"source_type": str(row["source_type"]), "market_code": ""}
+    snapshot_data = {
+        "source_type": source_type,
+        "market_code": COLLECTION_SOURCE_DEFAULT_MARKETS[source_type],
+    }
     if raw_payload:
         try:
             parsed = json.loads(str(raw_payload))

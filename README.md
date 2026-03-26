@@ -4,12 +4,12 @@
 
 BingWall 是一个围绕 Bing 壁纸构建的图片服务系统。一期目标不是做单一下载脚本，而是建设一个可持续采集、可管理、可对外服务、可扩展演进的内容系统。
 
-当前仓库已完成阶段一、阶段二闭环，并已落地阶段三 `T3.1` 标签体系；核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
+当前仓库已完成阶段一、阶段二闭环，并已落地阶段三 `T3.1` 标签体系与 `T3.2` 多来源采集；核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
 
 ## 当前状态
 
-- 项目阶段：阶段三已启动，`T3.1` 已完成；运维侧仍需补齐目标机 `cron` 安装与计划配置
-- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 采集与资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环、`T3.1` 标签体系
+- 项目阶段：阶段三进行中，`T3.1` 与 `T3.2` 已完成；运维侧仍需补齐目标机 `cron` 安装与计划配置
+- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 与 NASA APOD 多来源采集及资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环、`T3.1` 标签体系、`T3.2` 多来源采集
 - 当前文档状态：系统设计、模块说明、数据模型、API 约定、部署运行说明、项目状态与阶段 TODO 已同步到当前实现
 - 已确认运行时基线：`Python 3.14.2`、`Node.js 24.13.0`
 
@@ -45,6 +45,7 @@ make setup
 cp .env.example .env
 make db-migrate
 make collect-bing MARKET=en-US COUNT=1
+make collect-nasa-apod MARKET=global
 make consume-collection-tasks
 make inspect-resources
 make backup
@@ -80,7 +81,8 @@ make verify-deploy
 - `.python-version` 与 `.nvmrc` 运行时版本锁定
 - `.env.example` 配置示例与启动期必填校验
 - `make setup`、`make db-migrate`、`make verify`、`make run` 统一命令入口
-- `make collect-bing MARKET=en-US COUNT=1` 手动采集入口
+- `make collect-bing MARKET=en-US COUNT=1` Bing 手动采集入口
+- `make collect-nasa-apod MARKET=global` NASA APOD 手动采集入口
 - `make consume-collection-tasks` 手动采集任务消费入口，可供 cron 调用
 - `make inspect-resources` 资源巡检入口，可供 cron 调用
 - `make backup` 备份入口，默认面向目标机标准目录执行一致性数据库备份和目录归档
@@ -147,6 +149,13 @@ make verify-deploy
 - `/api/admin/tags`、`/api/admin/tags/{tag_id}` 与 `/api/admin/wallpapers/{wallpaper_id}/tags` 后台接口
 - `/admin/tags` 标签管理页，以及 `/admin/wallpapers/{id}` 内容详情页中的标签绑定入口
 - 标签创建、更新、绑定的审计日志写入，以及多标签绑定、停用标签隐藏和公开筛选联动测试
+
+当前 `T3.2` 已补齐内容：
+
+- `app/services/source_collection.py`、`app/domain/collection_sources.py` 与 `app/repositories/collection_repository.py`，把采集执行链路抽象为按 `source_type` 分发的统一来源接口，并支持跨来源任务认领与结果落库
+- `app/collectors/nasa_apod.py`、新增 `BINGWALL_COLLECT_NASA_APOD_*` 配置项与 `make collect-nasa-apod`，接入 `nasa_apod` 作为 Bing 之外的新来源
+- 后台任务创建、重试、消费与页面筛选已支持 `bing` / `nasa_apod` 两种来源，其中 `nasa_apod` 的 `market_code` 固定为 `global`
+- 已补齐多来源采集集成测试，验证 Bing 链路不回归、NASA APOD 新来源可入库、后台任务和结构化日志可按来源区分
 
 公开 API 最小验证示例：
 
@@ -215,6 +224,10 @@ curl -X POST http://127.0.0.1:8000/api/admin/collection-tasks \
   -H 'Authorization: Bearer <session_token>' \
   -H 'Content-Type: application/json' \
   -d '{"source_type":"bing","market_code":"en-US","date_from":"2026-03-24","date_to":"2026-03-24","force_refresh":false}'
+curl -X POST http://127.0.0.1:8000/api/admin/collection-tasks \
+  -H 'Authorization: Bearer <session_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"source_type":"nasa_apod","market_code":"global","date_from":"2026-03-24","date_to":"2026-03-24","force_refresh":false}'
 make consume-collection-tasks
 curl -H 'Authorization: Bearer <session_token>' \
   http://127.0.0.1:8000/api/admin/collection-tasks/1

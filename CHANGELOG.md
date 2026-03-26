@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## 2026-03-26T12:57:06Z
+
+### 变更内容
+
+- 新增 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/domain/collection_sources.py](app/domain/collection_sources.py)，把采集执行链路抽象为按 `source_type` 分发的统一来源接口，并补齐跨来源任务认领逻辑
+- 新增 [app/collectors/nasa_apod.py](app/collectors/nasa_apod.py)，并更新 [app/collectors/manual_tasks.py](app/collectors/manual_tasks.py)、[app/services/bing_collection.py](app/services/bing_collection.py)、[app/repositories/collection_repository.py](app/repositories/collection_repository.py) 与 [app/core/config.py](app/core/config.py)，接入 `nasa_apod` 作为 Bing 之外的新来源，同时保留 Bing 主链路兼容
+- 更新 [app/schemas/admin_collection.py](app/schemas/admin_collection.py)、[app/services/admin_collection.py](app/services/admin_collection.py) 与 [app/api/admin/routes.py](app/api/admin/routes.py)，让后台任务创建、重试、任务消费和来源开关校验支持 `bing` / `nasa_apod`
+- 更新 [web/admin/assets/admin.js](web/admin/assets/admin.js)、[Makefile](Makefile) 与 [.env.example](.env.example)，补齐后台来源选项、新的手动采集入口 `make collect-nasa-apod` 和 `BINGWALL_COLLECT_NASA_APOD_*` 配置示例
+- 新增 [tests/integration/test_multi_source_collection.py](tests/integration/test_multi_source_collection.py)，并更新 [tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py)，覆盖 NASA APOD 新来源入库、后台任务创建/消费与来源日志区分；同时保留既有 Bing 集成测试验证不回归
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/data-model.md](docs/data-model.md)，同步 `T3.2` 完成状态、接口约束、配置入口和后续优先级
+
+### 变更原因
+
+- 完成阶段三 `T3.2`，把“多来源采集预留”推进为可运行实现，并确保 Bing 现有采集、去重和资源入库链路不回归
+- 保持最保守范围，继续复用现有 SQLite、FastAPI、原生后台页面和本地文件存储，不引入消息队列、第三方 SDK 或新的前端框架
+- 选择 `nasa_apod` 作为首个 Bing 之外的新来源，是因为其“一日一图”模型最贴合当前 `source_type + wallpaper_date + market_code` 唯一键约束，可在不改表结构的前提下安全落地
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增运行入口：`make collect-nasa-apod`
+- 新增配置项：`BINGWALL_COLLECT_NASA_APOD_ENABLED`、`BINGWALL_COLLECT_NASA_APOD_DEFAULT_MARKET`、`BINGWALL_COLLECT_NASA_APOD_API_KEY`、`BINGWALL_COLLECT_NASA_APOD_TIMEOUT_SECONDS`、`BINGWALL_COLLECT_NASA_APOD_MAX_DOWNLOAD_RETRIES`
+- 变更时间：`2026-03-26T12:57:06Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖采集服务抽象、来源配置、后台手动任务来源选择、任务消费分发、结构化日志和多来源测试
+- 当前已支持 `bing` 与 `nasa_apod` 两种来源，其中 `nasa_apod` 的 `market_code` 固定为 `global`
+- Bing 既有 CLI 入口、后台任务接口、去重规则和资源落库规则保持不变；新增来源沿用同一套资源入库和状态联动逻辑
+- 不涉及数据库表结构调整、公开接口字段扩展、资源派生版本、OSS/CDN、下载统计或部署拓扑变化
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_bing_collection_service.py tests/integration/test_multi_source_collection.py tests/integration/test_admin_collection.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除统一来源抽象、`nasa_apod` 采集适配器、后台来源选项、多来源测试与相关文档更新，或执行 `git revert` 回退本次提交
+- 若环境中已经创建过 `source_type = nasa_apod` 的任务或内容，回滚前应先确认是否需要保留这些记录，避免后台任务与壁纸数据出现“库里仍有记录、代码已不识别”的状态
+- 回滚后仓库将恢复到“仅支持 Bing 采集、`T3.2` 仍停留在设计预留状态”的状态
+
 ## 2026-03-26T12:30:40Z
 
 ### 变更内容
