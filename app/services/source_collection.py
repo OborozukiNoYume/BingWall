@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import UTC
 from datetime import date
 from datetime import datetime
@@ -15,15 +16,30 @@ from urllib.parse import urlparse
 from app.domain.collection import CollectedImageMetadata
 from app.domain.collection import CollectionRunSummary
 from app.domain.collection import DownloadedImage
+from app.domain.resource_variants import RESOURCE_TYPE_DOWNLOAD
+from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
+from app.domain.resource_variants import RESOURCE_TYPE_PREVIEW
+from app.domain.resource_variants import RESOURCE_TYPE_THUMBNAIL
+from app.domain.resource_variants import ResourceType
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.collection_repository import ResourceCreateInput
 from app.repositories.collection_repository import TaskItemCreateInput
 from app.repositories.collection_repository import WallpaperCreateInput
 from app.repositories.file_storage import FileStorage
+from app.services.image_variants import LoadedImage
+from app.services.image_variants import generate_variant_image
+from app.services.image_variants import load_image_bytes
 
 logger = logging.getLogger(__name__)
 
 SAFE_PATH_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
+
+
+@dataclass(frozen=True, slots=True)
+class VariantResourceRecord:
+    resource_id: int
+    resource_type: ResourceType
+    relative_path: str
 
 
 class CollectionSourceAdapter(Protocol):
@@ -294,7 +310,7 @@ class SourceCollectionService:
         resource_id = self.repository.create_image_resource(
             ResourceCreateInput(
                 wallpaper_id=wallpaper_id,
-                resource_type="original",
+                resource_type=RESOURCE_TYPE_ORIGINAL,
                 storage_backend="local",
                 relative_path=relative_path,
                 filename=filename,
@@ -308,7 +324,8 @@ class SourceCollectionService:
 
         self._download_and_store_resource(
             wallpaper_id=wallpaper_id,
-            resource_id=resource_id,
+            original_resource_id=resource_id,
+            task_id=task_id,
             item=item,
             relative_path=relative_path,
         )
@@ -331,44 +348,134 @@ class SourceCollectionService:
         self,
         *,
         wallpaper_id: int,
-        resource_id: int,
+        original_resource_id: int,
+        task_id: int,
         item: CollectedImageMetadata,
         relative_path: str,
     ) -> None:
-        last_error: str | None = None
-        for attempt in range(1, self.max_download_retries + 1):
-            tmp_path = self.storage.tmp_path_for(relative_path)
-            cleanup_path(tmp_path)
-            try:
-                downloaded = self.adapter.download_image(item.origin_image_url)
-                tmp_path.write_bytes(downloaded.content)
-                validate_downloaded_image(downloaded.content)
-                content_hash = hashlib.sha256(downloaded.content).hexdigest()
-                mime_type = guess_mime_type(
-                    file_ext=Path(relative_path).suffix.lstrip(".").lower(),
-                    fallback=downloaded.mime_type,
+        try:
+            downloaded, loaded_image = self._download_original_image(
+                item=item,
+                relative_path=relative_path,
+            )
+        except Exception as exc:
+            processed_at_utc = utc_now_isoformat()
+            self.repository.mark_image_resource_failed(
+                resource_id=original_resource_id,
+                failure_reason=str(exc),
+                processed_at_utc=processed_at_utc,
+            )
+            self.repository.refresh_wallpaper_resource_status(
+                wallpaper_id=wallpaper_id,
+                processed_at_utc=processed_at_utc,
+            )
+            raise
+        content_hash = hashlib.sha256(downloaded.content).hexdigest()
+        original_mime_type = guess_mime_type(
+            file_ext=Path(relative_path).suffix.lstrip(".").lower(),
+            fallback=loaded_image.mime_type,
+        )
+        processed_at_utc = utc_now_isoformat()
+        original_tmp_path = self.storage.tmp_path_for(relative_path)
+        cleanup_path(original_tmp_path)
+        try:
+            original_tmp_path.write_bytes(downloaded.content)
+            self.storage.move_to_public(tmp_path=original_tmp_path, relative_path=relative_path)
+            self.repository.mark_image_resource_ready(
+                resource_id=original_resource_id,
+                file_size_bytes=len(downloaded.content),
+                width=loaded_image.width,
+                height=loaded_image.height,
+                content_hash=content_hash,
+                downloaded_at_utc=processed_at_utc,
+                integrity_check_result="passed",
+                mime_type=original_mime_type,
+            )
+        except Exception as exc:
+            failure_reason = f"original store failed: {exc}"
+            if original_tmp_path.exists():
+                self.storage.move_to_failed(
+                    tmp_path=original_tmp_path,
+                    relative_path=relative_path,
                 )
-                self.storage.move_to_public(tmp_path=tmp_path, relative_path=relative_path)
-                processed_at_utc = utc_now_isoformat()
-                self.repository.mark_image_resource_ready(
-                    resource_id=resource_id,
-                    file_size_bytes=len(downloaded.content),
-                    width=item.origin_width,
-                    height=item.origin_height,
-                    content_hash=content_hash,
-                    downloaded_at_utc=processed_at_utc,
-                    integrity_check_result="passed",
-                    mime_type=mime_type,
-                )
-                self.repository.refresh_wallpaper_resource_status(
-                    wallpaper_id=wallpaper_id,
+            self.repository.mark_image_resource_failed(
+                resource_id=original_resource_id,
+                failure_reason=failure_reason,
+                processed_at_utc=processed_at_utc,
+            )
+            self.repository.refresh_wallpaper_resource_status(
+                wallpaper_id=wallpaper_id,
+                processed_at_utc=processed_at_utc,
+            )
+            raise RuntimeError(failure_reason) from exc
+
+        variant_resources = self._create_variant_resource_records(
+            wallpaper_id=wallpaper_id,
+            item=item,
+            original_relative_path=relative_path,
+            loaded_image=loaded_image,
+        )
+        try:
+            for resource in variant_resources:
+                if resource.resource_type == RESOURCE_TYPE_DOWNLOAD:
+                    self._copy_original_as_download(
+                        resource=resource,
+                        original_relative_path=relative_path,
+                        original_content=downloaded.content,
+                        original_mime_type=original_mime_type,
+                        original_width=loaded_image.width,
+                        original_height=loaded_image.height,
+                        content_hash=content_hash,
+                        processed_at_utc=processed_at_utc,
+                    )
+                    continue
+                self._generate_variant_resource(
+                    resource=resource,
+                    original_image=loaded_image,
+                    original_source_key=item.source_key,
+                    task_id=task_id,
                     processed_at_utc=processed_at_utc,
                 )
-                return
+        except Exception:
+            self.repository.mark_pending_image_resources_failed(
+                resource_ids=tuple(resource.resource_id for resource in variant_resources),
+                failure_reason="variant processing aborted after an earlier failure",
+                processed_at_utc=utc_now_isoformat(),
+            )
+            self.repository.refresh_wallpaper_resource_status(
+                wallpaper_id=wallpaper_id,
+                processed_at_utc=utc_now_isoformat(),
+            )
+            raise
+
+        self.repository.refresh_wallpaper_resource_status(
+            wallpaper_id=wallpaper_id,
+            processed_at_utc=utc_now_isoformat(),
+        )
+
+    def _download_original_image(
+        self,
+        *,
+        item: CollectedImageMetadata,
+        relative_path: str,
+    ) -> tuple[DownloadedImage, LoadedImage]:
+        last_error: str | None = None
+        for attempt in range(1, self.max_download_retries + 1):
+            downloaded: DownloadedImage | None = None
+            try:
+                downloaded = self.adapter.download_image(item.origin_image_url)
+                loaded_image = load_image_bytes(
+                    downloaded.content,
+                    fallback_mime_type=downloaded.mime_type,
+                )
+                return downloaded, loaded_image
             except Exception as exc:
                 last_error = f"download attempt {attempt} failed: {exc}"
-                if tmp_path.exists():
-                    self.storage.move_to_failed(tmp_path=tmp_path, relative_path=relative_path)
+                if downloaded is not None:
+                    self._move_failed_original_download(
+                        relative_path=relative_path,
+                        content=downloaded.content,
+                    )
                 logger.warning(
                     "Download attempt %s/%s failed for %s: %s",
                     attempt,
@@ -379,17 +486,164 @@ class SourceCollectionService:
 
         if last_error is None:
             last_error = "download failed without a captured error"
-        processed_at_utc = utc_now_isoformat()
-        self.repository.mark_image_resource_failed(
-            resource_id=resource_id,
-            failure_reason=last_error,
-            processed_at_utc=processed_at_utc,
-        )
-        self.repository.refresh_wallpaper_resource_status(
-            wallpaper_id=wallpaper_id,
-            processed_at_utc=processed_at_utc,
-        )
         raise RuntimeError(last_error)
+
+    def _move_failed_original_download(self, *, relative_path: str, content: bytes) -> None:
+        tmp_path = self.storage.tmp_path_for(relative_path)
+        cleanup_path(tmp_path)
+        tmp_path.write_bytes(content)
+        self.storage.move_to_failed(tmp_path=tmp_path, relative_path=relative_path)
+
+    def _create_variant_resource_records(
+        self,
+        *,
+        wallpaper_id: int,
+        item: CollectedImageMetadata,
+        original_relative_path: str,
+        loaded_image: LoadedImage,
+    ) -> list[VariantResourceRecord]:
+        created_at_utc = utc_now_isoformat()
+        thumbnail_preview_ext = default_variant_file_ext(loaded_image=loaded_image)
+        resources: list[VariantResourceRecord] = []
+        for resource_type in (
+            RESOURCE_TYPE_THUMBNAIL,
+            RESOURCE_TYPE_PREVIEW,
+            *((RESOURCE_TYPE_DOWNLOAD,) if item.is_downloadable else ()),
+        ):
+            if resource_type == RESOURCE_TYPE_DOWNLOAD:
+                relative_path = build_variant_relative_path(
+                    original_relative_path=original_relative_path,
+                    resource_type=resource_type,
+                    file_ext=Path(original_relative_path).suffix.lstrip(".").lower() or "jpg",
+                )
+                file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"
+                mime_type = guess_mime_type(file_ext=file_ext, fallback=loaded_image.mime_type)
+            else:
+                relative_path = build_variant_relative_path(
+                    original_relative_path=original_relative_path,
+                    resource_type=resource_type,
+                    file_ext=thumbnail_preview_ext,
+                )
+                file_ext = thumbnail_preview_ext
+                mime_type = guess_mime_type(file_ext=file_ext, fallback=None)
+            resource_id = self.repository.create_image_resource(
+                ResourceCreateInput(
+                    wallpaper_id=wallpaper_id,
+                    resource_type=resource_type,
+                    storage_backend="local",
+                    relative_path=relative_path,
+                    filename=Path(relative_path).name,
+                    file_ext=file_ext,
+                    mime_type=mime_type,
+                    source_url=None,
+                    source_url_hash=None,
+                    created_at_utc=created_at_utc,
+                )
+            )
+            resources.append(
+                VariantResourceRecord(
+                    resource_id=resource_id,
+                    resource_type=resource_type,
+                    relative_path=relative_path,
+                )
+            )
+        return resources
+
+    def _copy_original_as_download(
+        self,
+        *,
+        resource: VariantResourceRecord,
+        original_relative_path: str,
+        original_content: bytes,
+        original_mime_type: str,
+        original_width: int,
+        original_height: int,
+        content_hash: str,
+        processed_at_utc: str,
+    ) -> None:
+        tmp_path = self.storage.tmp_path_for(resource.relative_path)
+        cleanup_path(tmp_path)
+        try:
+            tmp_path.write_bytes(original_content)
+            self.storage.move_to_public(tmp_path=tmp_path, relative_path=resource.relative_path)
+            self.repository.mark_image_resource_ready(
+                resource_id=resource.resource_id,
+                file_size_bytes=len(original_content),
+                width=original_width,
+                height=original_height,
+                content_hash=content_hash,
+                downloaded_at_utc=processed_at_utc,
+                integrity_check_result=f"copied_from:{original_relative_path}",
+                mime_type=original_mime_type,
+            )
+        except Exception as exc:
+            failure_reason = f"download resource copy failed: {exc}"
+            if tmp_path.exists():
+                self.storage.move_to_failed(
+                    tmp_path=tmp_path,
+                    relative_path=resource.relative_path,
+                )
+            self.repository.mark_image_resource_failed(
+                resource_id=resource.resource_id,
+                failure_reason=failure_reason,
+                processed_at_utc=processed_at_utc,
+            )
+            raise RuntimeError(failure_reason) from exc
+
+    def _generate_variant_resource(
+        self,
+        *,
+        resource: VariantResourceRecord,
+        original_image: LoadedImage,
+        original_source_key: str,
+        task_id: int,
+        processed_at_utc: str,
+    ) -> None:
+        tmp_path = self.storage.tmp_path_for(resource.relative_path)
+        cleanup_path(tmp_path)
+        try:
+            variant = generate_variant_image(
+                original_image.image,
+                resource_type=resource.resource_type,
+            )
+            tmp_path.write_bytes(variant.content)
+            self.storage.move_to_public(tmp_path=tmp_path, relative_path=resource.relative_path)
+            self.repository.mark_image_resource_ready(
+                resource_id=resource.resource_id,
+                file_size_bytes=len(variant.content),
+                width=variant.width,
+                height=variant.height,
+                content_hash=hashlib.sha256(variant.content).hexdigest(),
+                downloaded_at_utc=processed_at_utc,
+                integrity_check_result="passed",
+                mime_type=variant.mime_type,
+            )
+        except Exception as exc:
+            failure_reason = f"{resource.resource_type} generation failed: {exc}"
+            if tmp_path.exists():
+                self.storage.move_to_failed(
+                    tmp_path=tmp_path,
+                    relative_path=resource.relative_path,
+                )
+            self.repository.mark_image_resource_failed(
+                resource_id=resource.resource_id,
+                failure_reason=failure_reason,
+                processed_at_utc=processed_at_utc,
+            )
+            self.repository.create_task_item(
+                TaskItemCreateInput(
+                    task_id=task_id,
+                    source_item_key=original_source_key,
+                    action_name="generate_variant",
+                    result_status="failed",
+                    dedupe_hit_type=None,
+                    db_write_result="variant_resource_failed",
+                    file_write_result="failed",
+                    failure_reason=failure_reason,
+                    occurred_at_utc=utc_now_isoformat(),
+                )
+            )
+            raise RuntimeError(failure_reason) from exc
 
 
 def build_source_relative_path(
@@ -435,18 +689,20 @@ def extract_file_ext_from_source_url(source_url: str) -> str:
     return "jpg"
 
 
-def validate_downloaded_image(content: bytes) -> None:
-    if not content:
-        msg = "downloaded image is empty"
-        raise ValueError(msg)
-    if content.startswith(b"\xff\xd8\xff"):
-        return
-    if content.startswith(b"\x89PNG\r\n\x1a\n"):
-        return
-    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
-        return
-    msg = "downloaded file does not have a supported image signature"
-    raise ValueError(msg)
+def build_variant_relative_path(
+    *,
+    original_relative_path: str,
+    resource_type: ResourceType,
+    file_ext: str,
+) -> str:
+    path = Path(original_relative_path)
+    return str(path.with_name(f"{path.stem}--{resource_type}.{file_ext}"))
+
+
+def default_variant_file_ext(*, loaded_image: LoadedImage) -> str:
+    if "A" in loaded_image.image.getbands() or "transparency" in loaded_image.image.info:
+        return "png"
+    return "jpg"
 
 
 def task_type_for_trigger(trigger_type: str) -> str:

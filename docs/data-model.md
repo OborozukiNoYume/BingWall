@@ -87,7 +87,7 @@
 |---|---|---|---|
 | `id` | integer / uuid | 是 | 主键 |
 | `wallpaper_id` | integer / uuid | 是 | 所属壁纸 ID |
-| `resource_type` | string | 是 | 资源类型，如 `original` |
+| `resource_type` | string | 是 | 资源类型，当前使用 `original`、`thumbnail`、`preview`、`download` |
 | `storage_backend` | string | 是 | 存储后端，如 `local` |
 | `relative_path` | string | 是 | 存储相对路径 |
 | `filename` | string | 是 | 文件名 |
@@ -110,6 +110,8 @@
 ### 约束建议
 
 - 一个壁纸至少应有一个 `original` 类型资源
+- 当内容允许下载时，建议同时生成 `download` 资源；公开列表和详情依赖 `thumbnail` / `preview`
+- 同一壁纸下每种 `resource_type` 只能存在一条资源记录，避免公开端和巡检链路取到重复版本
 - `relative_path` 必须是系统生成路径，不能接收外部直接输入
 - `image_status = ready` 时，文件必须已存在于正式资源目录
 - 资源状态变化后，必须同步刷新所属 `wallpapers.resource_status` 快照，并更新 `updated_at_utc`
@@ -347,7 +349,7 @@
 
 ### `image_resources`
 
-- `(wallpaper_id, resource_type)` 普通索引
+- `(wallpaper_id, resource_type)` 唯一索引
 - `(image_status, last_processed_at_utc)` 巡检与重试索引
 - `(source_url_hash)` 技术辅助去重索引
 - `(content_hash)` 后续增强去重索引

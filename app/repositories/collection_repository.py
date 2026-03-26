@@ -6,6 +6,8 @@ import sqlite3
 from typing import cast
 from typing import Any
 
+from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
+from app.domain.resource_variants import expected_resource_types
 from app.repositories.sqlite import connect_sqlite
 
 
@@ -36,8 +38,8 @@ class ResourceCreateInput:
     filename: str
     file_ext: str
     mime_type: str
-    source_url: str
-    source_url_hash: str
+    source_url: str | None
+    source_url_hash: str | None
     created_at_utc: str
 
 
@@ -509,38 +511,88 @@ class CollectionRepository:
         )
         self.connection.commit()
 
+    def mark_pending_image_resources_failed(
+        self,
+        *,
+        resource_ids: tuple[int, ...],
+        failure_reason: str,
+        processed_at_utc: str,
+    ) -> None:
+        if not resource_ids:
+            return
+        placeholders = ", ".join("?" for _ in resource_ids)
+        self.connection.execute(
+            f"""
+            UPDATE image_resources
+            SET image_status = 'failed',
+                failure_reason = ?,
+                integrity_check_result = 'failed',
+                last_processed_at_utc = ?,
+                updated_at_utc = ?
+            WHERE id IN ({placeholders})
+              AND image_status = 'pending';
+            """,
+            (failure_reason, processed_at_utc, processed_at_utc, *resource_ids),
+        )
+        self.connection.commit()
+
     def refresh_wallpaper_resource_status(
         self, *, wallpaper_id: int, processed_at_utc: str
     ) -> None:
-        ready_resource = self.connection.execute(
+        wallpaper_row = self.connection.execute(
             """
-            SELECT id
-            FROM image_resources
-            WHERE wallpaper_id = ?
-              AND image_status = 'ready'
-            ORDER BY id ASC
+            SELECT is_downloadable
+            FROM wallpapers
+            WHERE id = ?
             LIMIT 1;
             """,
             (wallpaper_id,),
         ).fetchone()
-        failed_resource = self.connection.execute(
+        if wallpaper_row is None:
+            raise RuntimeError(f"Wallpaper {wallpaper_id} not found.")
+
+        resource_rows = self.connection.execute(
             """
-            SELECT 1
+            SELECT id, resource_type, image_status
             FROM image_resources
             WHERE wallpaper_id = ?
-              AND image_status = 'failed'
-            LIMIT 1;
+            ORDER BY id ASC;
             """,
             (wallpaper_id,),
-        ).fetchone()
+        ).fetchall()
+        ready_resource_types = {
+            str(row["resource_type"])
+            for row in resource_rows
+            if str(row["image_status"]) == "ready"
+        }
+        failed_resource_types = {
+            str(row["resource_type"])
+            for row in resource_rows
+            if str(row["image_status"]) == "failed"
+        }
+        expected_types = set(
+            expected_resource_types(is_downloadable=bool(wallpaper_row["is_downloadable"]))
+        )
 
         resource_status = "pending"
-        default_resource_id: int | None = None
-        if ready_resource is not None:
+        if expected_types.issubset(ready_resource_types):
             resource_status = "ready"
-            default_resource_id = int(ready_resource["id"])
-        elif failed_resource is not None:
+        elif expected_types.intersection(failed_resource_types):
             resource_status = "failed"
+
+        default_resource_id: int | None = None
+        for row in resource_rows:
+            if (
+                str(row["resource_type"]) == RESOURCE_TYPE_ORIGINAL
+                and str(row["image_status"]) == "ready"
+            ):
+                default_resource_id = int(row["id"])
+                break
+        if default_resource_id is None:
+            for row in resource_rows:
+                if str(row["image_status"]) == "ready":
+                    default_resource_id = int(row["id"])
+                    break
 
         self.connection.execute(
             """

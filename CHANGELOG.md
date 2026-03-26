@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 2026-03-26T13:42:52Z
+
+### 变更内容
+
+- 新增 [app/services/image_variants.py](app/services/image_variants.py)、[app/domain/resource_variants.py](app/domain/resource_variants.py) 与 [app/repositories/migrations/versions/V0004__image_resource_variants.sql](app/repositories/migrations/versions/V0004__image_resource_variants.sql)，把资源类型规范扩展为 `original` / `thumbnail` / `preview` / `download`，并为同一壁纸的资源类型增加唯一索引
+- 更新 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/repositories/collection_repository.py](app/repositories/collection_repository.py)，让采集链路在原图入库后生成缩略图、详情预览图和下载图，并把派生失败原因同步写入 `image_resources` 和任务日志
+- 更新 [app/repositories/public_repository.py](app/repositories/public_repository.py) 与 [app/services/public_catalog.py](app/services/public_catalog.py)，让公开列表优先返回缩略图，公开详情区分预览图与下载图，并保留对历史仅原图数据的保守回退
+- 更新 [app/repositories/health_repository.py](app/repositories/health_repository.py)，让资源状态同步与资源巡检按“原图 + 缩略图 + 预览图 + 可下载时的下载图”统一判断，避免派生资源失败后仍被误判为可公开
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_multi_source_collection.py](tests/integration/test_multi_source_collection.py)、[tests/integration/test_public_api.py](tests/integration/test_public_api.py)、[tests/integration/test_health_checks.py](tests/integration/test_health_checks.py)、[tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py) 与 [tests/support/image_factory.py](tests/support/image_factory.py)，覆盖派生资源生成、公开端资源选取、失败落盘与迁移校验
+- 更新 [pyproject.toml](pyproject.toml)、[requirements.lock.txt](requirements.lock.txt)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/TODO.md](docs/TODO.md)、[docs/data-model.md](docs/data-model.md) 与 [docs/api-conventions.md](docs/api-conventions.md)，同步 `T3.3` 完成状态、依赖锁定、资源类型口径和公开接口约束
+
+### 变更原因
+
+- 完成阶段三 `T3.3`，把“资源派生版本预留”推进为可运行实现，补齐列表缩略图、详情预览图和下载图的真实资源链路
+- 继续保持最保守范围，复用现有 FastAPI、SQLite、本地文件存储和公开前端，不提前引入 WebP、OSS/CDN、对象存储 SDK 或新的前端框架
+- 让资源派生失败进入现有后台任务日志和资源状态闭环，避免列表页继续直接加载原图、也避免后台难以定位派生失败原因
+
+### 依赖变更
+
+- 新增直接依赖：`Pillow==12.1.1`
+- 变更时间：`2026-03-26T13:42:52Z`
+- 依赖类型：直接依赖
+
+### 影响范围
+
+- 影响范围覆盖采集入库、资源记录、公开列表与详情接口、资源状态联动、资源巡检和相关测试
+- 新采集内容现在会生成 `original`、`thumbnail`、`preview`，以及可下载时的 `download` 资源；公开列表默认使用缩略图，详情区分预览图和下载图
+- 历史仅有原图的既有数据，公开接口仍保留到原图的保守回退，避免升级后立即出现大量 404；但新资源状态判定已经按多版本资源完整性执行
+- 不涉及 OSS/CDN、下载统计、搜索能力、部署拓扑变化或运行命令调整
+
+### 验证步骤
+
+- 执行 `make format`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除资源派生处理模块、回退 `V0004__image_resource_variants.sql`、公开资源选取逻辑、相关测试与文档更新，或执行 `git revert` 回退本次提交
+- 若目标环境已经采集出 `thumbnail` / `preview` / `download` 资源记录和对应文件，回滚前应确认是否需要保留这些派生文件，避免代码回退后磁盘残留未被引用的资源
+- 回滚后仓库将恢复到“公开列表和详情均主要依赖单一原图资源、`T3.3` 仍停留在文档预留状态”的状态
+
 ## 2026-03-26T12:57:06Z
 
 ### 变更内容

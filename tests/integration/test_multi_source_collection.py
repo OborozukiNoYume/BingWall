@@ -10,8 +10,9 @@ from app.repositories.collection_repository import CollectionRepository
 from app.repositories.file_storage import FileStorage
 from app.repositories.migrations import migrate_database
 from app.services.source_collection import SourceCollectionService
+from tests.support.image_factory import build_test_jpeg_bytes
 
-JPEG_BYTES = b"\xff\xd8\xff\xdbfake-jpeg-bytes"
+JPEG_BYTES = build_test_jpeg_bytes()
 
 
 class FakeNasaApodClient:
@@ -86,7 +87,7 @@ def test_nasa_apod_collection_persists_source_specific_records(tmp_path: Path) -
     connection.row_factory = sqlite3.Row
     try:
         wallpaper = connection.execute("SELECT * FROM wallpapers LIMIT 1;").fetchone()
-        resource = connection.execute("SELECT * FROM image_resources LIMIT 1;").fetchone()
+        resources = connection.execute("SELECT * FROM image_resources ORDER BY id ASC;").fetchall()
         task = connection.execute("SELECT * FROM collection_tasks LIMIT 1;").fetchone()
         item = connection.execute("SELECT * FROM collection_task_items LIMIT 1;").fetchone()
     finally:
@@ -98,9 +99,9 @@ def test_nasa_apod_collection_persists_source_specific_records(tmp_path: Path) -
     assert wallpaper["source_type"] == "nasa_apod"
     assert wallpaper["market_code"] == "global"
     assert wallpaper["source_name"] == "NASA APOD"
-    assert resource is not None
-    assert str(resource["relative_path"]).startswith("nasa_apod/")
-    assert resource["image_status"] == "ready"
+    assert len(resources) == 4
+    assert all(str(resource["relative_path"]).startswith("nasa_apod/") for resource in resources)
+    assert all(resource["image_status"] == "ready" for resource in resources)
     assert task is not None
     assert task["source_type"] == "nasa_apod"
     assert item is not None

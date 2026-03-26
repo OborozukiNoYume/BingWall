@@ -9,7 +9,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
 
     applied = migrate_database(database_path)
 
-    assert [migration.version for migration in applied] == [1, 2, 3]
+    assert [migration.version for migration in applied] == [1, 2, 3, 4]
 
     connection = sqlite3.connect(database_path)
     try:
@@ -66,6 +66,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "idx_wallpapers_created_at_utc",
         "idx_wallpapers_market_date",
         "idx_wallpapers_public_listing",
+        "uq_image_resources_wallpaper_resource_type",
     ]
     assert "created_at_utc" in wallpaper_columns
     assert "updated_at_utc" in wallpaper_columns
@@ -79,7 +80,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
     first_run = migrate_database(database_path)
     second_run = migrate_database(database_path)
 
-    assert [migration.version for migration in first_run] == [1, 2, 3]
+    assert [migration.version for migration in first_run] == [1, 2, 3, 4]
     assert second_run == []
 
     connection = sqlite3.connect(database_path)
@@ -98,6 +99,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
         (1, "baseline"),
         (2, "admin_sessions"),
         (3, "tags"),
+        (4, "image_resource_variants"),
     ]
 
 

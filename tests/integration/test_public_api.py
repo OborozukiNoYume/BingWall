@@ -60,7 +60,7 @@ def test_public_wallpaper_list_applies_visibility_rules_and_pagination(tmp_path:
     assert payload["data"]["items"][0]["title"] == "Visible latest"
     assert (
         payload["data"]["items"][0]["thumbnail_url"]
-        == "/images/bing/2026/03/en-US/visible-latest.jpg"
+        == "/images/bing/2026/03/en-US/visible-latest--thumbnail.jpg"
     )
 
 
@@ -82,9 +82,34 @@ def test_public_wallpaper_detail_returns_null_download_url_when_not_downloadable
     payload = response.json()
     assert response.status_code == 200
     assert payload["data"]["title"] == "Preview only"
-    assert payload["data"]["preview_url"] == "/images/bing/2026/03/en-US/preview-only.jpg"
+    assert payload["data"]["preview_url"] == "/images/bing/2026/03/en-US/preview-only--preview.jpg"
     assert payload["data"]["download_url"] is None
     assert payload["data"]["is_downloadable"] is False
+
+
+def test_public_wallpaper_detail_distinguishes_preview_and_download_resources(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Preview and download",
+        include_download_resource=True,
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get(f"/api/public/wallpapers/{wallpaper_id}")
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["data"]["preview_url"] == (
+        "/images/bing/2026/03/en-US/preview-and-download--preview.jpg"
+    )
+    assert payload["data"]["download_url"] == (
+        "/images/bing/2026/03/en-US/preview-and-download--download.jpg"
+    )
 
 
 def test_public_wallpaper_filters_and_site_info_only_return_public_options(tmp_path: Path) -> None:
@@ -288,6 +313,7 @@ def seed_wallpaper(
     failure_reason: str | None = None,
     publish_start_at_utc: str = "2000-01-01T00:00:00Z",
     publish_end_at_utc: str | None = "2100-01-01T00:00:00Z",
+    include_download_resource: bool = False,
 ) -> int:
     connection = sqlite3.connect(database_path)
     try:
@@ -347,6 +373,8 @@ def seed_wallpaper(
         if wallpaper_lastrowid is None:
             raise RuntimeError("Failed to create wallpaper test record.")
         wallpaper_id = int(wallpaper_lastrowid)
+        slug = slugify(title)
+        original_relative_path = f"bing/2026/03/{market_code}/{slug}.jpg"
         resource_cursor = connection.execute(
             """
             INSERT INTO image_resources (
@@ -375,11 +403,11 @@ def seed_wallpaper(
             """,
             (
                 wallpaper_id,
-                f"bing/2026/03/{market_code}/{slugify(title)}.jpg",
-                f"{slugify(title)}.jpg",
-                f"https://www.bing.com/{slugify(title)}.jpg",
-                f"hash-{slugify(title)}",
-                f"content-{slugify(title)}",
+                original_relative_path,
+                f"{slug}.jpg",
+                f"https://www.bing.com/{slug}.jpg",
+                f"hash-{slug}",
+                f"content-{slug}",
                 now_utc,
                 image_status,
                 failure_reason,
@@ -392,6 +420,43 @@ def seed_wallpaper(
         if resource_lastrowid is None:
             raise RuntimeError("Failed to create image resource test record.")
         resource_id = int(resource_lastrowid)
+        _seed_variant_resource(
+            connection=connection,
+            wallpaper_id=wallpaper_id,
+            resource_type="thumbnail",
+            relative_path=f"bing/2026/03/{market_code}/{slug}--thumbnail.jpg",
+            file_size_bytes=128,
+            width=480,
+            height=270,
+            now_utc=now_utc,
+            image_status=image_status,
+            failure_reason=failure_reason,
+        )
+        _seed_variant_resource(
+            connection=connection,
+            wallpaper_id=wallpaper_id,
+            resource_type="preview",
+            relative_path=f"bing/2026/03/{market_code}/{slug}--preview.jpg",
+            file_size_bytes=512,
+            width=1600,
+            height=900,
+            now_utc=now_utc,
+            image_status=image_status,
+            failure_reason=failure_reason,
+        )
+        if is_downloadable and include_download_resource:
+            _seed_variant_resource(
+                connection=connection,
+                wallpaper_id=wallpaper_id,
+                resource_type="download",
+                relative_path=f"bing/2026/03/{market_code}/{slug}--download.jpg",
+                file_size_bytes=1024,
+                width=1920,
+                height=1080,
+                now_utc=now_utc,
+                image_status=image_status,
+                failure_reason=failure_reason,
+            )
         connection.execute(
             "UPDATE wallpapers SET default_resource_id = ?, updated_at_utc = ? WHERE id = ?;",
             (resource_id, now_utc, wallpaper_id),
@@ -404,6 +469,64 @@ def seed_wallpaper(
 
 def slugify(value: str) -> str:
     return value.lower().replace(" ", "-")
+
+
+def _seed_variant_resource(
+    *,
+    connection: sqlite3.Connection,
+    wallpaper_id: int,
+    resource_type: str,
+    relative_path: str,
+    file_size_bytes: int,
+    width: int,
+    height: int,
+    now_utc: str,
+    image_status: str,
+    failure_reason: str | None,
+) -> None:
+    connection.execute(
+        """
+        INSERT INTO image_resources (
+            wallpaper_id,
+            resource_type,
+            storage_backend,
+            relative_path,
+            filename,
+            file_ext,
+            mime_type,
+            file_size_bytes,
+            width,
+            height,
+            source_url,
+            source_url_hash,
+            content_hash,
+            downloaded_at_utc,
+            integrity_check_result,
+            image_status,
+            failure_reason,
+            last_processed_at_utc,
+            created_at_utc,
+            updated_at_utc
+        )
+        VALUES (?, ?, 'local', ?, ?, 'jpg', 'image/jpeg', ?, ?, ?, NULL, NULL, ?, ?, 'passed', ?, ?, ?, ?, ?);
+        """,
+        (
+            wallpaper_id,
+            resource_type,
+            relative_path,
+            Path(relative_path).name,
+            file_size_bytes,
+            width,
+            height,
+            f"content-{resource_type}-{Path(relative_path).stem}",
+            now_utc,
+            image_status,
+            failure_reason,
+            now_utc,
+            now_utc,
+            now_utc,
+        ),
+    )
 
 
 def seed_tag(

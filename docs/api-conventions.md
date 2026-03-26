@@ -177,7 +177,7 @@
       "subtitle": "string",
       "market_code": "en-US",
       "wallpaper_date": "2026-03-22",
-      "thumbnail_url": "/images/bing/2026/03/en-US/example-thumb.jpg",
+      "thumbnail_url": "/images/bing/2026/03/en-US/example--thumbnail.jpg",
       "detail_url": "/wallpapers/1"
     }
   ]
@@ -200,8 +200,8 @@
   "copyright_text": "string",
   "market_code": "en-US",
   "wallpaper_date": "2026-03-22",
-  "preview_url": "/images/bing/2026/03/en-US/example.jpg",
-  "download_url": "/images/bing/2026/03/en-US/example.jpg",
+  "preview_url": "/images/bing/2026/03/en-US/example--preview.jpg",
+  "download_url": "/images/bing/2026/03/en-US/example--download.jpg",
   "is_downloadable": true,
   "width": 1920,
   "height": 1080,
@@ -365,6 +365,12 @@
 - 资源信息：`resource_relative_path`、`preview_url`、`resource_type`、`storage_backend`、`mime_type`、`file_size_bytes`、`width`、`height`、`origin_page_url`、`origin_image_url`
 - 当前状态：`content_status`、`resource_status`、`image_status`、`is_public`、`is_downloadable`、`deleted_at_utc`
 - 最近操作记录：`recent_operations[*].admin_username`、`action_type`、`before_state`、`after_state`、`trace_id`、`created_at_utc`
+
+补充约定：
+
+- 公开列表默认返回 `thumbnail_url`，避免列表页直接加载原图或下载图
+- 公开详情中的 `preview_url` 指向详情预览资源，`download_url` 指向下载资源；当内容不可下载时，`download_url = null`
+- 当前资源类型口径为 `original`、`thumbnail`、`preview`、`download`
 
 ### 8. 后台内容状态切换
 

@@ -1,12 +1,15 @@
 from pathlib import Path
 import sqlite3
 
+from _pytest.monkeypatch import MonkeyPatch
+
 from app.domain.collection import BingImageMetadata
 from app.domain.collection import DownloadedImage
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.file_storage import FileStorage
 from app.repositories.migrations import migrate_database
 from app.services.bing_collection import BingCollectionService
+from tests.support.image_factory import build_test_jpeg_bytes
 
 
 class FakeBingClient:
@@ -64,15 +67,25 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert len(wallpapers) == 1
     assert wallpapers[0]["resource_status"] == "ready"
     assert wallpapers[0]["content_status"] == "draft"
-    assert len(resources) == 1
-    assert resources[0]["image_status"] == "ready"
-    assert resources[0]["file_size_bytes"] == len(JPEG_BYTES)
+    assert len(resources) == 4
+    assert {str(resource["resource_type"]) for resource in resources} == {
+        "original",
+        "thumbnail",
+        "preview",
+        "download",
+    }
+    assert all(str(resource["image_status"]) == "ready" for resource in resources)
+    original_resource = next(
+        resource for resource in resources if str(resource["resource_type"]) == "original"
+    )
+    assert original_resource["file_size_bytes"] == len(JPEG_BYTES)
     assert len(tasks) == 1
     assert tasks[0]["task_status"] == "succeeded"
     assert len(items) == 1
     assert items[0]["result_status"] == "succeeded"
     public_files = list(storage.public_dir.rglob("*"))
     assert any(path.is_file() for path in public_files)
+    assert len([path for path in public_files if path.is_file()]) == 4
     assert all(path.suffix == ".jpg" for path in public_files if path.is_file())
 
 
@@ -166,6 +179,83 @@ def test_bing_collection_service_marks_failed_after_retry_exhaustion(tmp_path: P
     assert item["result_status"] == "failed"
     failed_files = [path for path in storage.failed_dir.rglob("*") if path.is_file()]
     assert len(failed_files) == 1
+
+
+def test_bing_collection_service_records_variant_failure_in_task_logs(
+    tmp_path: Path,
+    monkeypatch: MonkeyPatch,
+) -> None:
+    service, database_path, _storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.VariantFailure",
+                source_url="https://www.bing.com/th?id=OHR.VariantFailure_1920x1080.jpg",
+            )
+        ],
+        downloads=[DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg")],
+    )
+    from PIL import Image
+
+    from app.domain.resource_variants import ResourceType
+    from app.services.image_variants import (
+        generate_variant_image as original_generate_variant_image,
+    )
+
+    def fail_thumbnail(image: Image.Image, *, resource_type: ResourceType) -> object:
+        if resource_type == "thumbnail":
+            raise RuntimeError("thumbnail encoder unavailable")
+        return original_generate_variant_image(image, resource_type=resource_type)
+
+    monkeypatch.setattr("app.services.source_collection.generate_variant_image", fail_thumbnail)
+
+    try:
+        summary = service.collect(
+            market_code="en-US", count=1, trigger_type="manual", triggered_by=None
+        )
+    finally:
+        service.repository.close()
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper = connection.execute("SELECT * FROM wallpapers LIMIT 1;").fetchone()
+        resources = connection.execute(
+            "SELECT resource_type, image_status, failure_reason FROM image_resources ORDER BY id ASC;"
+        ).fetchall()
+        items = connection.execute(
+            "SELECT action_name, result_status, failure_reason FROM collection_task_items ORDER BY id ASC;"
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert summary.task_status == "failed"
+    assert wallpaper is not None
+    assert wallpaper["resource_status"] == "failed"
+    assert {str(resource["resource_type"]) for resource in resources} == {
+        "original",
+        "thumbnail",
+        "preview",
+        "download",
+    }
+    thumbnail_row = next(
+        resource for resource in resources if str(resource["resource_type"]) == "thumbnail"
+    )
+    preview_row = next(
+        resource for resource in resources if str(resource["resource_type"]) == "preview"
+    )
+    assert thumbnail_row["image_status"] == "failed"
+    assert "thumbnail generation failed" in str(thumbnail_row["failure_reason"])
+    assert preview_row["image_status"] == "failed"
+    assert "variant processing aborted" in str(preview_row["failure_reason"])
+    assert any(
+        item["action_name"] == "generate_variant"
+        and item["result_status"] == "failed"
+        and "thumbnail generation failed" in str(item["failure_reason"])
+        for item in items
+    )
 
 
 def test_bing_collection_service_skips_source_url_hash_duplicates(tmp_path: Path) -> None:
@@ -264,4 +354,4 @@ def make_metadata(
     )
 
 
-JPEG_BYTES = b"\xff\xd8\xff\xdbfake-jpeg-bytes"
+JPEG_BYTES = build_test_jpeg_bytes()

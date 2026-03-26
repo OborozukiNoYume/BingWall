@@ -12,6 +12,7 @@ mypy==1.18.2
 mypy_extensions==1.1.0
 packaging==26.0
 pathspec==1.0.4
+pillow==12.1.1
 pip==26.0.1
 pluggy==1.6.0
 pydantic==2.12.5

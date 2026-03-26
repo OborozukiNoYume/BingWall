@@ -63,7 +63,8 @@ class PublicCatalogService:
                 message="壁纸不存在或不可公开访问",
             )
 
-        image_url = build_public_image_url(relative_path=str(row["relative_path"]))
+        preview_url = build_public_image_url(relative_path=str(row["preview_relative_path"]))
+        download_url = build_public_image_url(relative_path=str(row["download_relative_path"]))
         return PublicWallpaperDetailData(
             id=int(row["id"]),
             title=present_title(row),
@@ -72,8 +73,8 @@ class PublicCatalogService:
             copyright_text=_optional_text(row["copyright_text"]),
             market_code=str(row["market_code"]),
             wallpaper_date=str(row["wallpaper_date"]),
-            preview_url=image_url,
-            download_url=image_url if bool(row["is_downloadable"]) else None,
+            preview_url=preview_url,
+            download_url=download_url if bool(row["is_downloadable"]) else None,
             is_downloadable=bool(row["is_downloadable"]),
             width=_optional_int(row["width"]),
             height=_optional_int(row["height"]),

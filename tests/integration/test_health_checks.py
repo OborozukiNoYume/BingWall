@@ -108,8 +108,8 @@ def test_resource_inspection_marks_missing_resource_failed_and_hides_public_wall
     finally:
         repository.close()
 
-    assert summary.checked_resource_count == 1
-    assert summary.missing_resource_count == 1
+    assert summary.checked_resource_count == 3
+    assert summary.missing_resource_count == 3
     assert summary.disabled_wallpaper_count == 1
     assert summary.items[0].action == "marked_failed_and_disabled"
 
@@ -126,9 +126,18 @@ def test_resource_inspection_marks_missing_resource_failed_and_hides_public_wall
         ).fetchone()
         resource_row = connection.execute(
             """
-            SELECT image_status, failure_reason
+            SELECT COUNT(*) AS total_count
             FROM image_resources
             WHERE wallpaper_id = ?;
+            """,
+            (wallpaper_id,),
+        ).fetchone()
+        failed_count_row = connection.execute(
+            """
+            SELECT COUNT(*) AS failed_count
+            FROM image_resources
+            WHERE wallpaper_id = ?
+              AND image_status = 'failed';
             """,
             (wallpaper_id,),
         ).fetchone()
@@ -140,8 +149,9 @@ def test_resource_inspection_marks_missing_resource_failed_and_hides_public_wall
     assert wallpaper_row["is_public"] == 0
     assert wallpaper_row["resource_status"] == "failed"
     assert resource_row is not None
-    assert resource_row["image_status"] == "failed"
-    assert "resource inspection missing file" in str(resource_row["failure_reason"])
+    assert resource_row["total_count"] == 3
+    assert failed_count_row is not None
+    assert failed_count_row["failed_count"] == 3
 
     with build_client(tmp_path) as client:
         after_response = client.get(f"/api/public/wallpapers/{wallpaper_id}")

@@ -4,6 +4,8 @@ from pathlib import Path
 import sqlite3
 from typing import cast
 
+from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
+from app.domain.resource_variants import expected_resource_types
 from app.repositories.sqlite import connect_sqlite
 
 
@@ -106,30 +108,18 @@ class HealthRepository:
                 """,
                 (failure_reason, processed_at_utc, processed_at_utc, resource_id),
             )
-            ready_resource = self.connection.execute(
+            resource_rows = self.connection.execute(
                 """
-                SELECT id
+                SELECT id, resource_type, image_status
                 FROM image_resources
                 WHERE wallpaper_id = ?
-                  AND image_status = 'ready'
-                ORDER BY id ASC
-                LIMIT 1;
+                ORDER BY id ASC;
                 """,
                 (wallpaper_id,),
-            ).fetchone()
-            failed_resource = self.connection.execute(
-                """
-                SELECT 1
-                FROM image_resources
-                WHERE wallpaper_id = ?
-                  AND image_status = 'failed'
-                LIMIT 1;
-                """,
-                (wallpaper_id,),
-            ).fetchone()
+            ).fetchall()
             wallpaper_row = self.connection.execute(
                 """
-                SELECT content_status
+                SELECT content_status, is_downloadable
                 FROM wallpapers
                 WHERE id = ?
                 LIMIT 1;
@@ -140,13 +130,39 @@ class HealthRepository:
                 msg = f"Wallpaper {wallpaper_id} not found while syncing missing resource."
                 raise RuntimeError(msg)
 
+            ready_resource_types = {
+                str(row["resource_type"])
+                for row in resource_rows
+                if str(row["image_status"]) == "ready"
+            }
+            failed_resource_types = {
+                str(row["resource_type"])
+                for row in resource_rows
+                if str(row["image_status"]) == "failed"
+            }
+            expected_types = set(
+                expected_resource_types(is_downloadable=bool(wallpaper_row["is_downloadable"]))
+            )
+
             resource_status = "pending"
-            default_resource_id: int | None = None
-            if ready_resource is not None:
+            if expected_types.issubset(ready_resource_types):
                 resource_status = "ready"
-                default_resource_id = int(ready_resource["id"])
-            elif failed_resource is not None:
+            elif expected_types.intersection(failed_resource_types):
                 resource_status = "failed"
+
+            default_resource_id: int | None = None
+            for row in resource_rows:
+                if (
+                    str(row["resource_type"]) == RESOURCE_TYPE_ORIGINAL
+                    and str(row["image_status"]) == "ready"
+                ):
+                    default_resource_id = int(row["id"])
+                    break
+            if default_resource_id is None:
+                for row in resource_rows:
+                    if str(row["image_status"]) == "ready":
+                        default_resource_id = int(row["id"])
+                        break
 
             next_content_status = str(wallpaper_row["content_status"])
             next_is_public = 1 if next_content_status == "enabled" else 0
