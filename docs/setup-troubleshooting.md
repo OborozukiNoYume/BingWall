@@ -212,17 +212,22 @@ mkdir -p var/data var/images/tmp var/images/public var/images/failed var/backups
 
 ### 解决方案
 ```bash
+# 推荐先执行最新迁移；当前迁移会把 legacy 的 active 归一化为 enabled，
+# 把其他未知非法值保守降级为 disabled，并阻止未来再写入非法状态
+.venv/bin/python -m app.repositories.migrations
+
+# 如果仍需手工修复，再按需更新为 enabled 或 disabled
 .venv/bin/python -c "
 import sqlite3
 conn = sqlite3.connect('var/data/bingwall.sqlite3')
-conn.execute('UPDATE admin_users SET status=\"enabled\"')
+conn.execute('UPDATE admin_users SET status=\"enabled\" WHERE username=\"admin\"')
 conn.commit()
 print('已修复状态')
 conn.close()
 "
 ```
 
-> **status 有效值**：`enabled`（可登录）、`disabled`（禁用）
+> **status 有效值**：`enabled`（可登录）、`disabled`（禁用）。当前数据库迁移还会拒绝新的非法状态写入。
 
 ---
 

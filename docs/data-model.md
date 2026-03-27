@@ -175,10 +175,16 @@
 | `username` | string | 是 | 登录名 |
 | `password_hash` | string | 是 | 密码摘要 |
 | `role_name` | string | 是 | 角色或权限级别 |
-| `status` | string | 是 | 账号状态 |
+| `status` | string | 是 | 账号状态，仅允许 `enabled`、`disabled` |
 | `last_login_at_utc` | datetime | 否 | 最近登录时间 |
 | `created_at_utc` | datetime | 是 | 创建时间 |
 | `updated_at_utc` | datetime | 是 | 更新时间 |
+
+约束说明：
+
+- `admin_users.status` 当前只允许 `enabled`、`disabled`
+- `enabled` 表示允许登录后台；`disabled` 表示账号存在但禁止登录
+- 历史库若存在 `active` 等 legacy 值，数据库迁移会先归一化为 `enabled` 或 `disabled`，随后再阻止新的非法状态写入
 
 ## 6. 审计日志 `audit_logs`
 

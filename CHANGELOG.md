@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-27T13:41:00Z
+
+### 变更内容
+
+- 新增 [app/repositories/migrations/versions/V0006__admin_user_status_constraint.sql](app/repositories/migrations/versions/V0006__admin_user_status_constraint.sql)，在迁移阶段先清洗 `admin_users.status` 的 legacy 数据，再通过数据库触发器拦截新的非法状态写入
+- 更新 [tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)，补齐第 `6` 个迁移版本、触发器存在性断言，以及 legacy `active` / 非法状态清洗和迁移后非法写入拦截测试
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[docs/data-model.md](docs/data-model.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步管理员状态枚举、legacy 值迁移口径和最新排障建议
+
+### 变更原因
+
+- 当前管理员登录只在业务代码里接受 `status = enabled`，但数据库表结构仍允许写入任意文本状态，`active`、大小写变体或其他脏值会直到登录时报错才暴露
+- 既然这类问题已经在真实排障中出现过，就需要把约束下沉到数据库层，避免未来继续写入非法状态
+- 对已有环境必须先兼容性清洗再施加约束，避免升级时因为历史脏数据直接中断迁移
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增数据库迁移：`V0006__admin_user_status_constraint.sql`
+- 变更时间：`2026-03-27T13:41:00Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 SQLite 迁移链路、迁移测试、管理员状态字段说明和排障文档
+- `admin_users.status` 现在只允许 `enabled`、`disabled`；历史 `active` 会在迁移时归一化为 `enabled`，其他未知非法值会保守降级为 `disabled`
+- 迁移完成后，无论是插入还是更新，数据库都会拒绝新的非法管理员状态写入
+- 本次不包含管理员角色扩展、登录错误文案调整、后台页面改造或会话表结构调整
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_sqlite_migrations.py tests/integration/test_admin_bootstrap.py tests/integration/test_admin_auth.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 `V0006__admin_user_status_constraint.sql`、回退迁移测试与文档更新，或执行 `git revert` 回退本次提交
+- 需要注意：如果某个环境已经执行了本次迁移，历史非法状态可能已被归一化为 `enabled` 或 `disabled`；代码回滚不会自动恢复这些清洗前的原始值
+
 ## 2026-03-27T13:36:36Z
 
 ### 变更内容
