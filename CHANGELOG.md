@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-27T14:47:30Z
+
+### 变更内容
+
+- 更新 [app/repositories/sqlite.py](app/repositories/sqlite.py)，把 SQLite 连接创建统一调整为 `check_same_thread=False`，兼容 FastAPI 同步依赖与同步路由在同一请求内跨工作线程执行的情况
+- 新增 [tests/unit/test_sqlite.py](tests/unit/test_sqlite.py)，补齐跨线程查询回归测试和外键约束开启断言
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[CHANGELOG.md](CHANGELOG.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步本次公开接口 `500` 的根因、影响范围、验证方式与回滚说明
+
+### 变更原因
+
+- 列表页显示“服务繁忙”并不是页面重试逻辑失效，而是公开接口在查询 SQLite 时直接报 `500`
+- 根因是仓库层数据库连接在一个线程里创建，却在另一个线程里执行查询；SQLite 默认禁止这种跨线程使用
+- 因此需要在不改业务查询逻辑的前提下，先把连接层修正为兼容当前 FastAPI 执行模型
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T14:47:30Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖所有通过 [app/repositories/sqlite.py](app/repositories/sqlite.py) 创建 SQLite 连接的仓库
+- 用户侧直接改善的是公开列表、公开筛选项等接口不再因线程限制而返回 `500`
+- 本次不包含接口字段调整、前端页面改版、数据库表结构修改或部署方式调整
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_sqlite.py tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 启动服务后执行 `curl http://127.0.0.1:30003/api/public/wallpapers?page=1&page_size=6&sort=date_desc`
+
+### 回滚说明
+
+- 如需回滚本次变更，可把 [app/repositories/sqlite.py](app/repositories/sqlite.py) 的连接参数恢复为默认值，并回退对应测试和文档更新，或执行 `git revert` 回退本次提交
+- 回滚后若仍保留当前 FastAPI 同步依赖写法，公开接口可能再次出现跨线程访问 SQLite 导致的 `500`
+
 ## 2026-03-27T14:24:40Z
 
 ### 变更内容

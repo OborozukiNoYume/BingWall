@@ -133,7 +133,48 @@ kill -9 <PID>
 
 ---
 
-## 问题 6：页面没有图片
+## 问题 6：公开列表页提示“服务繁忙”，重试后仍失败
+
+### 现象
+页面提示：
+```text
+服务繁忙
+公开接口暂时不可用，请稍后刷新页面重试。
+```
+
+接口直接访问时可能返回：
+```bash
+curl "http://127.0.0.1:30003/api/public/wallpapers?page=1&page_size=6&sort=date_desc"
+# HTTP/1.1 500 Internal Server Error
+```
+
+日志中常见报错：
+```text
+sqlite3.ProgrammingError: SQLite objects created in a thread can only be used in that same thread
+```
+
+### 原因
+FastAPI 的同步依赖和同步路由在同一请求里可能落在不同工作线程上执行。仓库层 SQLite 连接如果保持默认线程限制，就会出现“连接在甲线程创建、查询在乙线程执行”，最终触发 `500`。
+
+### 解决方案
+确认仓库中的 [app/repositories/sqlite.py](../app/repositories/sqlite.py) 已使用以下连接方式：
+
+```python
+sqlite3.connect(database_path, check_same_thread=False)
+```
+
+修复后重启服务，再执行：
+
+```bash
+curl "http://127.0.0.1:30003/api/public/wallpapers?page=1&page_size=6&sort=date_desc"
+curl "http://127.0.0.1:30003/api/public/wallpaper-filters"
+```
+
+如果这两个接口都返回 `200`，页面里的“服务繁忙”提示通常会消失。
+
+---
+
+## 问题 7：页面没有图片
 
 ### 现象
 访问 `/wallpapers` 页面显示空列表，API 返回 `items: []`
