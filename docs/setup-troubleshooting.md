@@ -356,9 +356,9 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
 
 ### 日期范围筛选 API
 
-**需求**：公开 API 支持按日期范围筛选壁纸
+**已实现能力**：公开 API 已支持按日期范围筛选壁纸
 
-**计划参数**：
+**可用参数**：
 | 参数 | 类型 | 功能 |
 |------|------|------|
 | `date_from` | string | 开始日期（格式：YYYY-MM-DD） |
@@ -369,12 +369,14 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
 GET /api/public/wallpapers?date_from=2026-03-01&date_to=2026-03-27
 ```
 
-**实现要点**：
-1. 在 `app/schemas/public.py` 的 `PublicWallpaperListQuery` 添加 `date_from` 和 `date_to` 字段
-2. 在 `app/repositories/public_repository.py` 的查询中添加日期范围条件
-3. 更新前端页面支持日期选择器
+**行为说明**：
+1. 两个参数都作用于 `wallpaper_date` 字段
+2. 日期范围按闭区间处理，会包含开始日和结束日当天的数据
+3. `date_from` 与 `date_to` 可与既有 `keyword`、`tag_keys`、地区、分辨率、排序和分页参数组合使用
+4. 当同时传入两个日期且 `date_to < date_from` 时，接口返回统一 `422`：`COMMON_INVALID_ARGUMENT`
+5. 当前只扩展了公开列表 API，没有同步增加公开前端日期选择器
 
-**状态**：待开发（2026-03-27 记录）
+**状态**：已实现（2026-03-27 更新）
 
 ---
 

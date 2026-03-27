@@ -1,5 +1,37 @@
 # CHANGELOG
 
+## 2026-03-27T13:31:19Z
+
+### 变更内容
+
+- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，把“日期范围筛选 API”从待开发占位描述改为已实现说明，补齐闭区间语义、统一 `422` 参数错误行为，以及“当前未扩展公开前端日期选择器”的范围说明
+
+### 变更原因
+
+- 上一轮功能已完成代码、测试和主文档同步，但遗漏了排障文档中的同名条目，导致该文件仍显示“待开发”，与实际实现状态不一致
+- 该文件还保留了“更新前端页面支持日期选择器”的计划描述，容易让读者误以为这次已经改了前端筛选界面
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T13:31:19Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅限排障与搭建文档，不涉及业务代码、接口行为、数据库结构、测试逻辑或前端页面
+- 文档现在明确：`date_from` / `date_to` 已可用、按 `wallpaper_date` 做闭区间过滤，且参数倒置时会返回统一 `422 COMMON_INVALID_ARGUMENT`
+
+### 验证步骤
+
+- 人工核对 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 中“日期范围筛选 API”条目与 [README.md](README.md)、[docs/api-conventions.md](docs/api-conventions.md) 的公开列表参数说明一致
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
+- 本次仅为文档修正，回滚不涉及代码或数据回滚
+
 ## 2026-03-27T13:21:12Z
 
 ### 变更内容
