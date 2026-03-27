@@ -308,7 +308,7 @@ curl http://127.0.0.1:30003/api/public/wallpapers
 # 管理后台登录
 curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
   -H 'Content-Type: application/json' \
-  -d '{"username":"admin","password":"admin123"}'
+  -d '{"username":"'"$BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME"'","password":"<your-bootstrap-admin-password>"}'
 ```
 
 ---
@@ -322,14 +322,6 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
 5. **壁纸状态**：采集的壁纸默认为草稿状态，需手动发布才能在公开 API 显示
 6. **管理员账号**：如需首次自动创建，必须在初始化数据库前同时配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；数据库里已有管理员时不会覆盖；`status` 必须是 `enabled`（不是 `active`）
 7. **OSS 公网地址配置**：`BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 不能写成空字符串；仅本地存储时应保持未设置，只有在资源使用 `storage_backend = oss` 时才需要配置真实公网地址
-
----
-
-## 默认账号信息
-
-| 用途 | 用户名 | 密码 |
-|------|--------|------|
-| 管理后台 | admin | admin123 |
 
 ---
 
