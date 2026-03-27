@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools==80.9.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bingwall"
+version = "0.1.0"
+description = "BingWall backend foundation for T1.3."
+readme = "README.md"
+requires-python = "==3.14.2"
+dependencies = [
+  "fastapi==0.116.1",
+  "Pillow==12.1.1",
+  "pydantic-settings==2.11.0",
+  "uvicorn==0.35.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "httpx==0.28.1",
+  "mypy==1.18.2",
+  "pytest==8.4.2",
+  "ruff==0.13.3",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.setuptools.package-data]
+"app.repositories.migrations" = ["versions/*.sql"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py314"
+line-length = 100
+preview = true
+
+[tool.mypy]
+python_version = "3.14"
+strict = true
+warn_unreachable = true
+pretty = true
+show_error_codes = true
