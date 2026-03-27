@@ -59,9 +59,9 @@ make run
 健康检查：
 
 ```bash
-curl http://127.0.0.1:8000/api/health/live
-curl http://127.0.0.1:8000/api/health/ready
-curl http://127.0.0.1:8000/api/health/deep
+curl http://127.0.0.1:30003/api/health/live
+curl http://127.0.0.1:30003/api/health/ready
+curl http://127.0.0.1:30003/api/health/deep
 ```
 
 阶段一自动化部署验收命令：
@@ -189,17 +189,17 @@ make verify-deploy
 公开 API 最小验证示例：
 
 ```bash
-curl http://127.0.0.1:8000/api/public/site-info
-curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc"
-curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&keyword=forest"
-curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&tag_keys=theme_forest,location_asia"
-curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&date_from=2026-03-20&date_to=2026-03-24"
-curl http://127.0.0.1:8000/api/public/wallpapers/today
-curl http://127.0.0.1:8000/api/public/wallpapers/random
-curl http://127.0.0.1:8000/api/public/wallpaper-filters
-curl http://127.0.0.1:8000/api/public/tags
-curl http://127.0.0.1:8000/api/public/wallpapers/1
-curl -X POST http://127.0.0.1:8000/api/public/download-events \
+curl http://127.0.0.1:30003/api/public/site-info
+curl "http://127.0.0.1:30003/api/public/wallpapers?page=1&page_size=20&sort=date_desc"
+curl "http://127.0.0.1:30003/api/public/wallpapers?page=1&page_size=20&sort=date_desc&keyword=forest"
+curl "http://127.0.0.1:30003/api/public/wallpapers?page=1&page_size=20&sort=date_desc&tag_keys=theme_forest,location_asia"
+curl "http://127.0.0.1:30003/api/public/wallpapers?page=1&page_size=20&sort=date_desc&date_from=2026-03-20&date_to=2026-03-24"
+curl http://127.0.0.1:30003/api/public/wallpapers/today
+curl http://127.0.0.1:30003/api/public/wallpapers/random
+curl http://127.0.0.1:30003/api/public/wallpaper-filters
+curl http://127.0.0.1:30003/api/public/tags
+curl http://127.0.0.1:30003/api/public/wallpapers/1
+curl -X POST http://127.0.0.1:30003/api/public/download-events \
   -H 'Content-Type: application/json' \
   -d '{"wallpaper_id":1,"download_channel":"public_detail"}'
 ```
@@ -207,45 +207,45 @@ curl -X POST http://127.0.0.1:8000/api/public/download-events \
 公开前端最小验证示例：
 
 ```bash
-curl http://127.0.0.1:8000/
-curl "http://127.0.0.1:8000/wallpapers?page=1&market_code=en-US&keyword=forest"
-curl http://127.0.0.1:8000/wallpapers/1
+curl http://127.0.0.1:30003/
+curl "http://127.0.0.1:30003/wallpapers?page=1&market_code=en-US&keyword=forest"
+curl http://127.0.0.1:30003/wallpapers/1
 ```
 
 后台鉴权最小验证示例：
 
 ```bash
-curl -X POST http://127.0.0.1:8000/api/admin/auth/login \
+curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"your-password"}'
 
-curl -X POST http://127.0.0.1:8000/api/admin/auth/logout \
+curl -X POST http://127.0.0.1:30003/api/admin/auth/logout \
   -H 'Authorization: Bearer <session_token>'
 ```
 
 后台内容管理最小验证示例：
 
 ```bash
-curl http://127.0.0.1:8000/admin/login
-curl "http://127.0.0.1:8000/admin/wallpapers?keyword=forest"
-curl http://127.0.0.1:8000/admin/tags
+curl http://127.0.0.1:30003/admin/login
+curl "http://127.0.0.1:30003/admin/wallpapers?keyword=forest"
+curl http://127.0.0.1:30003/admin/tags
 curl -H 'Authorization: Bearer <session_token>' \
-  "http://127.0.0.1:8000/api/admin/wallpapers?content_status=draft&page=1&page_size=20&keyword=forest"
+  "http://127.0.0.1:30003/api/admin/wallpapers?content_status=draft&page=1&page_size=20&keyword=forest"
 curl -H 'Authorization: Bearer <session_token>' \
-  http://127.0.0.1:8000/api/admin/wallpapers/1
-curl -X POST http://127.0.0.1:8000/api/admin/wallpapers/1/status \
+  http://127.0.0.1:30003/api/admin/wallpapers/1
+curl -X POST http://127.0.0.1:30003/api/admin/wallpapers/1/status \
   -H 'Authorization: Bearer <session_token>' \
   -H 'Content-Type: application/json' \
   -d '{"target_status":"enabled","operator_reason":"人工审核通过"}'
 curl -H 'Authorization: Bearer <session_token>' \
-  "http://127.0.0.1:8000/api/admin/audit-logs?target_type=wallpaper&target_id=1"
+  "http://127.0.0.1:30003/api/admin/audit-logs?target_type=wallpaper&target_id=1"
 curl -H 'Authorization: Bearer <session_token>' \
-  http://127.0.0.1:8000/api/admin/tags
-curl -X POST http://127.0.0.1:8000/api/admin/tags \
+  http://127.0.0.1:30003/api/admin/tags
+curl -X POST http://127.0.0.1:30003/api/admin/tags \
   -H 'Authorization: Bearer <session_token>' \
   -H 'Content-Type: application/json' \
   -d '{"tag_key":"theme_forest","tag_name":"森林","tag_category":"theme","status":"enabled","sort_weight":10,"operator_reason":"新增公开标签"}'
-curl -X PUT http://127.0.0.1:8000/api/admin/wallpapers/1/tags \
+curl -X PUT http://127.0.0.1:30003/api/admin/wallpapers/1/tags \
   -H 'Authorization: Bearer <session_token>' \
   -H 'Content-Type: application/json' \
   -d '{"tag_ids":[1,2],"operator_reason":"补充内容标签"}'
@@ -254,39 +254,39 @@ curl -X PUT http://127.0.0.1:8000/api/admin/wallpapers/1/tags \
 后台任务观测最小验证示例：
 
 ```bash
-curl http://127.0.0.1:8000/admin/tasks
-curl http://127.0.0.1:8000/admin/logs?task_id=1
-curl -X POST http://127.0.0.1:8000/api/admin/collection-tasks \
+curl http://127.0.0.1:30003/admin/tasks
+curl http://127.0.0.1:30003/admin/logs?task_id=1
+curl -X POST http://127.0.0.1:30003/api/admin/collection-tasks \
   -H 'Authorization: Bearer <session_token>' \
   -H 'Content-Type: application/json' \
   -d '{"source_type":"bing","market_code":"en-US","date_from":"2026-03-24","date_to":"2026-03-24","force_refresh":false}'
-curl -X POST http://127.0.0.1:8000/api/admin/collection-tasks \
+curl -X POST http://127.0.0.1:30003/api/admin/collection-tasks \
   -H 'Authorization: Bearer <session_token>' \
   -H 'Content-Type: application/json' \
   -d '{"source_type":"nasa_apod","market_code":"global","date_from":"2026-03-24","date_to":"2026-03-24","force_refresh":false}'
 curl -X POST -H 'Authorization: Bearer <session_token>' \
-  http://127.0.0.1:8000/api/admin/collection-tasks/1/consume
+  http://127.0.0.1:30003/api/admin/collection-tasks/1/consume
 make consume-collection-tasks
 curl -H 'Authorization: Bearer <session_token>' \
-  http://127.0.0.1:8000/api/admin/collection-tasks/1
+  http://127.0.0.1:30003/api/admin/collection-tasks/1
 curl -H 'Authorization: Bearer <session_token>' \
-  "http://127.0.0.1:8000/api/admin/logs?task_id=1&error_type=failed"
+  "http://127.0.0.1:30003/api/admin/logs?task_id=1&error_type=failed"
 ```
 
 下载统计最小验证示例：
 
 ```bash
-curl http://127.0.0.1:8000/admin/download-stats
+curl http://127.0.0.1:30003/admin/download-stats
 curl -H 'Authorization: Bearer <session_token>' \
-  "http://127.0.0.1:8000/api/admin/download-stats?days=7&top_limit=5"
+  "http://127.0.0.1:30003/api/admin/download-stats?days=7&top_limit=5"
 ```
 
 健康检查与资源巡检最小验证示例：
 
 ```bash
-curl http://127.0.0.1:8000/api/health/live
-curl http://127.0.0.1:8000/api/health/ready
-curl http://127.0.0.1:8000/api/health/deep
+curl http://127.0.0.1:30003/api/health/live
+curl http://127.0.0.1:30003/api/health/ready
+curl http://127.0.0.1:30003/api/health/deep
 make inspect-resources
 ```
 

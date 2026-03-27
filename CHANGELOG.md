@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-27T16:02:25Z
+
+### 变更内容
+
+- 更新 [Makefile](Makefile)，把 `make run` 从固定监听 `127.0.0.1:8000` 调整为跟随 `.env` / 环境变量中的 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`
+- 更新 [.env.example](.env.example) 与 [README.md](README.md)，把本地默认端口和所有运行示例统一为 `30003`
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，记录本次启动端口修正、验证方式、影响范围与回滚说明
+
+### 变更原因
+
+- 当前仓库的 `.env` 已配置 `BINGWALL_APP_PORT=30003`，但 `make run` 仍硬编码为 `8000`
+- 这会导致服务实际监听端口、应用配置日志和文档说明三者不一致，容易让操作者误判服务是否启动成功
+- 因此需要优先修正启动入口，让运行行为与配置文件保持一致
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T16:02:25Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地启动命令、环境变量示例和 README 里的访问示例端口
+- 在当前 `.env` 下，`make run` 启动后会监听 `0.0.0.0:30003`
+- 本次不包含接口字段调整、业务逻辑改造、部署拓扑调整或数据库结构修改
+
+### 验证步骤
+
+- 停止原先监听 `8000` 的开发服务
+- 执行 `make run`
+- 执行 `curl http://127.0.0.1:30003/api/health/live`
+- 执行 `curl http://127.0.0.1:30003/api/health/ready`
+
+### 回滚说明
+
+- 如需回滚本次变更，可把 [Makefile](Makefile) 的 `run` 命令改回固定 `8000`，并回退 `.env.example`、`README.md`、`PROJECT_STATE.md` 与 [CHANGELOG.md](CHANGELOG.md) 的同步说明，或执行 `git revert` 回退本次提交
+- 回滚后若 `.env` 仍声明 `30003`，启动行为和配置文档将再次出现不一致
+
 ## 2026-03-27T15:20:06Z
 
 ### 变更内容

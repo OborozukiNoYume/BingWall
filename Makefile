@@ -57,7 +57,7 @@ verify-backup-restore:
 	$(VENV_PYTHON) scripts/verify_t2_5.py
 
 run:
-	$(VENV_PYTHON) -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+	$(VENV_PYTHON) -c 'from app.core.config import get_settings; import uvicorn; settings = get_settings(); uvicorn.run("app.main:create_app", factory=True, host=settings.app_host, port=settings.app_port)'
 
 clean:
 	rm -rf $(VENV) .pytest_cache .mypy_cache .ruff_cache .coverage htmlcov
