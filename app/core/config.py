@@ -2,20 +2,22 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import AnyHttpUrl, Field, SecretStr, field_validator
+from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 AppEnvironment = Literal["development", "test", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
+SETTINGS_MODEL_CONFIG = SettingsConfigDict(
+    env_prefix="BINGWALL_",
+    env_file=".env",
+    env_file_encoding="utf-8",
+    extra="ignore",
+)
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(
-        env_prefix="BINGWALL_",
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-    )
+    model_config = SETTINGS_MODEL_CONFIG
 
     app_env: AppEnvironment = "development"
     app_host: str
@@ -51,6 +53,50 @@ class Settings(BaseSettings):
         return value
 
 
+class BootstrapAdminSettings(BaseSettings):
+    model_config = SETTINGS_MODEL_CONFIG
+
+    security_bootstrap_admin_username: str | None = Field(default=None, max_length=100)
+    security_bootstrap_admin_password: SecretStr | None = None
+
+    @field_validator("security_bootstrap_admin_username")
+    @classmethod
+    def validate_bootstrap_admin_username(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        if not normalized:
+            msg = "BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME must not be blank."
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("security_bootstrap_admin_password")
+    @classmethod
+    def validate_bootstrap_admin_password(cls, value: SecretStr | None) -> SecretStr | None:
+        if value is None:
+            return None
+        normalized = value.get_secret_value().strip()
+        if not normalized:
+            msg = "BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD must not be blank."
+            raise ValueError(msg)
+        if len(normalized) < 12:
+            msg = "BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD must be at least 12 characters long."
+            raise ValueError(msg)
+        return SecretStr(normalized)
+
+    @model_validator(mode="after")
+    def validate_bootstrap_admin_pair(self) -> "BootstrapAdminSettings":
+        has_username = self.security_bootstrap_admin_username is not None
+        has_password = self.security_bootstrap_admin_password is not None
+        if has_username != has_password:
+            msg = (
+                "BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME and "
+                "BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD must be provided together."
+            )
+            raise ValueError(msg)
+        return self
+
+
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return load_settings()
@@ -58,6 +104,10 @@ def get_settings() -> Settings:
 
 def load_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]
+
+
+def load_bootstrap_admin_settings() -> BootstrapAdminSettings:
+    return BootstrapAdminSettings()
 
 
 def reset_settings_cache() -> None:

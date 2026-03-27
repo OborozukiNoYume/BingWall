@@ -3,7 +3,7 @@ import os
 import pytest
 from pydantic import ValidationError
 
-from app.core.config import load_settings, reset_settings_cache
+from app.core.config import load_bootstrap_admin_settings, load_settings, reset_settings_cache
 from tests.conftest import clear_bingwall_env
 
 
@@ -58,5 +58,39 @@ def test_settings_load_valid_configuration() -> None:
     assert settings.collect_bing_max_download_retries == 3
     assert str(settings.storage_oss_public_base_url) == "https://cdn.example.com/bingwall"
     assert settings.security_session_ttl_hours == 12
+
+    clear_bingwall_env()
+
+
+def test_bootstrap_admin_settings_require_username_and_password_together() -> None:
+    clear_bingwall_env()
+    os.environ["BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME"] = "admin"
+    reset_settings_cache()
+
+    with pytest.raises(ValidationError):
+        load_bootstrap_admin_settings()
+
+
+def test_bootstrap_admin_settings_validate_password_length() -> None:
+    clear_bingwall_env()
+    os.environ["BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME"] = "admin"
+    os.environ["BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD"] = "short-pass"
+    reset_settings_cache()
+
+    with pytest.raises(ValidationError):
+        load_bootstrap_admin_settings()
+
+
+def test_bootstrap_admin_settings_load_valid_configuration() -> None:
+    clear_bingwall_env()
+    os.environ["BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME"] = " admin "
+    os.environ["BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD"] = "  strong-admin-password  "
+    reset_settings_cache()
+
+    settings = load_bootstrap_admin_settings()
+
+    assert settings.security_bootstrap_admin_username == "admin"
+    assert settings.security_bootstrap_admin_password is not None
+    assert settings.security_bootstrap_admin_password.get_secret_value() == "strong-admin-password"
 
     clear_bingwall_env()

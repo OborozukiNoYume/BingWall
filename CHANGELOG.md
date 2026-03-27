@@ -1,5 +1,84 @@
 # CHANGELOG
 
+## 2026-03-27T12:36:54Z
+
+### 变更内容
+
+- 新增 [app/services/admin_bootstrap.py](app/services/admin_bootstrap.py)，实现首个管理员账号幂等初始化：仅当 `admin_users` 为空且提供了初始化凭据时，自动创建状态为 `enabled` 的 `super_admin`
+- 更新 [app/core/config.py](app/core/config.py) 与 [app/repositories/migrations/__main__.py](app/repositories/migrations/__main__.py)，新增 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME`、`BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 配置校验，并把管理员初始化接入数据库迁移命令
+- 新增 [tests/integration/test_admin_bootstrap.py](tests/integration/test_admin_bootstrap.py)，并更新 [tests/unit/test_config.py](tests/unit/test_config.py) 与 [tests/conftest.py](tests/conftest.py)，覆盖首次创建、重复执行不重复创建、已有管理员不覆盖，以及配置成对出现和密码长度校验
+- 更新 [.env.example](.env.example)、[deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)、[README.md](README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md)，同步默认管理员初始化方式、使用步骤和排障说明
+
+### 变更原因
+
+- 当前后台登录依赖 `admin_users` 表，但仓库原先只能手工写 SQL 创建管理员，首次搭建和部署时容易漏掉这一步
+- 直接把一个真实可用的默认密码硬编码进仓库会形成已知弱口令，因此本次采用“环境变量提供初始化凭据 + 首次初始化时写入数据库”的保守方案
+- 需要保证初始化动作可重复执行，且在已有管理员时不覆盖现有账号，避免对既有环境造成误改
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 新增可选配置项：`BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME`、`BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`
+- 变更时间：`2026-03-27T12:36:54Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖数据库初始化命令、管理员首个账号创建流程、环境变量示例、部署说明和排障文档
+- 当 `admin_users` 为空且同时提供初始化用户名和密码时，执行 `make db-migrate` 会自动创建一个启用中的 `super_admin`
+- 当数据库中已经存在管理员时，再次执行初始化不会覆盖已有账号，也不会重复创建默认管理员
+- 本次不包含后台角色体系扩展、管理员修改密码界面、密码轮换流程或数据库表结构调整
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_config.py tests/integration/test_admin_bootstrap.py tests/integration/test_admin_auth.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除管理员初始化服务与配置校验、回退迁移命令接线、测试和文档更新，或执行 `git revert` 回退本次提交
+- 若某个环境已经通过该机制创建了首个管理员账号，代码回滚不会自动删除该账号；如需完全回退初始化结果，应先人工删除对应 `admin_users` 记录并确认相关会话与审计影响
+
+## 2026-03-27T12:19:30Z
+
+### 变更内容
+
+- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，修正文档中对 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 的说明，明确“未设置”与“设置为空字符串”在当前配置模型中的行为差异
+- 同步调整 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 的完整搭建步骤与注意事项，改为区分“仅本地文件存储”和“启用 OSS / CDN 公网访问”两种配置方式
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)，记录该排障结论已沉淀进项目文档，并刷新文档元信息时间
+
+### 变更原因
+
+- 服务器实测部署中已确认：`BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL=` 会被解析为空字符串并触发 `pydantic` URL 校验失败，但该变量在仅本地存储场景下本来允许完全不设置
+- 原文把“删掉变量”和“填一个临时占位值”混在一起，容易让部署人员误以为生产环境必须长期保留 `http://localhost` 之类的占位地址
+- 该变量还会参与 `storage_backend = oss` 资源的真实公网 URL 拼接，因此文档需要明确它不是单纯的启动占位参数
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T12:19:30Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围限于部署与排障文档，不涉及业务代码、接口契约、数据库结构或部署模板行为变更
+- 后续部署人员在仅使用本地文件存储时，可直接不设置该变量；在启用 OSS / CDN 时，必须填写真实公网地址前缀
+- 本次不包含配置模型修改、`.env.example` 模板改造或资源定位逻辑调整
+
+### 验证步骤
+
+- 重新检查 [app/core/config.py](app/core/config.py) 中 `storage_oss_public_base_url: AnyHttpUrl | None = None` 的配置定义
+- 重新检查 [app/services/resource_locator.py](app/services/resource_locator.py) 中 `storage_backend = oss` 时对 `oss_public_base_url` 的实际使用逻辑
+- 使用 `./.venv/bin/python` 实测验证：变量缺失时加载结果为 `None`；变量设置为空字符串时触发 `ValidationError`
+
+### 回滚说明
+
+- 如需回滚本次变更，可回退 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)、[CHANGELOG.md](CHANGELOG.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md) 的文档修订
+- 回滚后文档将恢复到“默认建议填写 `http://localhost` 占位值”的旧表述，部署人员可能继续混淆“未设置”和“空字符串”的差别
+
 ## 2026-03-26T15:13:37Z
 
 ### 变更内容

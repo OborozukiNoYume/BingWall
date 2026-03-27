@@ -173,6 +173,7 @@
 
 - 依赖安装命令：`make setup`
 - 数据库初始化命令：`make db-migrate`
+- 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
 - 手动采集任务消费命令：`make consume-collection-tasks`
 - 资源巡检命令：`make inspect-resources`
@@ -233,6 +234,7 @@
 - 正式资源目录使用 `bingwall:www-data` 和 `2750`
 - 临时目录、失败目录、数据库目录不对 Nginx 开放
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
+- 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
 
 #### `deploy/nginx/bingwall.conf`
 
