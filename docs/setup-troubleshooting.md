@@ -333,27 +333,24 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
 
 ---
 
-## 待开发功能
+## 已实现功能补充
 
 ### 今日壁纸 / 随机壁纸 API
 
-**需求**：添加公开 API 端点，返回今日壁纸或随机壁纸
-
-**计划端点**：
+**已实现端点**：
 | 端点 | 方法 | 功能 |
 |------|------|------|
-| `/api/public/wallpapers/today` | GET | 返回今日壁纸（按 wallpaper_date 匹配当天） |
-| `/api/public/wallpapers/random` | GET | 返回随机壁纸（从已发布壁纸中随机选取） |
+| `/api/public/wallpapers/today` | GET | 返回今日壁纸，按 UTC 当天匹配 `wallpaper_date`，并优先站点默认市场 |
+| `/api/public/wallpapers/random` | GET | 返回随机壁纸，仅从当前公开可见内容中随机选取 |
 
 **返回格式**：与 `/api/public/wallpapers/{id}` 一致，返回单个壁纸详情（含图片资源 URL）
 
-**实现要点**：
-1. 在 `app/api/public/routes.py` 添加新路由
-2. 在 `app/services/public_catalog.py` 添加 `get_today_wallpaper()` 和 `get_random_wallpaper()` 方法
-3. 在 `app/repositories/public_repository.py` 添加对应查询
-4. 添加单元测试
+**行为说明**：
+1. 两个接口都复用现有公开可见规则：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据
+2. `/api/public/wallpapers/today` 在当天存在多条候选时，先选默认市场；默认市场缺失时回退到当天排序最靠前的一条
+3. 当无符合条件的内容时，两个接口都返回统一 `404`：`PUBLIC_WALLPAPER_NOT_FOUND`
 
-**状态**：待开发（2026-03-27 记录）
+**状态**：已实现（2026-03-27 更新）
 
 ---
 

@@ -91,6 +91,47 @@ def list_public_wallpapers(
 
 
 @router.get(
+    "/wallpapers/today",
+    response_model=SuccessEnvelope[PublicWallpaperDetailData],
+    responses=ERROR_RESPONSES,
+)
+def get_public_today_wallpaper(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
+    data = service.get_today_wallpaper(default_market_code=settings.collect_bing_default_market)
+    logger.info(
+        "Public today wallpaper served: default_market=%s",
+        settings.collect_bing_default_market,
+    )
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/wallpapers/random",
+    response_model=SuccessEnvelope[PublicWallpaperDetailData],
+    responses=ERROR_RESPONSES,
+)
+def get_public_random_wallpaper(
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
+    data = service.get_random_wallpaper()
+    logger.info("Public random wallpaper served.")
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
     "/wallpapers/{wallpaper_id}",
     response_model=SuccessEnvelope[PublicWallpaperDetailData],
     responses=ERROR_RESPONSES,

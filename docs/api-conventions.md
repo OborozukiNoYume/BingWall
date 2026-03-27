@@ -185,7 +185,32 @@
 }
 ```
 
-### 2. 公开壁纸详情
+### 2. 今日壁纸
+
+- 方法：`GET`
+- 路径：`/api/public/wallpapers/today`
+
+响应数据结构（`data` 字段）与“公开壁纸详情”一致。
+
+说明：
+
+- 仅从当前公开可见内容中选择
+- 按 UTC 当天匹配 `wallpaper_date`
+- 若当天存在多条候选，优先返回站点默认市场对应内容；若默认市场无候选，则回退到当天排序最靠前的一条
+
+### 3. 随机壁纸
+
+- 方法：`GET`
+- 路径：`/api/public/wallpapers/random`
+
+响应数据结构（`data` 字段）与“公开壁纸详情”一致。
+
+说明：
+
+- 仅从当前公开可见内容中随机选择
+- 返回字段、资源 URL 生成规则和错误响应与公开详情保持一致
+
+### 4. 公开壁纸详情
 
 - 方法：`GET`
 - 路径：`/api/public/wallpapers/{wallpaper_id}`
@@ -216,7 +241,7 @@
 - 当资源来自本地正式目录时，地址表现为 `/images/<relative_path>`
 - 当资源来自 OSS/CDN 时，地址表现为配置好的绝对公网地址，例如 `https://cdn.example.com/bingwall/<relative_path>`
 
-### 3. 公开筛选项
+### 5. 公开筛选项
 
 - 方法：`GET`
 - 路径：`/api/public/wallpaper-filters`
@@ -248,7 +273,7 @@
 }
 ```
 
-### 4. 站点基础信息
+### 6. 站点基础信息
 
 - 方法：`GET`
 - 路径：`/api/public/site-info`
@@ -263,7 +288,7 @@
 }
 ```
 
-### 5. 后台登录
+### 7. 后台登录
 
 - 方法：`POST`
 - 路径：`/api/admin/auth/login`
@@ -296,7 +321,7 @@
 - `session_token` 为一次性返回的会话令牌，服务端仅保存其摘要
 - 登录成功后必须同时写入登录审计记录和会话记录
 
-### 5.1 后台登出
+### 7.1 后台登出
 
 - 方法：`POST`
 - 路径：`/api/admin/auth/logout`
@@ -319,7 +344,7 @@
 - 成功后必须使当前会话立即失效
 - 必须写入审计日志
 
-### 6. 后台内容列表
+### 8. 后台内容列表
 
 - 方法：`GET`
 - 路径：`/api/admin/wallpapers`
@@ -357,7 +382,7 @@
 - `created_at_utc`
 - `updated_at_utc`
 
-### 7. 后台内容详情
+### 9. 后台内容详情
 
 - 方法：`GET`
 - 路径：`/api/admin/wallpapers/{wallpaper_id}`
@@ -385,7 +410,7 @@
 - 公开详情中的 `preview_url` 指向详情预览资源，`download_url` 指向下载资源；当内容不可下载时，`download_url = null`
 - 当前资源类型口径为 `original`、`thumbnail`、`preview`、`download`
 
-### 8. 后台内容状态切换
+### 10. 后台内容状态切换
 
 - 方法：`POST`
 - 路径：`/api/admin/wallpapers/{wallpaper_id}/status`
@@ -407,7 +432,7 @@
 - 当前实现允许 `draft -> enabled`、`enabled -> disabled`、`disabled -> enabled`、任意非删除状态 `-> deleted`
 - 当目标状态为 `enabled` 时，必须同时满足 `resource_status = ready` 且默认资源 `image_status = ready`
 
-### 9. 手动采集任务创建
+### 11. 手动采集任务创建
 
 - 方法：`POST`
 - 路径：`/api/admin/collection-tasks`
@@ -442,7 +467,7 @@
 - 当前 Bing 与 NASA APOD 手动采集都仅支持最近 `8` 天内、且跨度不超过 `8` 天的日期范围
 - 当前实现会记录 `force_refresh` 请求参数，但仍继续沿用一期既有去重规则，不直接覆盖已存在内容
 
-### 10. 后台任务列表
+### 12. 后台任务列表
 
 - 方法：`GET`
 - 路径：`/api/admin/collection-tasks`
@@ -474,7 +499,7 @@
 - `retry_of_task_id`
 - `created_at_utc`
 
-### 11. 后台任务详情
+### 13. 后台任务详情
 
 - 方法：`GET`
 - 路径：`/api/admin/collection-tasks/{task_id}`
@@ -487,7 +512,7 @@
 - 逐条处理明细
 - 请求参数快照
 
-### 12. 后台任务重试
+### 14. 后台任务重试
 
 - 方法：`POST`
 - 路径：`/api/admin/collection-tasks/{task_id}/retry`
@@ -498,7 +523,7 @@
 - 不允许无筛选条件的批量重试
 - 当前实现仅允许重试 `failed` 或 `partially_failed` 的任务
 
-### 13. 后台日志查询
+### 15. 后台日志查询
 
 - 方法：`GET`
 - 路径：`/api/admin/logs`
@@ -516,7 +541,7 @@
 - 如需联动应用文本日志，应返回日志摘要或定位信息，不直接暴露服务器原始日志文件路径
 - 当前实现会返回 `task_id`、`task_status`、`source_type`、`trigger_type`、`action_name`、`result_status`、`failure_reason` 和结构化定位字段
 
-### 14. 后台审计记录查询
+### 16. 后台审计记录查询
 
 - 方法：`GET`
 - 路径：`/api/admin/audit-logs`
@@ -543,7 +568,7 @@
 - `trace_id`
 - `created_at_utc`
 
-### 15. 健康检查
+### 17. 健康检查
 
 #### 存活检查
 

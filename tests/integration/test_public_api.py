@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 import os
 from pathlib import Path
 import sqlite3
@@ -112,6 +113,216 @@ def test_public_wallpaper_detail_distinguishes_preview_and_download_resources(
     assert payload["data"]["download_url"] == (
         "/images/bing/2026/03/en-US/preview-and-download--download.jpg"
     )
+
+
+def test_public_today_wallpaper_prefers_default_market_for_current_utc_date(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    today = datetime.now(tz=UTC).date().isoformat()
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="fr-FR",
+        title="Fallback Today",
+    )
+    default_market_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="en-US",
+        title="Default Market Today",
+        include_download_resource=True,
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/today")
+        detail_response = client.get(f"/api/public/wallpapers/{default_market_id}")
+
+    payload = response.json()
+    detail_payload = detail_response.json()
+    assert response.status_code == 200
+    assert payload["data"] == detail_payload["data"]
+
+
+def test_public_today_wallpaper_falls_back_to_latest_same_day_candidate_when_default_market_missing(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    today = datetime.now(tz=UTC).date().isoformat()
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="fr-FR",
+        title="Older Today Candidate",
+    )
+    expected_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="ja-JP",
+        title="Latest Today Candidate",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/today")
+        detail_response = client.get(f"/api/public/wallpapers/{expected_id}")
+
+    payload = response.json()
+    detail_payload = detail_response.json()
+    assert response.status_code == 200
+    assert payload["data"] == detail_payload["data"]
+
+
+def test_public_today_wallpaper_applies_visibility_rules(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    today = datetime.now(tz=UTC).date().isoformat()
+    expected_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="en-US",
+        title="Visible Today",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="fr-FR",
+        title="Draft Today",
+        content_status="draft",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="ja-JP",
+        title="Expired Today",
+        publish_end_at_utc="2001-01-01T00:00:00Z",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=today,
+        market_code="de-DE",
+        title="Failed Resource Today",
+        content_status="disabled",
+        resource_status="failed",
+        image_status="failed",
+        failure_reason="resource missing",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/today")
+        detail_response = client.get(f"/api/public/wallpapers/{expected_id}")
+
+    payload = response.json()
+    detail_payload = detail_response.json()
+    assert response.status_code == 200
+    assert payload["data"] == detail_payload["data"]
+
+
+def test_public_today_wallpaper_returns_not_found_when_current_utc_date_has_no_visible_candidate(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    yesterday = (datetime.now(tz=UTC).date() - timedelta(days=1)).isoformat()
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=yesterday,
+        market_code="en-US",
+        title="Visible Yesterday",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=datetime.now(tz=UTC).date().isoformat(),
+        market_code="en-US",
+        title="Hidden Today",
+        content_status="draft",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/today")
+
+    payload = response.json()
+    assert response.status_code == 404
+    assert payload["error_code"] == "PUBLIC_WALLPAPER_NOT_FOUND"
+
+
+def test_public_random_wallpaper_returns_a_visible_detail(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    expected_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Only Visible Random",
+        include_download_resource=True,
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-23",
+        market_code="en-US",
+        title="Hidden Random Draft",
+        content_status="draft",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-22",
+        market_code="en-US",
+        title="Hidden Random Expired",
+        publish_end_at_utc="2001-01-01T00:00:00Z",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/random")
+        detail_response = client.get(f"/api/public/wallpapers/{expected_id}")
+
+    payload = response.json()
+    detail_payload = detail_response.json()
+    assert response.status_code == 200
+    assert payload["data"] == detail_payload["data"]
+
+
+def test_public_random_wallpaper_supports_oss_resource_urls(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="OSS Random Visible",
+        include_download_resource=True,
+        original_storage_backend="oss",
+        thumbnail_storage_backend="oss",
+        preview_storage_backend="oss",
+        download_storage_backend="oss",
+    )
+
+    with build_client(tmp_path, oss_public_base_url="https://cdn.example.com/bingwall") as client:
+        response = client.get("/api/public/wallpapers/random")
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["data"]["preview_url"] == (
+        "https://cdn.example.com/bingwall/bing/2026/03/en-US/oss-random-visible--preview.jpg"
+    )
+    assert payload["data"]["download_url"] == (
+        "https://cdn.example.com/bingwall/bing/2026/03/en-US/oss-random-visible--download.jpg"
+    )
+
+
+def test_public_random_wallpaper_returns_not_found_when_no_visible_wallpaper_exists(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Hidden Random Only",
+        content_status="disabled",
+        is_public=False,
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/random")
+
+    payload = response.json()
+    assert response.status_code == 404
+    assert payload["error_code"] == "PUBLIC_WALLPAPER_NOT_FOUND"
 
 
 def test_public_api_supports_local_and_oss_resource_urls_in_parallel(tmp_path: Path) -> None:

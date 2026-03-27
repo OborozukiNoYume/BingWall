@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-27T12:52:50Z
+
+### 变更内容
+
+- 更新 [app/api/public/routes.py](app/api/public/routes.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/repositories/public_repository.py](app/repositories/public_repository.py)，新增 `GET /api/public/wallpapers/today` 和 `GET /api/public/wallpapers/random` 两个公开端点，并复用现有公开详情的字段结构、资源 URL 生成逻辑和统一 404 错误响应
+- 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐今日壁纸默认市场优先、默认市场缺失回退、公开可见性过滤、随机抽取仅限公开可见内容、OSS 资源地址返回和空结果 404 等集成测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步新增公开接口、UTC 日期语义、随机池范围、最小验证命令和排障说明
+
+### 变更原因
+
+- 当前公开 API 已有列表、详情和下载登记，但缺少“站点今日壁纸”和“随机壁纸”这两个更直接的读取入口，调用方需要自己额外做筛选或随机逻辑
+- 本次保持最保守范围，只在现有公开查询链路上补两个只读端点，不改数据库结构、不改前端页面、不改下载链路
+- 需要保证新接口与既有公开详情完全一致，避免调用方拿到不同字段结构或随机到不可公开访问的数据
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T12:52:50Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开 API 查询链路、公开 API 集成测试和相关说明文档
+- `/api/public/wallpapers/today` 现在按 UTC 当天匹配 `wallpaper_date`，并在当天存在多条候选时优先返回站点默认市场内容
+- `/api/public/wallpapers/random` 现在仅从当前公开可见内容中随机选取，避免随机到详情不可访问的记录
+- 本次不包含数据库表结构调整、公开前端页面改造、后台管理能力扩展或自动发布策略调整
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除两个新增公开端点、回退公开仓库查询与测试、恢复相关文档描述，或执行 `git revert` 回退本次提交
+- 回滚后仓库将恢复到“公开端仅提供列表、详情、筛选项、标签、站点信息和下载登记接口”的状态，依赖 `today` / `random` 的调用方需要自行切换回旧方案
+- 本次未引入数据库迁移，因此代码回滚不涉及数据回滚动作
 ## 2026-03-27T12:36:54Z
 
 ### 变更内容

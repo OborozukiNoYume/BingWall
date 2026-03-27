@@ -58,36 +58,20 @@ class PublicCatalogService:
             wallpaper_id=wallpaper_id,
             current_time_utc=utc_now_isoformat(),
         )
-        if row is None:
-            raise ApiError(
-                status_code=404,
-                error_code="PUBLIC_WALLPAPER_NOT_FOUND",
-                message="壁纸不存在或不可公开访问",
-            )
+        return self._build_wallpaper_detail(self._require_visible_wallpaper(row))
 
-        preview_url = self.resource_locator.build_required_url(
-            storage_backend=_optional_text(row["preview_storage_backend"]),
-            relative_path=str(row["preview_relative_path"]),
+    def get_today_wallpaper(self, *, default_market_code: str) -> PublicWallpaperDetailData:
+        current_time_utc = utc_now_isoformat()
+        row = self.repository.get_visible_wallpaper_for_today(
+            current_time_utc=current_time_utc,
+            current_date=utc_today_isoformat(),
+            default_market_code=default_market_code,
         )
-        download_url = self.resource_locator.build_required_url(
-            storage_backend=_optional_text(row["download_storage_backend"]),
-            relative_path=str(row["download_relative_path"]),
-        )
-        return PublicWallpaperDetailData(
-            id=int(row["id"]),
-            title=present_title(row),
-            subtitle=_optional_text(row["subtitle"]),
-            description=_optional_text(row["description"]),
-            copyright_text=_optional_text(row["copyright_text"]),
-            market_code=str(row["market_code"]),
-            wallpaper_date=str(row["wallpaper_date"]),
-            preview_url=preview_url,
-            download_url=download_url if bool(row["is_downloadable"]) else None,
-            is_downloadable=bool(row["is_downloadable"]),
-            width=_optional_int(row["width"]),
-            height=_optional_int(row["height"]),
-            source_name=str(row["source_name"]),
-        )
+        return self._build_wallpaper_detail(self._require_visible_wallpaper(row))
+
+    def get_random_wallpaper(self) -> PublicWallpaperDetailData:
+        row = self.repository.get_random_visible_wallpaper(current_time_utc=utc_now_isoformat())
+        return self._build_wallpaper_detail(self._require_visible_wallpaper(row))
 
     def get_filters(self) -> PublicWallpaperFiltersData:
         market_codes = self.repository.list_visible_market_codes(
@@ -142,6 +126,40 @@ class PublicCatalogService:
             tag_category=_optional_text(row["tag_category"]),
         )
 
+    def _build_wallpaper_detail(self, row: Row) -> PublicWallpaperDetailData:
+        preview_url = self.resource_locator.build_required_url(
+            storage_backend=_optional_text(row["preview_storage_backend"]),
+            relative_path=str(row["preview_relative_path"]),
+        )
+        download_url = self.resource_locator.build_required_url(
+            storage_backend=_optional_text(row["download_storage_backend"]),
+            relative_path=str(row["download_relative_path"]),
+        )
+        return PublicWallpaperDetailData(
+            id=int(row["id"]),
+            title=present_title(row),
+            subtitle=_optional_text(row["subtitle"]),
+            description=_optional_text(row["description"]),
+            copyright_text=_optional_text(row["copyright_text"]),
+            market_code=str(row["market_code"]),
+            wallpaper_date=str(row["wallpaper_date"]),
+            preview_url=preview_url,
+            download_url=download_url if bool(row["is_downloadable"]) else None,
+            is_downloadable=bool(row["is_downloadable"]),
+            width=_optional_int(row["width"]),
+            height=_optional_int(row["height"]),
+            source_name=str(row["source_name"]),
+        )
+
+    def _require_visible_wallpaper(self, row: Row | None) -> Row:
+        if row is None:
+            raise ApiError(
+                status_code=404,
+                error_code="PUBLIC_WALLPAPER_NOT_FOUND",
+                message="壁纸不存在或不可公开访问",
+            )
+        return row
+
 
 def present_title(row: Row) -> str:
     title = _optional_text(row["title"])
@@ -155,6 +173,10 @@ def present_title(row: Row) -> str:
 
 def utc_now_isoformat() -> str:
     return datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+
+
+def utc_today_isoformat() -> str:
+    return datetime.now(tz=UTC).date().isoformat()
 
 
 def _optional_text(value: object) -> str | None:

@@ -94,9 +94,9 @@ make verify-deploy
 - SQLite 版本化迁移基线与核心表结构
 - 空库初始化与重复执行迁移能力
 - Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动
-- `/api/public/wallpapers`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 六个公开接口
+- `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 八个公开接口
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
-- 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword` 与 `tag_keys` 组合查询
+- 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword` 与 `tag_keys` 组合查询；`/api/public/wallpapers/today` 按 UTC 当天匹配并优先默认市场，`/api/public/wallpapers/random` 仅从当前公开可见内容中随机返回
 - `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面
 - `web/public/assets/site.css` 与 `web/public/assets/site.js` 页面静态资源
 - 前端页面只通过公开 API 获取业务数据，并在空结果、内容不存在、服务繁忙时显示明确提示
@@ -191,6 +191,8 @@ curl http://127.0.0.1:8000/api/public/site-info
 curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc"
 curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&keyword=forest"
 curl "http://127.0.0.1:8000/api/public/wallpapers?page=1&page_size=20&sort=date_desc&tag_keys=theme_forest,location_asia"
+curl http://127.0.0.1:8000/api/public/wallpapers/today
+curl http://127.0.0.1:8000/api/public/wallpapers/random
 curl http://127.0.0.1:8000/api/public/wallpaper-filters
 curl http://127.0.0.1:8000/api/public/tags
 curl http://127.0.0.1:8000/api/public/wallpapers/1

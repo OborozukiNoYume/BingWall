@@ -91,10 +91,49 @@ class PublicRepository:
     def get_visible_wallpaper_by_id(
         self, *, wallpaper_id: int, current_time_utc: str
     ) -> sqlite3.Row | None:
+        return self._get_visible_wallpaper_detail(
+            current_time_utc=current_time_utc,
+            extra_clauses=["w.id = ?"],
+            extra_parameters=(wallpaper_id,),
+            order_by="w.id DESC",
+        )
+
+    def get_visible_wallpaper_for_today(
+        self,
+        *,
+        current_time_utc: str,
+        current_date: str,
+        default_market_code: str,
+    ) -> sqlite3.Row | None:
+        return self._get_visible_wallpaper_detail(
+            current_time_utc=current_time_utc,
+            extra_clauses=["w.wallpaper_date = ?"],
+            extra_parameters=(current_date, default_market_code),
+            order_by="CASE WHEN w.market_code = ? THEN 0 ELSE 1 END ASC, w.id DESC",
+        )
+
+    def get_random_visible_wallpaper(self, *, current_time_utc: str) -> sqlite3.Row | None:
+        return self._get_visible_wallpaper_detail(
+            current_time_utc=current_time_utc,
+            extra_clauses=[],
+            extra_parameters=(),
+            order_by="RANDOM()",
+        )
+
+    def _get_visible_wallpaper_detail(
+        self,
+        *,
+        current_time_utc: str,
+        extra_clauses: list[str],
+        extra_parameters: tuple[str | int, ...],
+        order_by: str,
+    ) -> sqlite3.Row | None:
         filters, parameters = self._build_visibility_filters(
             query=PublicWallpaperListQuery(),
             current_time_utc=current_time_utc,
         )
+        if extra_clauses:
+            filters = f"{filters} AND {' AND '.join(extra_clauses)}"
         row = self.connection.execute(
             f"""
             SELECT
@@ -132,7 +171,7 @@ class PublicRepository:
                AND download_resource.resource_type = ?
                AND download_resource.image_status = 'ready'
             WHERE {filters}
-              AND w.id = ?
+            ORDER BY {order_by}
             LIMIT 1;
             """,
             (
@@ -140,7 +179,7 @@ class PublicRepository:
                 PUBLIC_DETAIL_PREVIEW_RESOURCE_TYPE,
                 PUBLIC_DETAIL_DOWNLOAD_RESOURCE_TYPE,
                 *parameters,
-                wallpaper_id,
+                *extra_parameters,
             ),
         ).fetchone()
         return cast(sqlite3.Row | None, row)
