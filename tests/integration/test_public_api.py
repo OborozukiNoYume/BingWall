@@ -90,6 +90,75 @@ def test_public_wallpaper_detail_returns_null_download_url_when_not_downloadable
     assert payload["data"]["is_downloadable"] is False
 
 
+def test_public_wallpaper_list_supports_date_range_filter(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-20",
+        market_code="en-US",
+        title="Before Range",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Inside Range Latest",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-22",
+        market_code="fr-FR",
+        title="Inside Range Early",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-26",
+        market_code="ja-JP",
+        title="After Range",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get(
+            "/api/public/wallpapers?date_from=2026-03-22&date_to=2026-03-24&page=1&page_size=20"
+        )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["pagination"] == {
+        "page": 1,
+        "page_size": 20,
+        "total": 2,
+        "total_pages": 1,
+    }
+    assert [item["title"] for item in payload["data"]["items"]] == [
+        "Inside Range Latest",
+        "Inside Range Early",
+    ]
+
+
+def test_public_wallpaper_list_returns_validation_error_for_invalid_date_range(
+    tmp_path: Path,
+) -> None:
+    prepare_database(tmp_path)
+
+    with build_client(tmp_path) as client:
+        reversed_range_response = client.get(
+            "/api/public/wallpapers?date_from=2026-03-24&date_to=2026-03-22"
+        )
+        invalid_format_response = client.get("/api/public/wallpapers?date_from=2026-03")
+
+    reversed_range_payload = reversed_range_response.json()
+    invalid_format_payload = invalid_format_response.json()
+
+    assert reversed_range_response.status_code == 422
+    assert reversed_range_payload["error_code"] == "COMMON_INVALID_ARGUMENT"
+    assert "结束日期不能早于开始日期" in reversed_range_payload["message"]
+
+    assert invalid_format_response.status_code == 422
+    assert invalid_format_payload["error_code"] == "COMMON_INVALID_ARGUMENT"
+    assert "date_from" in invalid_format_payload["message"]
+
+
 def test_public_wallpaper_detail_distinguishes_preview_and_download_resources(
     tmp_path: Path,
 ) -> None:

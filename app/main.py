@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
+from pydantic import ValidationError
 
 from app.api.errors import ApiError
 from app.api.errors import api_error_exception_handler
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     app.include_router(web_router)
     app.add_exception_handler(ApiError, api_error_exception_handler)
     app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
+    app.add_exception_handler(ValidationError, request_validation_exception_handler)
     app.mount("/assets", StaticFiles(directory=get_assets_dir()), name="assets")
     app.mount("/admin-assets", StaticFiles(directory=get_admin_assets_dir()), name="admin-assets")
     app.mount(

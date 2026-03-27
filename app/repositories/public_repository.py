@@ -246,6 +246,12 @@ class PublicRepository:
         if query.market_code is not None:
             clauses.append("w.market_code = ?")
             parameters.append(query.market_code)
+        if query.date_from is not None:
+            clauses.append("w.wallpaper_date >= ?")
+            parameters.append(query.date_from.isoformat())
+        if query.date_to is not None:
+            clauses.append("w.wallpaper_date <= ?")
+            parameters.append(query.date_to.isoformat())
         if query.resolution_min_width is not None:
             clauses.append("COALESCE(original_resource.width, w.origin_width, 0) >= ?")
             parameters.append(query.resolution_min_width)

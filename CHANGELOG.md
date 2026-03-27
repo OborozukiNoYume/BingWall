@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-27T13:21:12Z
+
+### 变更内容
+
+- 更新 [app/schemas/public.py](app/schemas/public.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/api/public/routes.py](app/api/public/routes.py)、[app/api/errors.py](app/api/errors.py) 与 [app/main.py](app/main.py)，为 `GET /api/public/wallpapers` 新增 `date_from`、`date_to` 两个公开查询参数，格式固定为 `YYYY-MM-DD`，并按 `wallpaper_date` 执行包含开始日和结束日的日期范围过滤；同时补齐依赖参数模型校验失败时的统一 `422` 错误响应接线
+- 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐公开列表日期范围命中、起止日期倒置校验失败和非法日期格式校验失败的集成测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/api-conventions.md](docs/api-conventions.md)，同步公开列表新参数、闭区间语义、示例请求和项目状态说明
+
+### 变更原因
+
+- 当前公开 API 列表已支持关键词、标签、地区和分辨率筛选，但缺少最基础的按日期范围筛选能力，调用方需要自行拉全量后再二次过滤
+- 本次保持最保守范围，只在现有公开列表链路上增加两个只读查询参数，不调整数据库结构、不改前端页面、不改后台接口
+- 需要让调用方能直接按壁纸日期做归档浏览、区间拉取和历史同步，同时继续复用现有分页、公开可见性和统一错误响应约定
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T13:21:12Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开列表查询参数校验、公开仓储 SQL 条件、公开 API 集成测试和相关说明文档
+- `/api/public/wallpapers` 现在支持 `date_from` 与 `date_to`，两者基于 `wallpaper_date` 做闭区间过滤，并且可以与 `keyword`、`tag_keys`、地区、分辨率、排序和分页组合使用
+- 当两个日期参数同时提供且 `date_to < date_from`，接口会继续返回统一的 `422 COMMON_INVALID_ARGUMENT` 参数错误响应
+- 本次不包含数据库表结构调整、后台内容列表日期筛选变更、公开前端筛选表单改造或 `today` / `random` 端点行为调整
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除公开列表新增的日期参数、回退仓储筛选条件、测试和文档更新，或执行 `git revert` 回退本次提交
+- 回滚后仓库将恢复到“公开列表仅支持关键词、标签、地区和分辨率筛选，不支持按壁纸日期范围筛选”的状态
+- 本次未引入数据库迁移，因此代码回滚不涉及数据回滚动作
+
 ## 2026-03-27T12:52:50Z
 
 ### 变更内容

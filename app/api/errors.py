@@ -6,6 +6,7 @@ from fastapi import Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from fastapi.responses import Response
+from pydantic import ValidationError
 
 
 class ApiError(Exception):
@@ -55,7 +56,7 @@ def build_error_response(
 
 
 def request_validation_exception_handler(request: Request, exc: Exception) -> Response:
-    if not isinstance(exc, RequestValidationError):
+    if not isinstance(exc, (RequestValidationError, ValidationError)):
         raise TypeError("request_validation_exception_handler received unexpected exception type")
     errors = exc.errors()
     message = "参数错误"

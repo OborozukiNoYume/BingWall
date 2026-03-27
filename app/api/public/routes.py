@@ -76,9 +76,14 @@ def list_public_wallpapers(
     )
     data, pagination = service.list_wallpapers(query=query)
     logger.info(
-        "Public wallpaper list served: market=%s keyword=%s page=%s page_size=%s total=%s",
+        (
+            "Public wallpaper list served: market=%s keyword=%s date_from=%s date_to=%s "
+            "page=%s page_size=%s total=%s"
+        ),
         query.market_code,
         query.keyword,
+        query.date_from,
+        query.date_to,
         query.page,
         query.page_size,
         pagination.total,

@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-26T12:30:40Z
+- 更新时间：2026-03-27T13:21:12Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：公开接口与后台接口的统一契约说明
 
@@ -163,6 +163,8 @@
 | `market_code` | string | 否 | 地区筛选 |
 | `keyword` | string | 否 | 关键词搜索，当前匹配标题、简述、版权说明、描述以及启用标签的 `tag_key` / `tag_name` |
 | `tag_keys` | string | 否 | 标签稳定键列表，使用半角逗号分隔；多标签按“同时命中”处理 |
+| `date_from` | string | 否 | 开始日期，格式固定为 `YYYY-MM-DD` |
+| `date_to` | string | 否 | 结束日期，格式固定为 `YYYY-MM-DD` |
 | `resolution_min_width` | integer | 否 | 最小宽度 |
 | `resolution_min_height` | integer | 否 | 最小高度 |
 | `sort` | string | 否 | 一期建议支持 `date_desc` |
@@ -184,6 +186,12 @@
   ]
 }
 ```
+
+说明：
+
+- `date_from` 与 `date_to` 作用于 `wallpaper_date` 字段
+- 当两个参数同时提供时，必须满足 `date_from <= date_to`
+- 日期范围按闭区间处理，即会包含开始日和结束日当天的数据
 
 ### 2. 今日壁纸
 

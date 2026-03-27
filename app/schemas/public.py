@@ -1,8 +1,10 @@
+from datetime import date
 from typing import Literal
 import re
 
 from pydantic import BaseModel
 from pydantic import Field
+from pydantic import ValidationInfo
 from pydantic import field_validator
 
 
@@ -12,6 +14,8 @@ class PublicWallpaperListQuery(BaseModel):
     market_code: str | None = Field(default=None, min_length=2, max_length=32)
     keyword: str | None = Field(default=None, max_length=100)
     tag_keys: str | None = Field(default=None, max_length=500)
+    date_from: date | None = None
+    date_to: date | None = None
     resolution_min_width: int | None = Field(default=None, ge=1)
     resolution_min_height: int | None = Field(default=None, ge=1)
     sort: Literal["date_desc"] = "date_desc"
@@ -38,6 +42,14 @@ class PublicWallpaperListQuery(BaseModel):
         if invalid:
             raise ValueError("tag_keys contains invalid tag key")
         return ",".join(parts)
+
+    @field_validator("date_to")
+    @classmethod
+    def validate_date_range(cls, value: date | None, info: ValidationInfo) -> date | None:
+        date_from = info.data.get("date_from")
+        if value is not None and date_from is not None and value < date_from:
+            raise ValueError("结束日期不能早于开始日期")
+        return value
 
 
 class PublicWallpaperSummary(BaseModel):
