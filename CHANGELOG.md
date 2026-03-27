@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## 2026-03-27T16:46:29Z
+
+### 变更内容
+
+- 更新 [app/web/routes.py](app/web/routes.py)、[web/public/assets/site.css](web/public/assets/site.css) 与 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，在公开首页英雄区新增“今日壁纸 API”和“随机壁纸 API”两个快捷入口，直接展示接口路径并提供跳转链接，同时补齐首页壳与样式断言
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录本次首页入口补充、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 当前公开接口已经提供 `/api/public/wallpapers/today` 和 `/api/public/wallpapers/random`，但公开首页只展示最新壁纸列表，没有把这两个单条读取入口明确暴露出来
+- 这会让访客即使知道系统有“今日壁纸”和“随机壁纸”能力，也需要自己记接口地址或翻文档，首页引导不完整
+- 因此本次采用最保守方式，只补首页入口展示，不改接口字段、不改接口行为，也不扩展到其他页面
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T16:46:29Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开首页 HTML 结构、公开首页样式和对应的前端集成测试
+- 访客现在访问 `/` 时，可以直接看到“今日壁纸 API”和“随机壁纸 API”两个入口，并打开对应 JSON 返回
+- 本次不包含公开 API 逻辑修改、列表页改版、详情页改版、数据库结构调整或后台功能变更
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_frontend.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除首页新增的两个 API 快捷入口、回退对应样式与测试断言，或执行 `git revert` 回退本次提交
+- 回滚后公开首页将恢复为“只展示站点说明和最新壁纸列表，不直接展示 today/random 接口入口”的状态
+
 ## 2026-03-27T16:33:08Z
 
 ### 变更内容

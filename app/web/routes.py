@@ -172,6 +172,22 @@ def render_public_page(
     wallpaper_id: int | None = None,
 ) -> HTMLResponse:
     wallpaper_id_attr = f' data-wallpaper-id="{wallpaper_id}"' if wallpaper_id is not None else ""
+    home_api_shortcuts = ""
+    if page_name == "home":
+        home_api_shortcuts = """
+          <div class="api-shortcuts" aria-label="公开接口快捷入口">
+            <article class="api-shortcut-card">
+              <p class="api-shortcut-label">今日壁纸 API</p>
+              <code>/api/public/wallpapers/today</code>
+              <a class="button-link" href="/api/public/wallpapers/today" target="_blank" rel="noreferrer">查看接口返回</a>
+            </article>
+            <article class="api-shortcut-card">
+              <p class="api-shortcut-label">随机壁纸 API</p>
+              <code>/api/public/wallpapers/random</code>
+              <a class="button-link" href="/api/public/wallpapers/random" target="_blank" rel="noreferrer">查看接口返回</a>
+            </article>
+          </div>
+        """
     html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
   <head>
@@ -198,6 +214,7 @@ def render_public_page(
             <p class="site-name">BingWall</p>
             <p class="site-description">正在加载站点说明...</p>
           </div>
+{home_api_shortcuts}
         </section>
         <section class="content-panel" id="app-root" aria-live="polite">
           <noscript>

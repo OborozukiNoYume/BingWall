@@ -99,7 +99,7 @@ make verify-deploy
 - `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 八个公开接口
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
 - 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword`、`tag_keys`、`date_from`、`date_to` 组合查询，其中日期格式固定为 `YYYY-MM-DD`，且按 `wallpaper_date` 做包含边界的范围过滤；`/api/public/wallpapers/today` 按 UTC 当天匹配并优先默认市场，`/api/public/wallpapers/random` 仅从当前公开可见内容中随机返回
-- `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面
+- `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面；其中首页已直接展示“今日壁纸 API”和“随机壁纸 API”两个快捷入口，便于访客快速查看单条公开接口返回
 - `web/public/assets/site.css` 与 `web/public/assets/site.js` 页面静态资源
 - 前端页面只通过公开 API 获取业务数据，并在空结果、内容不存在、服务繁忙时显示明确提示
 - `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example` 单机部署模板

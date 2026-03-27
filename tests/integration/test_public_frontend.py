@@ -27,6 +27,8 @@ def test_public_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
     assert "text/html" in home_response.headers["content-type"]
     assert 'data-page="home"' in home_response.text
     assert 'src="/assets/site.js"' in home_response.text
+    assert "/api/public/wallpapers/today" in home_response.text
+    assert "/api/public/wallpapers/random" in home_response.text
 
     assert list_response.status_code == 200
     assert 'data-page="list"' in list_response.text
@@ -56,6 +58,7 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert "sqlite" not in asset_response.text.lower()
 
     assert css_response.status_code == 200
+    assert ".api-shortcuts" in css_response.text
     assert ".card-grid" in css_response.text
     assert ".detail-layout" in css_response.text
     assert ".tag-filter-grid" in css_response.text
