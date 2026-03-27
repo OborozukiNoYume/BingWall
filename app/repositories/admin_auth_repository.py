@@ -28,6 +28,18 @@ class AdminAuthRepository:
         ).fetchone()
         return cast(sqlite3.Row | None, row)
 
+    def get_admin_user_by_id(self, *, admin_user_id: int) -> sqlite3.Row | None:
+        row = self.connection.execute(
+            """
+            SELECT id, username, password_hash, role_name, status
+            FROM admin_users
+            WHERE id = ?
+            LIMIT 1;
+            """,
+            (admin_user_id,),
+        ).fetchone()
+        return cast(sqlite3.Row | None, row)
+
     def create_session(
         self,
         *,
@@ -84,6 +96,23 @@ class AdminAuthRepository:
                 WHERE id = ?;
                 """,
                 (logged_in_at_utc, logged_in_at_utc, admin_user_id),
+            )
+
+    def update_admin_password(
+        self,
+        *,
+        admin_user_id: int,
+        password_hash: str,
+        updated_at_utc: str,
+    ) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                UPDATE admin_users
+                SET password_hash = ?, updated_at_utc = ?
+                WHERE id = ?;
+                """,
+                (password_hash, updated_at_utc, admin_user_id),
             )
 
     def insert_audit_log(
@@ -161,6 +190,19 @@ class AdminAuthRepository:
                 """,
                 (seen_at_utc, seen_at_utc, session_id),
             )
+
+    def revoke_sessions_for_admin(self, *, admin_user_id: int, revoked_at_utc: str) -> int:
+        with self.connection:
+            cursor = self.connection.execute(
+                """
+                UPDATE admin_sessions
+                SET revoked_at_utc = ?, updated_at_utc = ?
+                WHERE admin_user_id = ?
+                  AND revoked_at_utc IS NULL;
+                """,
+                (revoked_at_utc, revoked_at_utc, admin_user_id),
+            )
+        return int(cursor.rowcount)
 
     def revoke_session(self, *, session_id: int, revoked_at_utc: str) -> None:
         with self.connection:

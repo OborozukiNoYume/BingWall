@@ -58,6 +58,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     return;
   }
 
+  if (pageName === "admin-change-password") {
+    renderChangePasswordPage(session);
+    return;
+  }
+
   if (pageName === "admin-task-detail" && taskId) {
     await renderTaskDetailPage(session, taskId);
     return;
@@ -147,6 +152,108 @@ function renderLoginPage() {
       console.error(error);
       const message = error instanceof ApiError ? error.message : "后台登录失败，请稍后重试。";
       setNotice(feedback, "登录失败", message);
+    }
+  });
+}
+
+function renderChangePasswordPage(session) {
+  adminRoot.innerHTML = `
+    <section class="auth-card">
+      <div>
+        <p class="admin-eyebrow">账号安全</p>
+        <h2>修改后台密码</h2>
+        <p class="muted-copy">提交成功后，当前账号的后台会话会立即失效，需使用新密码重新登录。</p>
+      </div>
+      <form class="admin-form" id="admin-change-password-form">
+        <div class="field-group">
+          <label for="current-password">当前密码</label>
+          <input
+            id="current-password"
+            name="current_password"
+            type="password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+        <div class="field-group">
+          <label for="new-password">新密码</label>
+          <input
+            id="new-password"
+            name="new_password"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+        <div class="field-group">
+          <label for="confirm-new-password">确认新密码</label>
+          <input
+            id="confirm-new-password"
+            name="confirm_new_password"
+            type="password"
+            autocomplete="new-password"
+            required
+          />
+        </div>
+        <div class="button-row">
+          <button class="primary-button" type="submit">保存新密码</button>
+          <a class="ghost-button" href="/admin/wallpapers">返回内容管理</a>
+        </div>
+      </form>
+      <div class="notice-card" id="change-password-feedback">
+        <h3>说明</h3>
+        <p>当前页面通过 <code>/api/admin/auth/change-password</code> 校验当前密码并更新后台口令。</p>
+      </div>
+    </section>
+  `;
+
+  const form = document.querySelector("#admin-change-password-form");
+  const feedback = document.querySelector("#change-password-feedback");
+  if (!(form instanceof HTMLFormElement) || !(feedback instanceof HTMLElement)) {
+    return;
+  }
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const formData = new FormData(form);
+    const currentPassword = stringValue(formData.get("current_password"));
+    const newPassword = stringValue(formData.get("new_password"));
+    const confirmNewPassword = stringValue(formData.get("confirm_new_password"));
+
+    if (newPassword !== confirmNewPassword) {
+      setNotice(feedback, "提交失败", "两次输入的新密码不一致，请重新确认。");
+      return;
+    }
+
+    setNotice(feedback, "正在修改密码...", "系统会校验当前密码，并在成功后要求重新登录。");
+
+    try {
+      const response = await fetchAdmin("/api/admin/auth/change-password", {
+        method: "POST",
+        token: session.session_token,
+        body: JSON.stringify({
+          current_password: currentPassword,
+          new_password: newPassword,
+          confirm_new_password: confirmNewPassword,
+        }),
+      });
+      clearSession();
+      setNotice(
+        feedback,
+        "密码已修改",
+        `已使 ${response.revoked_session_count} 个后台会话失效，正在返回登录页。`,
+      );
+      window.setTimeout(() => {
+        redirectToLogin();
+      }, 1200);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        handleAdminError(error);
+        return;
+      }
+      console.error(error);
+      const message = error instanceof ApiError ? error.message : "修改密码失败，请稍后重试。";
+      setNotice(feedback, "修改失败", message);
     }
   });
 }

@@ -4,12 +4,12 @@
 
 BingWall 是一个围绕 Bing 壁纸构建的图片服务系统。一期目标不是做单一下载脚本，而是建设一个可持续采集、可管理、可对外服务、可扩展演进的内容系统。
 
-当前仓库已完成阶段一、阶段二闭环，并已落地阶段三 `T3.1` 标签体系、`T3.2` 多来源采集、`T3.3` 资源派生版本、`T3.4` OSS / CDN 兼容资源定位与 `T3.5` 下载统计；核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
+当前仓库已完成阶段一、阶段二闭环，并已落地阶段三 `T3.1` 标签体系、`T3.2` 多来源采集、`T3.3` 资源派生版本、`T3.4` OSS / CDN 兼容资源定位、`T3.5` 下载统计与 `T3.6` 关键词搜索增强；核心设计以 [系统设计说明书](docs/system-design.md) 为总纲，配套文档用于约束后续实现。
 
 ## 当前状态
 
 - 项目阶段：阶段三进行中，`T3.1`、`T3.2`、`T3.3`、`T3.4`、`T3.5` 已完成；运维侧仍需补齐目标机 `cron` 安装与计划配置
-- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 与 NASA APOD 多来源采集及资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环、`T3.1` 标签体系、`T3.2` 多来源采集、`T3.3` 资源派生版本、`T3.4` OSS / CDN 兼容资源定位、`T3.5` 下载登记与后台统计
+- 当前代码状态：已完成最小后端工程骨架、统一配置入口、最小 FastAPI 应用、SQLite 迁移基线、数据库初始化命令、Bing 与 NASA APOD 多来源采集及资源入库主链路、公开 API 最小集、基础公开前端、`T1.6` 自动化部署验收，以及 `T2.1` 管理员认证与会话控制、`T2.2` 后台内容管理 API / 页面与审计查询、`T2.3` 手动采集任务与后台观测闭环、`T2.4` 健康检查与资源巡检闭环、`T2.5` 备份恢复与恢复演练闭环、`T3.1` 标签体系、`T3.2` 多来源采集、`T3.3` 资源派生版本、`T3.4` OSS / CDN 兼容资源定位、`T3.5` 下载登记与后台统计、`T3.6` 关键词搜索增强，以及后台“修改密码”页面与会话失效闭环
 - 当前文档状态：系统设计、模块说明、数据模型、API 约定、部署运行说明、项目状态与阶段 TODO 已同步到当前实现
 - 已确认运行时基线：`Python 3.14.2`、`Node.js 24.13.0`
 
@@ -108,11 +108,12 @@ make verify-deploy
 
 当前 `T2.1` 已补齐内容：
 
-- `/api/admin/auth/login`、`/api/admin/auth/logout` 后台认证接口
+- `/api/admin/auth/login`、`/api/admin/auth/change-password`、`/api/admin/auth/logout` 后台认证接口
 - `Authorization: Bearer <session_token>` 会话鉴权约定
 - `admin_sessions` 数据表与会话令牌摘要持久化
-- 管理员密码摘要校验、账号状态检查、会话过期判断与主动登出失效
+- 管理员密码摘要校验、账号状态检查、会话过期判断、主动登出失效，以及登录后自助修改密码
 - 登录/登出审计日志写入与当前管理员上下文注入能力
+- 修改密码成功后会立即使当前账号已有后台会话失效，要求使用新密码重新登录
 - 后台鉴权集成测试、密码摘要与会话摘要单元测试
 
 当前 `T2.2` 已补齐内容：
@@ -120,7 +121,7 @@ make verify-deploy
 - `/api/admin/wallpapers`、`/api/admin/wallpapers/{wallpaper_id}`、`/api/admin/wallpapers/{wallpaper_id}/status`、`/api/admin/audit-logs` 后台接口
 - 后台内容列表、详情、状态切换和审计查询 schema / repository / service；内容列表支持 `keyword + 状态` 联合检索
 - 启用、禁用和逻辑删除的状态流转校验，以及每次状态变更的审计日志写入
-- `/admin/login`、`/admin`、`/admin/wallpapers/{id}`、`/admin/audit-logs` 后台页面
+- `/admin/login`、`/admin`、`/admin/wallpapers/{id}`、`/admin/change-password`、`/admin/audit-logs` 后台页面
 - `web/admin/assets/admin.js` 与 `web/admin/assets/admin.css` 后台静态资源，页面仅通过后台 API 工作
 - 后台内容管理、后台页面与公开可见性联动的集成测试
 
@@ -219,6 +220,11 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
   -H 'Content-Type: application/json' \
   -d '{"username":"admin","password":"your-password"}'
 
+curl -X POST http://127.0.0.1:30003/api/admin/auth/change-password \
+  -H 'Authorization: Bearer <session_token>' \
+  -H 'Content-Type: application/json' \
+  -d '{"current_password":"your-password","new_password":"your-new-password","confirm_new_password":"your-new-password"}'
+
 curl -X POST http://127.0.0.1:30003/api/admin/auth/logout \
   -H 'Authorization: Bearer <session_token>'
 ```
@@ -227,6 +233,7 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/logout \
 
 ```bash
 curl http://127.0.0.1:30003/admin/login
+curl http://127.0.0.1:30003/admin/change-password
 curl "http://127.0.0.1:30003/admin/wallpapers?keyword=forest"
 curl http://127.0.0.1:30003/admin/tags
 curl -H 'Authorization: Bearer <session_token>' \

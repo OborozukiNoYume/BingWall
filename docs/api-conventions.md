@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-27T13:21:12Z
+- 更新时间：2026-03-27T16:33:08Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：公开接口与后台接口的统一契约说明
 
@@ -351,6 +351,42 @@
 - 必须基于当前登录会话执行
 - 成功后必须使当前会话立即失效
 - 必须写入审计日志
+
+### 7.2 后台修改密码
+
+- 方法：`POST`
+- 路径：`/api/admin/auth/change-password`
+
+请求头：
+
+- `Authorization: Bearer <session_token>`
+
+请求体结构：
+
+```json
+{
+  "current_password": "old-password",
+  "new_password": "new-password",
+  "confirm_new_password": "new-password"
+}
+```
+
+响应数据结构（`data` 字段）：
+
+```json
+{
+  "relogin_required": true,
+  "revoked_session_count": 2
+}
+```
+
+约束：
+
+- 必须基于当前登录会话执行
+- 必须先校验当前密码正确
+- `new_password` 与 `confirm_new_password` 必须一致
+- 修改成功后必须立即使当前账号已有后台会话失效，并要求重新登录
+- 审计日志中只能记录“已修改密码”和会话失效数量，不得记录明文密码或密码摘要
 
 ### 8. 后台内容列表
 

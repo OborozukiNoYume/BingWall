@@ -27,6 +27,7 @@ def test_admin_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
         list_response = client.get("/admin/wallpapers?page=2&content_status=draft")
         detail_response = client.get(f"/admin/wallpapers/{wallpaper_id}")
         tags_response = client.get("/admin/tags?status=enabled")
+        change_password_response = client.get("/admin/change-password")
         task_list_response = client.get("/admin/tasks?page=1&task_status=queued")
         task_detail_response = client.get("/admin/tasks/7")
         download_stats_response = client.get("/admin/download-stats?days=30&top_limit=10")
@@ -49,6 +50,10 @@ def test_admin_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
     assert tags_response.status_code == 200
     assert 'data-page="admin-tags"' in tags_response.text
     assert "标签管理" in tags_response.text
+
+    assert change_password_response.status_code == 200
+    assert 'data-page="admin-change-password"' in change_password_response.text
+    assert "修改密码" in change_password_response.text
 
     assert task_list_response.status_code == 200
     assert 'data-page="admin-tasks"' in task_list_response.text
@@ -80,6 +85,7 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
 
     assert js_response.status_code == 200
     assert "/api/admin/auth/login" in js_response.text
+    assert "/api/admin/auth/change-password" in js_response.text
     assert "/api/admin/auth/logout" in js_response.text
     assert "/api/admin/wallpapers" in js_response.text
     assert "/api/admin/wallpapers/" in js_response.text
@@ -93,6 +99,7 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     assert "/api/admin/audit-logs" in js_response.text
     assert "逻辑删除" in js_response.text
     assert "标签管理" in js_response.text
+    assert "修改后台密码" in js_response.text
     assert "下载统计" in js_response.text
     assert "立即执行该任务" in js_response.text
     assert "sqlite" not in js_response.text.lower()

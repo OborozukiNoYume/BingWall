@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import reset_settings_cache
 from app.core.security import hash_password
+from app.core.security import verify_password
 from app.main import create_app
 from app.repositories.migrations import migrate_database
 from tests.conftest import clear_bingwall_env
@@ -192,6 +193,177 @@ def test_admin_logout_rejects_expired_session(tmp_path: Path) -> None:
     assert response.status_code == 401
     assert payload["error_code"] == "ADMIN_AUTH_SESSION_EXPIRED"
     assert payload["message"] == "会话已过期，请重新登录"
+
+
+def test_admin_change_password_updates_hash_revokes_sessions_and_requires_relogin(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+
+    with build_client(tmp_path) as client:
+        first_login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "correct-password"},
+        )
+        second_login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "correct-password"},
+        )
+        change_password_response = client.post(
+            "/api/admin/auth/change-password",
+            json={
+                "current_password": "correct-password",
+                "new_password": "new-password",
+                "confirm_new_password": "new-password",
+            },
+            headers={
+                "Authorization": f"Bearer {first_login_response.json()['data']['session_token']}",
+            },
+        )
+        logout_response = client.post(
+            "/api/admin/auth/logout",
+            headers={
+                "Authorization": f"Bearer {second_login_response.json()['data']['session_token']}",
+            },
+        )
+        old_password_login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "correct-password"},
+        )
+        new_password_login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "new-password"},
+        )
+
+    payload = change_password_response.json()
+    assert change_password_response.status_code == 200
+    assert payload["data"] == {"relogin_required": True, "revoked_session_count": 2}
+
+    logout_payload = logout_response.json()
+    assert logout_response.status_code == 401
+    assert logout_payload["error_code"] == "ADMIN_AUTH_UNAUTHORIZED"
+
+    old_password_payload = old_password_login_response.json()
+    assert old_password_login_response.status_code == 401
+    assert old_password_payload["error_code"] == "ADMIN_AUTH_INVALID_CREDENTIALS"
+
+    assert new_password_login_response.status_code == 200
+    assert new_password_login_response.json()["data"]["session_token"]
+
+    connection = sqlite3.connect(database_path)
+    try:
+        admin_row = connection.execute(
+            """
+            SELECT password_hash
+            FROM admin_users
+            WHERE id = 1;
+            """
+        ).fetchone()
+        session_rows = connection.execute(
+            """
+            SELECT revoked_at_utc
+            FROM admin_sessions
+            WHERE admin_user_id = 1
+            ORDER BY id ASC;
+            """
+        ).fetchall()
+        audit_actions = connection.execute(
+            """
+            SELECT action_type
+            FROM audit_logs
+            ORDER BY id ASC;
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert admin_row is not None
+    assert verify_password("new-password", str(admin_row[0])) is True
+    assert all(row[0] for row in session_rows[:2])
+    assert "admin_password_changed" in [row[0] for row in audit_actions]
+
+
+def test_admin_change_password_rejects_invalid_current_password(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+
+    with build_client(tmp_path) as client:
+        login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "correct-password"},
+        )
+        change_password_response = client.post(
+            "/api/admin/auth/change-password",
+            json={
+                "current_password": "wrong-password",
+                "new_password": "new-password",
+                "confirm_new_password": "new-password",
+            },
+            headers={"Authorization": f"Bearer {login_response.json()['data']['session_token']}"},
+        )
+        old_password_login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "correct-password"},
+        )
+
+    payload = change_password_response.json()
+    assert change_password_response.status_code == 401
+    assert payload["error_code"] == "ADMIN_AUTH_INVALID_CURRENT_PASSWORD"
+    assert payload["message"] == "当前密码错误"
+
+    assert old_password_login_response.status_code == 200
+
+    connection = sqlite3.connect(database_path)
+    try:
+        audit_actions = connection.execute(
+            """
+            SELECT action_type
+            FROM audit_logs
+            ORDER BY id ASC;
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert "admin_password_changed" not in [row[0] for row in audit_actions]
+
+
+def test_admin_change_password_rejects_mismatched_confirmation(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+
+    with build_client(tmp_path) as client:
+        login_response = client.post(
+            "/api/admin/auth/login",
+            json={"username": "admin", "password": "correct-password"},
+        )
+        response = client.post(
+            "/api/admin/auth/change-password",
+            json={
+                "current_password": "correct-password",
+                "new_password": "new-password",
+                "confirm_new_password": "other-password",
+            },
+            headers={"Authorization": f"Bearer {login_response.json()['data']['session_token']}"},
+        )
+
+    payload = response.json()
+    assert response.status_code == 422
+    assert payload["error_code"] == "ADMIN_AUTH_PASSWORD_CONFIRMATION_MISMATCH"
+    assert payload["message"] == "两次输入的新密码不一致"
 
 
 def test_admin_login_rejects_disabled_account(tmp_path: Path) -> None:

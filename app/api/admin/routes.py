@@ -32,6 +32,8 @@ from app.schemas.admin_collection import AdminCollectionTaskRetryData
 from app.schemas.admin_auth import AdminLoginData
 from app.schemas.admin_auth import AdminLoginRequest
 from app.schemas.admin_auth import AdminLogoutData
+from app.schemas.admin_auth import AdminPasswordChangeData
+from app.schemas.admin_auth import AdminPasswordChangeRequest
 from app.schemas.admin_auth import AdminSessionContext
 from app.schemas.admin_downloads import AdminDownloadStatsData
 from app.schemas.admin_downloads import AdminDownloadStatsQuery
@@ -230,6 +232,30 @@ def login_admin(
         user_agent=request.headers.get("user-agent"),
     )
     logger.info("Admin login response served for username=%s", payload.username)
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.post(
+    "/auth/change-password",
+    response_model=SuccessEnvelope[AdminPasswordChangeData],
+    responses=ERROR_RESPONSES,
+)
+def change_admin_password(
+    payload: AdminPasswordChangeRequest,
+    request: Request,
+    session: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[AdminAuthService, Depends(get_admin_auth_service)],
+) -> dict[str, object]:
+    data = service.change_password(
+        session=session,
+        current_password=payload.current_password,
+        new_password=payload.new_password,
+        confirm_new_password=payload.confirm_new_password,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info("Admin password change response served for username=%s", session.username)
     return build_success_response(request=request, data=data.model_dump())
 
 

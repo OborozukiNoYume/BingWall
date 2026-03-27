@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-27T16:33:08Z
+
+### 变更内容
+
+- 更新 [app/schemas/admin_auth.py](app/schemas/admin_auth.py)、[app/repositories/admin_auth_repository.py](app/repositories/admin_auth_repository.py)、[app/services/admin_auth.py](app/services/admin_auth.py) 与 [app/api/admin/routes.py](app/api/admin/routes.py)，新增 `POST /api/admin/auth/change-password` 后台接口，支持已登录管理员校验当前密码后修改自己的密码，并在成功后使该账号当前后台会话全部失效
+- 更新 [app/web/routes.py](app/web/routes.py) 与 [web/admin/assets/admin.js](web/admin/assets/admin.js)，新增 `/admin/change-password` 页面、后台导航入口和修改密码表单交互；提交成功后会清空浏览器中的后台会话并跳回登录页
+- 更新 [tests/integration/test_admin_auth.py](tests/integration/test_admin_auth.py) 与 [tests/integration/test_admin_frontend.py](tests/integration/test_admin_frontend.py)，补齐修改密码成功、当前密码错误、确认密码不一致，以及后台页面壳与静态资源接线断言
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md)、[docs/data-model.md](docs/data-model.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步本次后台改密能力、接口契约、会话失效口径、验证方式和回滚说明
+
+### 变更原因
+
+- 当前后台登录后只支持继续访问内容管理、标签、任务、日志和审计页面，缺少管理员在已登录状态下自行修改密码的入口
+- 这会导致管理员想更换后台口令时只能直接改库、重新初始化，或依赖额外脚本，不符合后台管理页的基本使用预期
+- 因此需要在不改数据库结构、不重做后台认证体系的前提下，补一个保守的“已登录后修改自己的密码”页面和接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T16:33:08Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖后台认证 API、后台导航、后台登录后的账号安全操作，以及对应的集成测试和项目文档
+- 管理员现在可以访问 `/admin/change-password`，输入当前密码和两次新密码完成改密；成功后需要使用新密码重新登录
+- 本次采用更保守的安全口径：改密成功后会立即使该账号当前已有后台会话失效，避免旧会话继续可用
+- 本次不包含管理员管理他人账号、密码强度策略升级、角色权限改造、数据库表结构调整或新的配置项
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_admin_auth.py tests/integration/test_admin_frontend.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 `POST /api/admin/auth/change-password` 接口、回退 `/admin/change-password` 页面和对应测试文档，或执行 `git revert` 回退本次提交
+- 回滚后后台将恢复为“只支持登录和登出，不支持登录后自助修改密码”的状态
+
 ## 2026-03-27T16:02:25Z
 
 ### 变更内容

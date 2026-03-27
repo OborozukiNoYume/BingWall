@@ -112,6 +112,16 @@ def get_admin_tags_page() -> HTMLResponse:
     )
 
 
+@router.get("/admin/change-password", response_class=HTMLResponse)
+def get_admin_change_password_page() -> HTMLResponse:
+    return render_admin_page(
+        page_name="admin-change-password",
+        page_title="BingWall Admin | 修改密码",
+        page_heading="修改密码",
+        page_summary="校验当前密码后更新后台账号密码，并让当前账号重新登录以使旧会话失效。",
+    )
+
+
 @router.get("/admin/tasks/{task_id}", response_class=HTMLResponse)
 def get_admin_collection_task_detail_page(task_id: int) -> HTMLResponse:
     return render_admin_page(
@@ -238,6 +248,7 @@ def render_admin_page(
         <nav class="admin-nav" aria-label="后台导航">
           <a href="/admin/wallpapers">内容管理</a>
           <a href="/admin/tags">标签管理</a>
+          <a href="/admin/change-password">修改密码</a>
           <a href="/admin/tasks">采集任务</a>
           <a href="/admin/download-stats">下载统计</a>
           <a href="/admin/logs">结构化日志</a>

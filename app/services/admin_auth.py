@@ -9,12 +9,14 @@ from sqlite3 import Row
 
 from app.api.errors import ApiError
 from app.core.security import generate_session_token
+from app.core.security import hash_password
 from app.core.security import hash_session_token
 from app.core.security import summarize_client_value
 from app.core.security import verify_password
 from app.repositories.admin_auth_repository import AdminAuthRepository
 from app.schemas.admin_auth import AdminAuthenticatedUser
 from app.schemas.admin_auth import AdminLoginData
+from app.schemas.admin_auth import AdminPasswordChangeData
 from app.schemas.admin_auth import AdminSessionContext
 
 logger = logging.getLogger(__name__)
@@ -187,6 +189,96 @@ class AdminAuthService:
             "Admin logout succeeded for username=%s session_id=%s",
             session.username,
             session.session_id,
+        )
+
+    def change_password(
+        self,
+        *,
+        session: AdminSessionContext,
+        current_password: str,
+        new_password: str,
+        confirm_new_password: str,
+        trace_id: str,
+        client_ip: str | None,
+        user_agent: str | None,
+    ) -> AdminPasswordChangeData:
+        user_row = self.repository.get_admin_user_by_id(admin_user_id=session.admin_user_id)
+        if user_row is None or str(user_row["status"]) != "enabled":
+            raise ApiError(
+                status_code=401,
+                error_code="ADMIN_AUTH_UNAUTHORIZED",
+                message="未登录或会话无效",
+            )
+
+        if not verify_password(current_password, str(user_row["password_hash"])):
+            logger.warning(
+                "Admin password change rejected because current password is invalid: username=%s",
+                session.username,
+            )
+            raise ApiError(
+                status_code=401,
+                error_code="ADMIN_AUTH_INVALID_CURRENT_PASSWORD",
+                message="当前密码错误",
+            )
+
+        if new_password != confirm_new_password:
+            raise ApiError(
+                status_code=422,
+                error_code="ADMIN_AUTH_PASSWORD_CONFIRMATION_MISMATCH",
+                message="两次输入的新密码不一致",
+            )
+
+        if current_password == new_password:
+            raise ApiError(
+                status_code=422,
+                error_code="ADMIN_AUTH_PASSWORD_REUSE_NOT_ALLOWED",
+                message="新密码不能与当前密码相同",
+            )
+
+        changed_at = utc_now()
+        changed_at_utc = to_utc_string(changed_at)
+        self.repository.update_admin_password(
+            admin_user_id=session.admin_user_id,
+            password_hash=hash_password(new_password),
+            updated_at_utc=changed_at_utc,
+        )
+        revoked_session_count = self.repository.revoke_sessions_for_admin(
+            admin_user_id=session.admin_user_id,
+            revoked_at_utc=changed_at_utc,
+        )
+        self.repository.insert_audit_log(
+            admin_user_id=session.admin_user_id,
+            action_type="admin_password_changed",
+            target_type="admin_user",
+            target_id=str(session.admin_user_id),
+            before_state_json=json.dumps(
+                {"password_changed": False},
+                ensure_ascii=False,
+            ),
+            after_state_json=json.dumps(
+                {
+                    "password_changed": True,
+                    "relogin_required": True,
+                    "revoked_session_count": revoked_session_count,
+                },
+                ensure_ascii=False,
+            ),
+            request_source=build_request_source(
+                client_ip=client_ip,
+                user_agent=user_agent,
+                secret=self.session_secret,
+            ),
+            trace_id=trace_id,
+            created_at_utc=changed_at_utc,
+        )
+        logger.info(
+            "Admin password changed for username=%s revoked_session_count=%s",
+            session.username,
+            revoked_session_count,
+        )
+        return AdminPasswordChangeData(
+            relogin_required=True,
+            revoked_session_count=max(revoked_session_count, 1),
         )
 
     def _is_login_allowed(self, user_row: Row, *, password: str) -> bool:
