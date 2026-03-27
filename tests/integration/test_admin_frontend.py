@@ -86,12 +86,15 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     assert 'setOptionalParam(params, "keyword", state.keyword)' in js_response.text
     assert "/api/admin/tags" in js_response.text
     assert "/api/admin/collection-tasks" in js_response.text
+    assert "/api/admin/collection-tasks/" in js_response.text
+    assert "/consume" in js_response.text
     assert "/api/admin/download-stats" in js_response.text
     assert "/api/admin/logs" in js_response.text
     assert "/api/admin/audit-logs" in js_response.text
     assert "逻辑删除" in js_response.text
     assert "标签管理" in js_response.text
     assert "下载统计" in js_response.text
+    assert "立即执行该任务" in js_response.text
     assert "sqlite" not in js_response.text.lower()
 
     assert css_response.status_code == 200

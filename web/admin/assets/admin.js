@@ -691,7 +691,7 @@ function renderTaskListView(session, payload, state) {
     <div class="panel-head">
       <div>
         <h2>采集任务与后台观测</h2>
-        <p class="muted-copy">手动创建任务后，由 cron 消费队列；页面只负责通过后台 API 观察状态和重试。</p>
+        <p class="muted-copy">手动创建任务后，可由 cron 自动消费，也可在本页对 queued 任务执行一次人工触发。</p>
       </div>
       <p class="meta-pill">共 ${pagination.total} 条任务</p>
     </div>
@@ -902,6 +902,7 @@ function renderTaskListView(session, payload, state) {
     });
   }
 
+  bindTaskConsumeActions(session);
   bindTaskRetryActions(session);
 }
 
@@ -921,6 +922,7 @@ async function renderTaskDetailPage(session, id) {
 function renderTaskDetailView(session, detail) {
   const items = Array.isArray(detail.items) ? detail.items : [];
   const snapshot = detail.request_snapshot || {};
+  const allowConsume = detail.task_status === "queued";
   const allowRetry = detail.task_status === "failed" || detail.task_status === "partially_failed";
 
   adminRoot.innerHTML = `
@@ -949,6 +951,7 @@ function renderTaskDetailView(session, detail) {
           ${renderDetailRow("结束时间", detail.finished_at_utc || "未结束")}
         </dl>
         <div class="button-row">
+          ${allowConsume ? `<button class="primary-button" type="button" data-task-consume="${escapeHtml(String(detail.id))}">立即执行该任务</button>` : ""}
           ${allowRetry ? `<button class="primary-button" type="button" data-task-retry="${escapeHtml(String(detail.id))}">重试该任务</button>` : ""}
         </div>
       </article>
@@ -1015,6 +1018,7 @@ function renderTaskDetailView(session, detail) {
     return;
   }
 
+  bindTaskConsumeActions(session, feedback);
   bindTaskRetryActions(session, feedback);
 }
 
@@ -1614,6 +1618,42 @@ function bindTaskRetryActions(session, feedbackNode = null) {
   });
 }
 
+function bindTaskConsumeActions(session, feedbackNode = null) {
+  document.querySelectorAll("[data-task-consume]").forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    button.addEventListener("click", async () => {
+      const targetId = button.dataset.taskConsume;
+      if (!targetId) {
+        return;
+      }
+      const confirmed = window.confirm(`确认立即执行任务 ${targetId} 吗？`);
+      if (!confirmed) {
+        return;
+      }
+      if (feedbackNode instanceof HTMLElement) {
+        setNotice(feedbackNode, "正在手动触发任务...", "系统会立即执行该 queued 任务，并保留原有 cron 消费机制。");
+      }
+      try {
+        await fetchAdmin(`/api/admin/collection-tasks/${encodeURIComponent(targetId)}/consume`, {
+          method: "POST",
+          token: session.session_token,
+        });
+        redirectTo(`/admin/tasks/${encodeURIComponent(String(targetId))}`);
+      } catch (error) {
+        console.error(error);
+        const message = error instanceof ApiError ? error.message : "任务手动触发失败，请稍后重试。";
+        if (feedbackNode instanceof HTMLElement) {
+          setNotice(feedbackNode, "触发失败", message);
+        } else {
+          window.alert(message);
+        }
+      }
+    });
+  });
+}
+
 function bindTagEditActions(items) {
   document.querySelectorAll("[data-tag-edit]").forEach((button) => {
     if (!(button instanceof HTMLButtonElement)) {
@@ -1712,6 +1752,7 @@ function renderTaskRow(item) {
         <div class="button-row">
           <a class="inline-link" href="/admin/tasks/${escapeHtml(String(item.id))}">详情</a>
           <a class="inline-link" href="/admin/logs?task_id=${escapeHtml(String(item.id))}">日志</a>
+          ${renderConsumeButton(item)}
           ${renderRetryButton(item)}
         </div>
       </td>
@@ -1747,6 +1788,13 @@ function renderRetryButton(item) {
     return "";
   }
   return `<button class="mini-button" type="button" data-task-retry="${escapeHtml(String(item.id))}">重试</button>`;
+}
+
+function renderConsumeButton(item) {
+  if (item.task_status !== "queued") {
+    return "";
+  }
+  return `<button class="mini-button" type="button" data-task-consume="${escapeHtml(String(item.id))}">立即执行</button>`;
 }
 
 function renderTaskItemRow(item) {

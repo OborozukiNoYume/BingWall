@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sqlite3
+from typing import Any
 
 from app.collectors.nasa_apod import NasaApodSourceAdapter
 from app.domain.collection import CollectedImageMetadata
@@ -106,6 +107,127 @@ def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
     assert audit_row["action_type"] == "collection_task_created"
     assert audit_row["target_type"] == "collection_task"
     assert audit_row["target_id"] == str(task_id)
+
+
+def test_admin_collection_task_can_be_consumed_manually(tmp_path: Path, monkeypatch: Any) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+
+    metadata = [
+        make_metadata(
+            market_code="en-US",
+            wallpaper_date="2026-03-24",
+            source_key="bing:en-US:2026-03-24:OHR.Today",
+            source_url="https://www.bing.com/th?id=OHR.Today_1920x1080.jpg",
+        )
+    ]
+
+    def fake_fetch_metadata(self: object, market_code: str, count: int) -> list[BingImageMetadata]:
+        del self, market_code, count
+        return list(metadata)
+
+    def fake_download_image(self: object, image_url: str) -> DownloadedImage:
+        del self, image_url
+        return DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg")
+
+    monkeypatch.setattr("app.collectors.bing.BingClient.fetch_metadata", fake_fetch_metadata)
+    monkeypatch.setattr("app.collectors.bing.BingClient.download_image", fake_download_image)
+
+    with build_client(tmp_path) as client:
+        session_token = login_admin(client)
+        create_response = client.post(
+            "/api/admin/collection-tasks",
+            headers={"Authorization": f"Bearer {session_token}"},
+            json={
+                "source_type": "bing",
+                "market_code": "en-US",
+                "date_from": "2026-03-24",
+                "date_to": "2026-03-24",
+                "force_refresh": False,
+            },
+        )
+        task_id = create_response.json()["data"]["task_id"]
+        consume_response = client.post(
+            f"/api/admin/collection-tasks/{task_id}/consume",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+        detail_response = client.get(
+            f"/api/admin/collection-tasks/{task_id}",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+
+    consume_payload = consume_response.json()
+    detail_payload = detail_response.json()
+
+    assert create_response.status_code == 200
+    assert consume_response.status_code == 200
+    assert consume_payload["data"]["task_id"] == task_id
+    assert consume_payload["data"]["task_status"] == "succeeded"
+    assert consume_payload["data"]["success_count"] == 1
+    assert consume_payload["data"]["duplicate_count"] == 0
+    assert consume_payload["data"]["failure_count"] == 0
+    assert detail_response.status_code == 200
+    assert detail_payload["data"]["task_status"] == "succeeded"
+    assert detail_payload["data"]["started_at_utc"] is not None
+    assert len(detail_payload["data"]["items"]) == 1
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        audit_row = connection.execute(
+            """
+            SELECT action_type, target_type, target_id
+            FROM audit_logs
+            WHERE action_type = 'collection_task_consumed'
+              AND target_id = ?
+            ORDER BY id DESC
+            LIMIT 1;
+            """,
+            (str(task_id),),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert audit_row is not None
+    assert audit_row["target_type"] == "collection_task"
+    assert audit_row["target_id"] == str(task_id)
+
+
+def test_admin_collection_task_manual_consume_rejects_non_queued_status(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_admin_user(
+        database_path=database_path,
+        username="admin",
+        password="correct-password",
+    )
+    task_id = seed_collection_task(
+        database_path=database_path,
+        request_snapshot={
+            "source_type": "bing",
+            "market_code": "en-US",
+            "date_from": "2026-03-24",
+            "date_to": "2026-03-24",
+            "force_refresh": False,
+        },
+        task_status="succeeded",
+        error_summary=None,
+    )
+
+    with build_client(tmp_path) as client:
+        session_token = login_admin(client)
+        response = client.post(
+            f"/api/admin/collection-tasks/{task_id}/consume",
+            headers={"Authorization": f"Bearer {session_token}"},
+        )
+
+    payload = response.json()
+    assert response.status_code == 409
+    assert payload["error_code"] == "COLLECT_TASK_CONSUME_NOT_ALLOWED"
+    assert payload["message"] == "只有 queued 状态的任务允许手动触发执行"
 
 
 def test_manual_collection_consumer_updates_task_detail_and_logs(tmp_path: Path) -> None:

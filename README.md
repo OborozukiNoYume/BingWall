@@ -126,10 +126,10 @@ make verify-deploy
 
 当前 `T2.3` 已补齐内容：
 
-- `/api/admin/collection-tasks`、`/api/admin/collection-tasks/{task_id}`、`/api/admin/collection-tasks/{task_id}/retry`、`/api/admin/logs` 后台任务与结构化日志接口
-- 手动采集任务创建、任务列表、任务详情、失败任务重试、结构化日志查询和 `collection_task_items` 明细展示
+- `/api/admin/collection-tasks`、`/api/admin/collection-tasks/{task_id}`、`/api/admin/collection-tasks/{task_id}/consume`、`/api/admin/collection-tasks/{task_id}/retry`、`/api/admin/logs` 后台任务与结构化日志接口
+- 手动采集任务创建、任务列表、任务详情、`queued` 任务人工触发执行、失败任务重试、结构化日志查询和 `collection_task_items` 明细展示
 - `app.collectors.manual_tasks` 与 `make consume-collection-tasks` 队列消费入口，按 `queued -> running -> succeeded / partially_failed / failed` 更新任务状态
-- `/admin/tasks`、`/admin/tasks/{task_id}`、`/admin/logs` 后台页面，以及任务创建表单、统计摘要、错误摘要和逐条处理明细展示
+- `/admin/tasks`、`/admin/tasks/{task_id}`、`/admin/logs` 后台页面，以及任务创建表单、手动触发按钮、统计摘要、错误摘要和逐条处理明细展示
 - 手动采集与后台观测的集成测试，覆盖任务创建、消费、日志查询、重试和前端页面壳
 
 当前 `T2.4` 已补齐内容：
@@ -264,6 +264,8 @@ curl -X POST http://127.0.0.1:8000/api/admin/collection-tasks \
   -H 'Authorization: Bearer <session_token>' \
   -H 'Content-Type: application/json' \
   -d '{"source_type":"nasa_apod","market_code":"global","date_from":"2026-03-24","date_to":"2026-03-24","force_refresh":false}'
+curl -X POST -H 'Authorization: Bearer <session_token>' \
+  http://127.0.0.1:8000/api/admin/collection-tasks/1/consume
 make consume-collection-tasks
 curl -H 'Authorization: Bearer <session_token>' \
   http://127.0.0.1:8000/api/admin/collection-tasks/1

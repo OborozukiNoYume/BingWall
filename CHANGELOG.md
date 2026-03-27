@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-27T15:20:06Z
+
+### 变更内容
+
+- 更新 [app/api/admin/routes.py](app/api/admin/routes.py)、[app/services/admin_collection.py](app/services/admin_collection.py)、[app/repositories/collection_repository.py](app/repositories/collection_repository.py) 与 [app/schemas/admin_collection.py](app/schemas/admin_collection.py)，新增 `POST /api/admin/collection-tasks/{task_id}/consume` 后台接口，允许管理员手动执行指定的 `queued` 采集任务，并补齐对应审计日志
+- 更新 [web/admin/assets/admin.js](web/admin/assets/admin.js)，在后台采集任务列表页和详情页新增“立即执行”按钮，并把页面说明从“只观察 cron 消费”调整为“既支持 cron，也支持人工触发 queued 任务”
+- 更新 [tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py) 与 [tests/integration/test_admin_frontend.py](tests/integration/test_admin_frontend.py)，补齐后台手动触发成功、非 `queued` 状态拒绝和前端资源接线断言
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步本次手动触发能力、验证方式、影响范围和回滚说明
+
+### 变更原因
+
+- 当前后台“采集任务”页只能创建 `queued` 任务、查看状态和重试失败任务，缺少管理员立即执行指定排队任务的入口
+- 这会让后台页面在没有现成 `cron` 消费或需要人工补跑时，无法完成真正意义上的“手动触发”
+- 因此需要在不移除既有 `cron` 模式的前提下，为单个 `queued` 任务补一个受控、可审计的人工触发入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-27T15:20:06Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖后台采集任务 API、后台任务页面交互、采集任务执行状态流转和审计日志记录
+- 管理员现在可以在 `/admin/tasks` 列表页或任务详情页直接触发指定 `queued` 任务执行；现有 `cron` 消费入口仍然保留
+- 为避免并发冲突，非 `queued` 任务仍会被拒绝手动触发；同来源已有运行中任务时，也会拒绝本次人工触发
+- 本次不包含数据库表结构修改、来源采集规则调整、调度系统替换或自动改造为“创建即执行”
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_admin_collection.py tests/integration/test_admin_frontend.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 `POST /api/admin/collection-tasks/{task_id}/consume` 接口、回退后台页面按钮与相关测试文档，或执行 `git revert` 回退本次提交
+- 回滚后后台会恢复为“只能创建 queued 任务，再等待 cron 或命令行消费”的状态
+
 ## 2026-03-27T14:47:30Z
 
 ### 变更内容

@@ -67,6 +67,15 @@ class AdminCollectionTaskRetryData(BaseModel):
     retry_of_task_id: int
 
 
+class AdminCollectionTaskConsumeData(BaseModel):
+    task_id: int
+    task_status: CollectionTaskStatus
+    success_count: int
+    duplicate_count: int
+    failure_count: int
+    error_summary: str | None
+
+
 class AdminCollectionTaskListQuery(BaseModel):
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=20, ge=1, le=100)

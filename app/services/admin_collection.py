@@ -8,6 +8,9 @@ from sqlite3 import Row
 from typing import cast
 
 from app.api.errors import ApiError
+from app.collectors.bing import BingClient
+from app.collectors.nasa_apod import NasaApodClient
+from app.collectors.nasa_apod import NasaApodSourceAdapter
 from app.core.config import Settings
 from app.domain.collection import CollectionRunSummary
 from app.domain.collection_sources import COLLECTION_SOURCE_DEFAULT_MARKETS
@@ -15,12 +18,15 @@ from app.domain.collection_sources import COLLECTION_SOURCE_TYPES
 from app.domain.collection_sources import CollectionSourceType
 from app.repositories.admin_collection_repository import AdminCollectionRepository
 from app.repositories.collection_repository import CollectionRepository
+from app.repositories.file_storage import FileStorage
 from app.repositories.collection_repository import TaskItemCreateInput
+from app.services.bing_collection import BingSourceAdapter
 from app.services.source_collection import SourceCollectionService
 from app.services.source_collection import utc_now_isoformat
 from app.schemas.admin_auth import AdminSessionContext
 from app.schemas.admin_collection import AdminCollectionLogListData
 from app.schemas.admin_collection import AdminCollectionLogListQuery
+from app.schemas.admin_collection import AdminCollectionTaskConsumeData
 from app.schemas.admin_collection import AdminCollectionLogSummary
 from app.schemas.admin_collection import AdminCollectionTaskCreateData
 from app.schemas.admin_collection import AdminCollectionTaskCreateRequest
@@ -367,6 +373,142 @@ class ManualCollectionTaskConsumer:
             failure_count=1,
             error_summary=failure_reason,
         )
+
+
+class AdminCollectionExecutionService:
+    def __init__(
+        self,
+        *,
+        repository: CollectionRepository,
+        audit_repository: AdminCollectionRepository,
+        consumer: ManualCollectionTaskConsumer,
+        session_secret: str,
+    ) -> None:
+        self.repository = repository
+        self.audit_repository = audit_repository
+        self.consumer = consumer
+        self.session_secret = session_secret
+
+    def consume_task(
+        self,
+        *,
+        task_id: int,
+        session: AdminSessionContext,
+        trace_id: str,
+        client_ip: str | None,
+        user_agent: str | None,
+    ) -> AdminCollectionTaskConsumeData:
+        task_row = self.repository.get_collection_task(task_id=task_id)
+        if task_row is None:
+            raise ApiError(
+                status_code=404,
+                error_code="COLLECT_TASK_NOT_FOUND",
+                message="采集任务不存在",
+            )
+
+        if str(task_row["task_status"]) != "queued":
+            raise ApiError(
+                status_code=409,
+                error_code="COLLECT_TASK_CONSUME_NOT_ALLOWED",
+                message="只有 queued 状态的任务允许手动触发执行",
+            )
+
+        claimed_row = self.repository.claim_task_by_id(
+            task_id=task_id,
+            claimed_at_utc=utc_now_isoformat(),
+        )
+        if claimed_row is None:
+            latest_row = self.repository.get_collection_task(task_id=task_id)
+            if latest_row is None:
+                raise ApiError(
+                    status_code=404,
+                    error_code="COLLECT_TASK_NOT_FOUND",
+                    message="采集任务不存在",
+                )
+            if str(latest_row["task_status"]) != "queued":
+                raise ApiError(
+                    status_code=409,
+                    error_code="COLLECT_TASK_CONSUME_NOT_ALLOWED",
+                    message="任务状态已变化，不能重复手动触发",
+                )
+            raise ApiError(
+                status_code=409,
+                error_code="COLLECT_TASK_SOURCE_BUSY",
+                message="同来源已有运行中的任务，请稍后再试",
+            )
+
+        summary = self.consumer.consume_task(task_id=task_id)
+        consumed_at_utc = utc_now_isoformat()
+        self.audit_repository.insert_audit_log(
+            admin_user_id=session.admin_user_id,
+            action_type="collection_task_consumed",
+            target_type="collection_task",
+            target_id=str(task_id),
+            before_state_json=json.dumps(
+                {
+                    "task_status": "queued",
+                },
+                ensure_ascii=False,
+            ),
+            after_state_json=json.dumps(
+                {
+                    "task_status": summary.task_status,
+                    "success_count": summary.success_count,
+                    "duplicate_count": summary.duplicate_count,
+                    "failure_count": summary.failure_count,
+                    "error_summary": summary.error_summary,
+                },
+                ensure_ascii=False,
+            ),
+            request_source=build_request_source(
+                client_ip=client_ip,
+                user_agent=user_agent,
+                secret=self.session_secret,
+            ),
+            trace_id=trace_id,
+            created_at_utc=consumed_at_utc,
+        )
+        return AdminCollectionTaskConsumeData(
+            task_id=summary.task_id,
+            task_status=parse_collection_task_status(summary.task_status),
+            success_count=summary.success_count,
+            duplicate_count=summary.duplicate_count,
+            failure_count=summary.failure_count,
+            error_summary=summary.error_summary,
+        )
+
+
+def build_collection_source_services(
+    *,
+    settings: Settings,
+    repository: CollectionRepository,
+    storage: FileStorage,
+) -> dict[str, SourceCollectionService]:
+    services: dict[str, SourceCollectionService] = {}
+    if settings.collect_bing_enabled:
+        services["bing"] = SourceCollectionService(
+            repository=repository,
+            storage=storage,
+            adapter=BingSourceAdapter(
+                client=BingClient(timeout_seconds=settings.collect_bing_timeout_seconds)
+            ),
+            max_download_retries=settings.collect_bing_max_download_retries,
+            auto_publish_enabled=settings.collect_auto_publish_enabled,
+        )
+    if settings.collect_nasa_apod_enabled:
+        services["nasa_apod"] = SourceCollectionService(
+            repository=repository,
+            storage=storage,
+            adapter=NasaApodSourceAdapter(
+                client=NasaApodClient(
+                    api_key=settings.collect_nasa_apod_api_key.get_secret_value(),
+                    timeout_seconds=settings.collect_nasa_apod_timeout_seconds,
+                )
+            ),
+            max_download_retries=settings.collect_nasa_apod_max_download_retries,
+            auto_publish_enabled=settings.collect_auto_publish_enabled,
+        )
+    return services
 
 
 def is_collection_source_enabled(settings: Settings, source_type: CollectionSourceType) -> bool:

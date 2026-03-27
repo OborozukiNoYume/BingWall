@@ -17,9 +17,12 @@ from app.core.config import get_settings
 from app.repositories.admin_auth_repository import AdminAuthRepository
 from app.repositories.admin_collection_repository import AdminCollectionRepository
 from app.repositories.admin_content_repository import AdminContentRepository
+from app.repositories.collection_repository import CollectionRepository
 from app.repositories.download_repository import DownloadRepository
+from app.repositories.file_storage import FileStorage
 from app.schemas.admin_collection import AdminCollectionLogListData
 from app.schemas.admin_collection import AdminCollectionLogListQuery
+from app.schemas.admin_collection import AdminCollectionTaskConsumeData
 from app.schemas.admin_collection import AdminCollectionTaskCreateData
 from app.schemas.admin_collection import AdminCollectionTaskCreateRequest
 from app.schemas.admin_collection import AdminCollectionTaskDetailData
@@ -48,7 +51,10 @@ from app.schemas.admin_content import AdminWallpaperStatusUpdateData
 from app.schemas.admin_content import AdminWallpaperStatusUpdateRequest
 from app.schemas.common import ErrorEnvelope
 from app.schemas.common import SuccessEnvelope
+from app.services.admin_collection import AdminCollectionExecutionService
 from app.services.admin_collection import AdminCollectionService
+from app.services.admin_collection import ManualCollectionTaskConsumer
+from app.services.admin_collection import build_collection_source_services
 from app.services.admin_auth import AdminAuthService
 from app.services.admin_content import AdminContentService
 from app.services.downloads import DownloadService
@@ -126,6 +132,42 @@ def get_admin_collection_service(
         repository,
         session_secret=settings.security_session_secret.get_secret_value(),
         settings=settings,
+    )
+
+
+def get_collection_repository(
+    settings: Annotated[Settings, Depends(get_settings)],
+) -> Iterator[CollectionRepository]:
+    repository = CollectionRepository(settings.database_path)
+    try:
+        yield repository
+    finally:
+        repository.close()
+
+
+def get_admin_collection_execution_service(
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[CollectionRepository, Depends(get_collection_repository)],
+    audit_repository: Annotated[AdminCollectionRepository, Depends(get_admin_collection_repository)],
+) -> AdminCollectionExecutionService:
+    storage = FileStorage(
+        tmp_dir=settings.storage_tmp_dir,
+        public_dir=settings.storage_public_dir,
+        failed_dir=settings.storage_failed_dir,
+    )
+    consumer = ManualCollectionTaskConsumer(
+        repository=repository,
+        services=build_collection_source_services(
+            settings=settings,
+            repository=repository,
+            storage=storage,
+        ),
+    )
+    return AdminCollectionExecutionService(
+        repository=repository,
+        audit_repository=audit_repository,
+        consumer=consumer,
+        session_secret=settings.security_session_secret.get_secret_value(),
     )
 
 
@@ -495,6 +537,34 @@ def retry_admin_collection_task(
         "Admin collection task retried: new_task_id=%s original_task_id=%s",
         data.task_id,
         data.retry_of_task_id,
+    )
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.post(
+    "/collection-tasks/{task_id}/consume",
+    response_model=SuccessEnvelope[AdminCollectionTaskConsumeData],
+    responses=ERROR_RESPONSES,
+)
+def consume_admin_collection_task(
+    task_id: int,
+    request: Request,
+    session: Annotated[AdminSessionContext, Depends(require_admin_session)],
+    service: Annotated[
+        AdminCollectionExecutionService, Depends(get_admin_collection_execution_service)
+    ],
+) -> dict[str, object]:
+    data = service.consume_task(
+        task_id=task_id,
+        session=session,
+        trace_id=str(request.state.trace_id),
+        client_ip=request.client.host if request.client is not None else None,
+        user_agent=request.headers.get("user-agent"),
+    )
+    logger.info(
+        "Admin collection task consumed manually: task_id=%s task_status=%s",
+        data.task_id,
+        data.task_status,
     )
     return build_success_response(request=request, data=data.model_dump())
 
