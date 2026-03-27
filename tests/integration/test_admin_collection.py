@@ -378,6 +378,7 @@ def run_manual_consumer(
                 client=FakeBingClient(metadata=list(metadata), downloads=downloads)
             ),
             max_download_retries=2,
+            auto_publish_enabled=True,
         )
     if source_type == "nasa_apod":
         services["nasa_apod"] = SourceCollectionService(
@@ -387,6 +388,7 @@ def run_manual_consumer(
                 client=FakeNasaApodClient(metadata=list(metadata), downloads=downloads)
             ),
             max_download_retries=2,
+            auto_publish_enabled=True,
         )
     consumer = ManualCollectionTaskConsumer(
         repository=repository,

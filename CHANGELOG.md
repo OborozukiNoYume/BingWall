@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 2026-03-27T14:24:40Z
+
+### 变更内容
+
+- 更新 [app/core/config.py](app/core/config.py)、[app/services/source_collection.py](app/services/source_collection.py)、[app/services/bing_collection.py](app/services/bing_collection.py) 与 [app/repositories/collection_repository.py](app/repositories/collection_repository.py)，新增 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED` 配置，并让新采集内容在资源全部就绪后默认自动切到 `enabled + is_public=true`
+- 更新 [app/collectors/bing.py](app/collectors/bing.py)、[app/collectors/nasa_apod.py](app/collectors/nasa_apod.py) 与 [app/collectors/manual_tasks.py](app/collectors/manual_tasks.py)，让 Bing、NASA APOD 和手动任务消费三条采集入口都使用同一自动公开策略
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_multi_source_collection.py](tests/integration/test_multi_source_collection.py)、[tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py) 与 [tests/unit/test_config.py](tests/unit/test_config.py)，补齐默认自动公开、关闭自动公开后保持 `draft` 和配置加载验证
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/system-design.md](docs/system-design.md)、[docs/data-model.md](docs/data-model.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)、[.env.example](.env.example) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，同步默认自动公开口径、关闭方式和排障说明
+
+### 变更原因
+
+- 当前采集链路会先把新内容写成 `draft + is_public=0`，导致采集成功后公开 API 仍然返回空列表，必须再手工改库才能看到内容
+- 直接把入库默认值改成 `enabled` 不可行，因为数据库约束要求 `enabled` 必须搭配 `resource_status = ready`
+- 因此需要在资源全部就绪后再自动公开，并保留一个可关闭的配置开关，兼顾当前需求和后续回退到人工审核的可能性
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 新增配置项：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`
+- 变更时间：`2026-03-27T14:24:40Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Bing、NASA APOD、手动任务消费三条采集入口，以及相关测试与文档
+- 当前默认配置下，新采集内容会在原图、缩略图、预览图和下载图全部就绪后自动切到 `enabled` 且 `is_public = true`
+- 当 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false` 时，新采集内容仍保持 `draft`，沿用人工审核后再发布的旧流程
+- 本次不包含历史 `draft` 数据批量发布、后台页面改造、公开前端筛选改造或数据库表结构调整
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_bing_collection_service.py tests/integration/test_multi_source_collection.py tests/integration/test_admin_collection.py tests/unit/test_config.py`
+- 执行 `./.venv/bin/python -m ruff check app tests`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除自动公开配置和资源就绪后的自动发布接线、回退相关测试与文档更新，或执行 `git revert` 回退本次提交
+- 回滚后仓库将恢复到“新采集内容默认保持 draft，需要后台或手工改库后才会公开显示”的状态
+
 ## 2026-03-27T13:41:00Z
 
 ### 变更内容

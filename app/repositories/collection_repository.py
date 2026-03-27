@@ -606,6 +606,21 @@ class CollectionRepository:
         )
         self.connection.commit()
 
+    def auto_publish_wallpaper_if_ready(self, *, wallpaper_id: int, processed_at_utc: str) -> None:
+        self.connection.execute(
+            """
+            UPDATE wallpapers
+            SET content_status = 'enabled',
+                is_public = 1,
+                updated_at_utc = ?
+            WHERE id = ?
+              AND content_status = 'draft'
+              AND resource_status = 'ready';
+            """,
+            (processed_at_utc, wallpaper_id),
+        )
+        self.connection.commit()
+
     def fetch_one(self, query: str, parameters: tuple[Any, ...] = ()) -> sqlite3.Row | None:
         row = self.connection.execute(query, parameters).fetchone()
         return cast(sqlite3.Row | None, row)

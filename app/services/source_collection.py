@@ -68,11 +68,13 @@ class SourceCollectionService:
         storage: FileStorage,
         adapter: CollectionSourceAdapter,
         max_download_retries: int,
+        auto_publish_enabled: bool = True,
     ) -> None:
         self.repository = repository
         self.storage = storage
         self.adapter = adapter
         self.max_download_retries = max_download_retries
+        self.auto_publish_enabled = auto_publish_enabled
 
     def collect(
         self,
@@ -452,6 +454,11 @@ class SourceCollectionService:
             wallpaper_id=wallpaper_id,
             processed_at_utc=utc_now_isoformat(),
         )
+        if self.auto_publish_enabled:
+            self.repository.auto_publish_wallpaper_if_ready(
+                wallpaper_id=wallpaper_id,
+                processed_at_utc=utc_now_isoformat(),
+            )
 
     def _download_original_image(
         self,

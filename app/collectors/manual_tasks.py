@@ -43,6 +43,7 @@ def main() -> None:
                 client=BingClient(timeout_seconds=settings.collect_bing_timeout_seconds)
             ),
             max_download_retries=settings.collect_bing_max_download_retries,
+            auto_publish_enabled=settings.collect_auto_publish_enabled,
         )
     if settings.collect_nasa_apod_enabled:
         services["nasa_apod"] = SourceCollectionService(
@@ -55,6 +56,7 @@ def main() -> None:
                 )
             ),
             max_download_retries=settings.collect_nasa_apod_max_download_retries,
+            auto_publish_enabled=settings.collect_auto_publish_enabled,
         )
     if not services:
         raise RuntimeError("No collection sources are enabled by configuration.")

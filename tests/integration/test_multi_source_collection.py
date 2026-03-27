@@ -99,6 +99,8 @@ def test_nasa_apod_collection_persists_source_specific_records(tmp_path: Path) -
     assert wallpaper["source_type"] == "nasa_apod"
     assert wallpaper["market_code"] == "global"
     assert wallpaper["source_name"] == "NASA APOD"
+    assert wallpaper["content_status"] == "enabled"
+    assert wallpaper["is_public"] == 1
     assert len(resources) == 4
     assert all(str(resource["relative_path"]).startswith("nasa_apod/") for resource in resources)
     assert all(resource["image_status"] == "ready" for resource in resources)

@@ -189,6 +189,7 @@ def main() -> None:
             )
         ),
         max_download_retries=settings.collect_nasa_apod_max_download_retries,
+        auto_publish_enabled=settings.collect_auto_publish_enabled,
     )
     try:
         summary = service.collect(

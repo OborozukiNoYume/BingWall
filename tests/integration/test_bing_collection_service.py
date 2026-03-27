@@ -66,7 +66,8 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert summary.failure_count == 0
     assert len(wallpapers) == 1
     assert wallpapers[0]["resource_status"] == "ready"
-    assert wallpapers[0]["content_status"] == "draft"
+    assert wallpapers[0]["content_status"] == "enabled"
+    assert wallpapers[0]["is_public"] == 1
     assert len(resources) == 4
     assert {str(resource["resource_type"]) for resource in resources} == {
         "original",
@@ -133,6 +134,44 @@ def test_bing_collection_service_skips_business_key_duplicates(tmp_path: Path) -
     assert wallpaper_count == 1
     assert latest_task["duplicate_count"] == 1
     assert latest_item["dedupe_hit_type"] == "business_key"
+
+
+def test_bing_collection_service_can_keep_new_wallpaper_in_draft_when_auto_publish_disabled(
+    tmp_path: Path,
+) -> None:
+    service, database_path, _storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.DraftOnly",
+                source_url="https://www.bing.com/th?id=OHR.DraftOnly_1920x1080.jpg&pid=hp",
+            )
+        ],
+        downloads=[DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg")],
+        auto_publish_enabled=False,
+    )
+
+    try:
+        summary = service.collect(
+            market_code="en-US", count=1, trigger_type="manual", triggered_by="test"
+        )
+    finally:
+        service.repository.close()
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper = connection.execute("SELECT * FROM wallpapers LIMIT 1;").fetchone()
+    finally:
+        connection.close()
+
+    assert summary.task_status == "succeeded"
+    assert wallpaper is not None
+    assert wallpaper["resource_status"] == "ready"
+    assert wallpaper["content_status"] == "draft"
+    assert wallpaper["is_public"] == 0
 
 
 def test_bing_collection_service_marks_failed_after_retry_exhaustion(tmp_path: Path) -> None:
@@ -308,6 +347,7 @@ def build_service(
     metadata: list[BingImageMetadata],
     downloads: list[DownloadedImage],
     max_download_retries: int = 2,
+    auto_publish_enabled: bool = True,
 ) -> tuple[BingCollectionService, Path, FileStorage]:
     database_path = tmp_path / "bingwall.sqlite3"
     migrate_database(database_path)
@@ -322,6 +362,7 @@ def build_service(
         storage=storage,
         bing_client=FakeBingClient(metadata=metadata, downloads=downloads),
         max_download_retries=max_download_retries,
+        auto_publish_enabled=auto_publish_enabled,
     )
     return service, database_path, storage
 

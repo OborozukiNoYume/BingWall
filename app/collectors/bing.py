@@ -121,6 +121,7 @@ def main() -> None:
         storage=storage,
         bing_client=BingClient(timeout_seconds=settings.collect_bing_timeout_seconds),
         max_download_retries=settings.collect_bing_max_download_retries,
+        auto_publish_enabled=settings.collect_auto_publish_enabled,
     )
     try:
         summary = service.collect(

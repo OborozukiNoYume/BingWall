@@ -159,17 +159,38 @@ kill -9 <PID>
 采集成功返回 `success_count=8`，但 API 仍返回 `items: []`
 
 ### 原因
-采集的壁纸默认状态为 `is_public=0` 且 `content_status='draft'`，公开 API 只显示 `is_public=1` 且 `content_status='enabled'` 的壁纸。
+当前版本默认会在采集资源全部就绪后自动把新内容切到 `is_public=1` 且 `content_status='enabled'`。如果仍然看不到，常见原因通常是以下两类之一：
+
+- 配置里把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED` 关闭了，此时新采集内容会保留为 `draft`
+- 资源未全部就绪，或后续巡检把异常内容降级为 `disabled`
 
 ### 解决方案
-手动更新数据库将壁纸设为公开：
+先确认当前配置与数据库状态：
 ```bash
 .venv/bin/python -c "
 import sqlite3
 conn = sqlite3.connect('var/data/bingwall.sqlite3')
-conn.execute('UPDATE wallpapers SET is_public=1, content_status=\"enabled\"')
+rows = conn.execute('SELECT id, content_status, is_public, resource_status FROM wallpapers ORDER BY id DESC LIMIT 5').fetchall()
+print(rows)
+conn.close()
+"
+```
+
+如果希望新采集内容自动公开，确保 `.env` 或运行环境里有：
+
+```bash
+BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=true
+```
+
+如果你是有意关闭了自动公开，也可以再手动发布指定内容：
+
+```bash
+.venv/bin/python -c "
+import sqlite3
+conn = sqlite3.connect('var/data/bingwall.sqlite3')
+conn.execute('UPDATE wallpapers SET is_public=1, content_status=\"enabled\" WHERE id=?', (1,))
 conn.commit()
-print(f'已更新 {conn.total_changes} 条记录')
+print('已手动发布指定内容')
 conn.close()
 "
 ```

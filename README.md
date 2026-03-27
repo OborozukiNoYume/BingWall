@@ -76,6 +76,7 @@ make verify-deploy
 - 验收默认使用临时本地端口 `18080`，避免占用真实系统 `80` 端口，不会改写 `/etc/systemd/system` 或现有 Nginx 配置。
 - 本机需要可用的 `docker`、`systemd-run`、`systemctl --user`、`systemd-analyze` 和 `systemd-tmpfiles`。
 - 如需首次自动创建后台管理员，请在 `.env` 中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 和 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`，然后执行 `make db-migrate`；该初始化只会在 `admin_users` 为空时创建一个状态为 `enabled` 的 `super_admin`。
+- 新采集内容当前默认会在资源全部就绪后自动公开；如需改回“采集后待审核”，可把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`。
 
 当前 `T1.1` 到 `T1.6` 已补齐内容：
 
@@ -94,6 +95,7 @@ make verify-deploy
 - SQLite 版本化迁移基线与核心表结构
 - 空库初始化与重复执行迁移能力
 - Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动
+- 新采集内容默认会在资源全部就绪后自动切到 `enabled + is_public=true`；如需保留人工审核，可通过 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false` 关闭自动公开
 - `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 八个公开接口
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
 - 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword`、`tag_keys`、`date_from`、`date_to` 组合查询，其中日期格式固定为 `YYYY-MM-DD`，且按 `wallpaper_date` 做包含边界的范围过滤；`/api/public/wallpapers/today` 按 UTC 当天匹配并优先默认市场，`/api/public/wallpapers/random` 仅从当前公开可见内容中随机返回

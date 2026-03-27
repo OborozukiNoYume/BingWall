@@ -339,7 +339,8 @@
 - `image_status` 是资源表的真实状态，`resource_status` 是壁纸表上用于查询优化和展示的资源状态快照；两者语义必须保持一致
 - `image_resources` 写入、资源巡检和后台状态变更都必须经过统一领域规则，同步刷新 `resource_status`
 - 公开列表和详情只能返回同时满足以下条件的数据：`content_status = enabled`、`is_public = true`、资源真实状态为 `image_status = ready`，且当前时间处于发布时间窗口内（如设置了开始或结束时间）
-- 新采集内容默认 `draft`
+- 新采集内容在当前默认配置下会在资源全部就绪后自动转为 `enabled` 且 `is_public = true`
+- 当 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED = false` 时，新采集内容保持 `draft`
 - 新资源默认 `pending`
 - 资源失败时，关联内容不得进入公开状态
 - `is_downloadable = false` 时，内容可以继续公开展示，但下载地址不得返回给公开端

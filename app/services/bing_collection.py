@@ -53,6 +53,7 @@ class BingCollectionService:
         storage: FileStorage,
         bing_client: BingClientProtocol,
         max_download_retries: int,
+        auto_publish_enabled: bool = True,
     ) -> None:
         self.repository = repository
         self.delegate = SourceCollectionService(
@@ -60,6 +61,7 @@ class BingCollectionService:
             storage=storage,
             adapter=BingSourceAdapter(client=bing_client),
             max_download_retries=max_download_retries,
+            auto_publish_enabled=auto_publish_enabled,
         )
 
     def collect(
