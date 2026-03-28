@@ -262,7 +262,7 @@
 说明：
 
 - `thumbnail_url`、`preview_url`、`download_url` 统一表示“可公开访问的资源地址”
-- `download_variants[*]` 返回当前公开可下载的全部分辨率资源；`download_url` 固定指向默认下载资源，当前优先选择最高分辨率
+- `download_variants[*]` 返回当前公开可下载的全部分辨率资源；Bing 当前按官方 15 种分辨率口径生成该列表，`download_url` 固定指向默认下载资源，当前优先选择最高分辨率
 - 当资源来自本地正式目录时，地址表现为 `/images/<relative_path>`
 - 当资源来自 OSS/CDN 时，地址表现为配置好的绝对公网地址，例如 `https://cdn.example.com/bingwall/<relative_path>`
 
