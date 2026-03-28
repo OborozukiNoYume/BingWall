@@ -1,0 +1,13 @@
+# BingWall cron 示例
+#
+# 部署前请根据目标机实际路径调整以下内容：
+# - 应用目录：/opt/bingwall/app
+# - Python 虚拟环境：/opt/bingwall/app/.venv/bin/python
+# - 日志目录：/var/log/bingwall
+#
+# 说明：
+# - 第 1 条每天创建“当天固定日期”的 cron 采集任务
+# - 第 2 条每分钟消费一次任务队列，真正执行下载
+
+15 3 * * * cd /opt/bingwall/app && ./.venv/bin/python scripts/create_scheduled_collection_tasks.py >> /var/log/bingwall/create-scheduled-collection-tasks.log 2>&1
+* * * * * cd /opt/bingwall/app && ./.venv/bin/python -m app.collectors.manual_tasks --max-tasks 5 >> /var/log/bingwall/consume-collection-tasks.log 2>&1

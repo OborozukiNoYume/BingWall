@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-28T14:34:00Z
+
+### 变更内容
+
+- 新增 [app/services/scheduled_collection.py](app/services/scheduled_collection.py)、[scripts/create_scheduled_collection_tasks.py](scripts/create_scheduled_collection_tasks.py) 与 [deploy/cron/bingwall-cron](deploy/cron/bingwall-cron)，补齐“按当天 UTC 日期创建固定日期采集任务”的定时入口；脚本会为已启用来源写入 `trigger_type = cron`、`task_type = scheduled_collect`、`date_from = date_to = 当天` 的 `queued` 任务，并在同来源同日期已有非失败 cron 任务时保守跳过
+- 更新 [app/repositories/admin_collection_repository.py](app/repositories/admin_collection_repository.py) 与 [Makefile](Makefile)，补充定时建任务所需的近期任务查询方法、`make create-scheduled-collection-tasks` 命令，以及本地联调便捷入口 `make scheduled-collect`
+- 新增 [tests/integration/test_scheduled_collection.py](tests/integration/test_scheduled_collection.py)，覆盖定时任务创建、同日非失败任务跳过、失败任务允许重建三个关键场景
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步本次定时采集落地方式、影响范围、验证步骤、部署示例与回滚说明
+
+### 变更原因
+
+- 当前后台手动采集已经支持固定日期范围，但仓库里缺少“每天自动按当天日期建任务”的脚本和 `cron` 模板，导致自动采集仍停留在设计层，没有形成可直接部署的闭环
+- 直接新起一套独立下载逻辑风险较高，会绕开现有任务状态、日志、重试与后台观测链路
+- 因此本次采用更保守的方案：只新增“定时建任务”这一层薄封装，继续复用现有任务消费器执行实际下载
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-28T14:34:00Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖定时采集任务创建脚本、目标机 `cron` 示例模板、命令入口、后台任务记录与对应的集成测试
+- 管理后台现在可以看到由 `cron` 自动创建的固定日期采集任务，任务详情中的 `date_from` / `date_to` 会明确显示具体日期，而不是只表现为“最近 N 张”
+- 本次不包含后台页面改版、数据库结构调整、调度系统替换、消息队列引入或现有采集下载主链路重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_scheduled_collection.py tests/integration/test_admin_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 `scripts/create_scheduled_collection_tasks.py`、`deploy/cron/bingwall-cron`、`make create-scheduled-collection-tasks` / `make scheduled-collect` 入口，以及对应测试和文档更新，或执行 `git revert` 回退本次提交
+- 回滚后仓库将恢复为“只能后台手动创建固定日期任务，或由现有消费器执行 queued 任务，但不提供每日自动创建当天任务脚本”的状态
+
 ## 2026-03-27T16:46:29Z
 
 ### 变更内容

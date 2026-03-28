@@ -158,6 +158,33 @@ class AdminCollectionRepository:
         ).fetchall()
         return list(rows)
 
+    def list_recent_tasks_for_source(
+        self,
+        *,
+        source_type: str,
+        trigger_type: str,
+        limit: int = 20,
+    ) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            """
+            SELECT
+                id,
+                task_type,
+                source_type,
+                trigger_type,
+                task_status,
+                request_snapshot_json,
+                created_at_utc
+            FROM collection_tasks
+            WHERE source_type = ?
+              AND trigger_type = ?
+            ORDER BY created_at_utc DESC, id DESC
+            LIMIT ?;
+            """,
+            (source_type, trigger_type, limit),
+        ).fetchall()
+        return list(rows)
+
     def list_logs(self, *, query: AdminCollectionLogListQuery) -> tuple[list[sqlite3.Row], int]:
         filters, parameters = self._build_log_filters(query=query)
         count_row = self.connection.execute(

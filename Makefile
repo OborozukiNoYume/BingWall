@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod consume-collection-tasks inspect-resources backup restore verify-backup-restore run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources backup restore verify-backup-restore run clean
 
 MARKET ?= en-US
 COUNT ?= 1
@@ -21,7 +21,7 @@ lint:
 	$(VENV_PYTHON) -m ruff check .
 
 typecheck:
-	$(VENV_PYTHON) -m mypy app tests scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py
+	$(VENV_PYTHON) -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py
 
 test:
 	$(VENV_PYTHON) -m pytest
@@ -39,6 +39,13 @@ collect-bing:
 
 collect-nasa-apod:
 	$(VENV_PYTHON) -m app.collectors.nasa_apod --market $(MARKET)
+
+create-scheduled-collection-tasks:
+	$(VENV_PYTHON) scripts/create_scheduled_collection_tasks.py
+
+scheduled-collect:
+	$(VENV_PYTHON) scripts/create_scheduled_collection_tasks.py
+	$(VENV_PYTHON) -m app.collectors.manual_tasks --max-tasks 5
 
 consume-collection-tasks:
 	$(VENV_PYTHON) -m app.collectors.manual_tasks

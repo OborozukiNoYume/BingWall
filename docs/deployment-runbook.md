@@ -176,6 +176,8 @@
 - 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 自动公开开关：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`，默认 `true`；开启时，新采集内容会在资源全部就绪后自动公开
 - 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
+- 定时固定日期建任务命令：`make create-scheduled-collection-tasks`
+- 本地联调便捷命令：`make scheduled-collect`
 - 手动采集任务消费命令：`make consume-collection-tasks`
 - 资源巡检命令：`make inspect-resources`
 - 备份命令：`make backup`
@@ -189,6 +191,7 @@
 - `systemd` 服务模板：`deploy/systemd/bingwall-api.service`
 - 目录权限模板：`deploy/systemd/bingwall.tmpfiles.conf`
 - Nginx 路由模板：`deploy/nginx/bingwall.conf`
+- `cron` 示例模板：`deploy/cron/bingwall-cron`
 
 ### 仓库内自动化部署验收
 
@@ -248,12 +251,30 @@
 
 ### 定时任务
 
-后续必须补齐：
+当前仓库已提供：
 
-- 自动采集 cron 表达式
-- 手动任务消费 cron 表达式
-- 巡检 cron 表达式
-- 备份 cron 表达式
+- `scripts/create_scheduled_collection_tasks.py`：按当天 UTC 日期为每个已启用来源创建一条 `queued` 的 `scheduled_collect` 任务，任务快照固定写入 `date_from=date_to=当天`
+- `deploy/cron/bingwall-cron`：目标机 `cron` 配置示例，包含“每日创建固定日期采集任务”和“每分钟消费采集队列”两条示例
+
+行为说明：
+
+- Bing 定时任务会写入 `count=8`，先读取最近 `8` 天元数据，再按固定日期过滤，降低上游切日边界漏采风险
+- NASA APOD 定时任务写入 `count=1`，直接固定到当天日期
+- 若同来源同日期已存在 `queued`、`running`、`succeeded` 或 `partially_failed` 的 `cron` 任务，新脚本会跳过创建，避免重复堆积；若历史任务为 `failed`，则允许重建
+
+建议部署步骤：
+
+1. 复制 `deploy/cron/bingwall-cron` 到目标机 `cron` 配置位置
+2. 根据真实路径调整 `/opt/bingwall/app`、`.venv/bin/python` 和 `/var/log/bingwall`
+3. 执行 `crontab -l`、`crontab <file>` 或系统级安装命令完成加载
+4. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
+5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron` 且日期固定
+
+当前目标机仍需补齐：
+
+- `cron` 安装与服务启用
+- 生产机表达式加载与日志轮转确认
+- 巡检与备份表达式补充
 
 ### 健康检查
 
