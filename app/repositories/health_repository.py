@@ -4,8 +4,8 @@ from pathlib import Path
 import sqlite3
 from typing import cast
 
+from app.domain.resource_variants import derive_resource_status
 from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
-from app.domain.resource_variants import expected_resource_types
 from app.repositories.sqlite import connect_sqlite
 
 
@@ -130,25 +130,13 @@ class HealthRepository:
                 msg = f"Wallpaper {wallpaper_id} not found while syncing missing resource."
                 raise RuntimeError(msg)
 
-            ready_resource_types = {
-                str(row["resource_type"])
-                for row in resource_rows
-                if str(row["image_status"]) == "ready"
-            }
-            failed_resource_types = {
-                str(row["resource_type"])
-                for row in resource_rows
-                if str(row["image_status"]) == "failed"
-            }
-            expected_types = set(
-                expected_resource_types(is_downloadable=bool(wallpaper_row["is_downloadable"]))
+            resource_status = derive_resource_status(
+                resources=[
+                    (str(row["resource_type"]), str(row["image_status"]))
+                    for row in resource_rows
+                ],
+                is_downloadable=bool(wallpaper_row["is_downloadable"]),
             )
-
-            resource_status = "pending"
-            if expected_types.issubset(ready_resource_types):
-                resource_status = "ready"
-            elif expected_types.intersection(failed_resource_types):
-                resource_status = "failed"
 
             default_resource_id: int | None = None
             for row in resource_rows:

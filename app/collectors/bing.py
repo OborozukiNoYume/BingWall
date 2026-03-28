@@ -10,6 +10,8 @@ from pathlib import Path
 import re
 from time import sleep
 from typing import Any
+from urllib.error import HTTPError
+from urllib.parse import parse_qsl
 from urllib.parse import parse_qs
 from urllib.parse import urlencode
 from urllib.parse import urljoin
@@ -20,6 +22,7 @@ from urllib.request import urlopen
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.domain.collection import BingImageMetadata
+from app.domain.collection import CollectedDownloadVariant
 from app.domain.collection import DownloadedImage
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.file_storage import FileStorage
@@ -32,6 +35,35 @@ BING_BASE_URL = "https://www.bing.com"
 BING_METADATA_PATH = "/HPImageArchive.aspx"
 IMAGE_ID_PATTERN = re.compile(r"(?:^|[?&])id=([^&]+)")
 DIMENSION_PATTERN = re.compile(r"_(\d+)x(\d+)\.(?:jpg|jpeg|png|webp)$", re.IGNORECASE)
+UHD_PATTERN = re.compile(r"_UHD\.(?:jpg|jpeg|png|webp)$", re.IGNORECASE)
+
+BING_DOWNLOAD_VARIANT_CANDIDATES: tuple[tuple[str, int | None, int | None], ...] = (
+    ("UHD", 3840, 2160),
+    ("1920x1200", 1920, 1200),
+    ("1920x1080", 1920, 1080),
+    ("1366x768", 1366, 768),
+    ("1280x768", 1280, 768),
+    ("1280x720", 1280, 720),
+    ("1080x1920", 1080, 1920),
+    ("1024x768", 1024, 768),
+    ("800x600", 800, 600),
+    ("800x480", 800, 480),
+    ("768x1280", 768, 1280),
+    ("768x1024", 768, 1024),
+    ("640x480", 640, 480),
+    ("640x360", 640, 360),
+    ("480x800", 480, 800),
+    ("480x640", 480, 640),
+    ("360x480", 360, 480),
+    ("320x240", 320, 240),
+    ("240x320", 240, 320),
+)
+
+
+class BingImageDownloadError(RuntimeError):
+    def __init__(self, message: str, *, status_code: int | None) -> None:
+        super().__init__(message)
+        self.status_code = status_code
 
 
 class BingClient:
@@ -58,20 +90,46 @@ class BingClient:
 
     def download_image(self, image_url: str) -> DownloadedImage:
         request = Request(url=image_url, headers={"User-Agent": "BingWall/0.1"})
-        mime_type, content = read_binary_with_retry(
-            request=request,
-            timeout_seconds=self.timeout_seconds,
-            attempts=2,
-        )
+        try:
+            mime_type, content = read_binary_with_retry(
+                request=request,
+                timeout_seconds=self.timeout_seconds,
+                attempts=2,
+            )
+        except HTTPError as exc:
+            raise BingImageDownloadError(
+                f"image request failed with HTTP {exc.code}: {image_url}",
+                status_code=exc.code,
+            ) from exc
+        except RuntimeError as exc:
+            raise BingImageDownloadError(str(exc), status_code=None) from exc
         return DownloadedImage(content=content, mime_type=mime_type)
 
     def _map_image_payload(self, *, market_code: str, payload: dict[str, Any]) -> BingImageMetadata:
         wallpaper_date = parse_bing_date(str(payload["startdate"]))
         origin_image_url = urljoin(BING_BASE_URL, str(payload["url"]))
+        download_variants = build_download_variants(
+            image_url=origin_image_url,
+            urlbase=normalize_optional_text(payload.get("urlbase")),
+            is_downloadable=bool(payload.get("wp")),
+        )
         source_id = extract_source_id(str(payload.get("urlbase") or payload["url"]))
         source_key = f"bing:{market_code}:{wallpaper_date.isoformat()}:{source_id}"
-        width, height = parse_dimensions_from_url(origin_image_url)
-        raw_extra_json = json.dumps(payload, ensure_ascii=False, sort_keys=True)
+        primary_variant = download_variants[0] if download_variants else None
+        width, height = parse_dimensions_from_url(
+            primary_variant.source_url if primary_variant is not None else origin_image_url
+        )
+        raw_payload = dict(payload)
+        raw_payload["download_variants"] = [
+            {
+                "variant_key": variant.variant_key,
+                "source_url": variant.source_url,
+                "width": variant.width,
+                "height": variant.height,
+            }
+            for variant in download_variants
+        ]
+        raw_extra_json = json.dumps(raw_payload, ensure_ascii=False, sort_keys=True)
         return BingImageMetadata(
             market_code=market_code,
             wallpaper_date=wallpaper_date,
@@ -86,6 +144,7 @@ class BingClient:
             origin_width=width,
             origin_height=height,
             raw_extra_json=raw_extra_json,
+            download_variants=download_variants,
         )
 
 
@@ -174,10 +233,15 @@ def extract_source_id(value: str) -> str:
 
 
 def parse_dimensions_from_url(image_url: str) -> tuple[int | None, int | None]:
-    match = DIMENSION_PATTERN.search(image_url)
-    if match is None:
-        return None, None
-    return int(match.group(1)), int(match.group(2))
+    parsed_url = urlparse(image_url)
+    candidates = [*parse_qs(parsed_url.query).get("id", []), parsed_url.path, image_url]
+    for candidate in candidates:
+        if UHD_PATTERN.search(candidate):
+            return 3840, 2160
+        match = DIMENSION_PATTERN.search(candidate)
+        if match is not None:
+            return int(match.group(1)), int(match.group(2))
+    return None, None
 
 
 def normalize_optional_text(value: Any) -> str | None:
@@ -195,6 +259,87 @@ def build_bing_relative_path(item: BingImageMetadata) -> str:
         source_key=item.source_key,
         origin_image_url=item.origin_image_url,
     )
+
+
+def build_download_variants(
+    *,
+    image_url: str,
+    urlbase: str | None,
+    is_downloadable: bool,
+) -> tuple[CollectedDownloadVariant, ...]:
+    if not is_downloadable or not urlbase:
+        return ()
+
+    parsed_image_url = urlparse(image_url)
+    file_ext = extract_file_ext_from_bing_image_url(image_url)
+    passthrough_query = [
+        (key, value)
+        for key, value in parse_qsl(parsed_image_url.query, keep_blank_values=True)
+        if key != "id"
+    ]
+    original_width, original_height = parse_dimensions_from_url(image_url)
+    original_variant_key = (
+        "UHD"
+        if UHD_PATTERN.search(image_url)
+        else f"{original_width}x{original_height}"
+        if original_width is not None and original_height is not None
+        else None
+    )
+
+    variants: list[CollectedDownloadVariant] = []
+    seen_variant_keys: set[str] = set()
+    for variant_key, width, height in BING_DOWNLOAD_VARIANT_CANDIDATES:
+        if variant_key in seen_variant_keys:
+            continue
+        variants.append(
+            CollectedDownloadVariant(
+                variant_key=variant_key,
+                source_url=build_variant_image_url(
+                    urlbase=urlbase,
+                    variant_key=variant_key,
+                    file_ext=file_ext,
+                    passthrough_query=passthrough_query,
+                ),
+                width=width,
+                height=height,
+            )
+        )
+        seen_variant_keys.add(variant_key)
+
+    if original_variant_key is not None and original_variant_key not in seen_variant_keys:
+        variants.append(
+            CollectedDownloadVariant(
+                variant_key=original_variant_key,
+                source_url=image_url,
+                width=original_width,
+                height=original_height,
+            )
+        )
+    return tuple(variants)
+
+
+def build_variant_image_url(
+    *,
+    urlbase: str,
+    variant_key: str,
+    file_ext: str,
+    passthrough_query: list[tuple[str, str]],
+) -> str:
+    suffix = f"_UHD.{file_ext}" if variant_key == "UHD" else f"_{variant_key}.{file_ext}"
+    candidate = f"{urlbase}{suffix}"
+    if passthrough_query:
+        candidate = f"{candidate}&{urlencode(passthrough_query)}"
+    return urljoin(BING_BASE_URL, candidate)
+
+
+def extract_file_ext_from_bing_image_url(image_url: str) -> str:
+    parsed_url = urlparse(image_url)
+    query_id = parse_qs(parsed_url.query).get("id", [])
+    for candidate in (*query_id, parsed_url.path):
+        suffix = Path(candidate).suffix.lstrip(".").lower()
+        if suffix:
+            return suffix
+    return "jpg"
 
 
 def read_json_with_retry(

@@ -100,7 +100,7 @@ make verify-deploy
 - 空库初始化与重复执行迁移能力
 - Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动
 - 新采集内容默认会在资源全部就绪后自动切到 `enabled + is_public=true`；如需保留人工审核，可通过 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false` 关闭自动公开
-- `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 八个公开接口
+- `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 八个公开接口；其中公开详情现会返回默认下载地址和 `download_variants` 多分辨率下载列表
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
 - 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword`、`tag_keys`、`date_from`、`date_to` 组合查询，其中日期格式固定为 `YYYY-MM-DD`，且按 `wallpaper_date` 做包含边界的范围过滤；`/api/public/wallpapers/today` 按 UTC 当天匹配并优先默认市场，`/api/public/wallpapers/random` 仅从当前公开可见内容中随机返回
 - `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面；其中首页已直接展示“今日壁纸 API”和“随机壁纸 API”两个快捷入口，便于访客快速查看单条公开接口返回
@@ -170,7 +170,7 @@ make verify-deploy
 当前 `T3.3` 已补齐内容：
 
 - `app/services/image_variants.py`、`app/domain/resource_variants.py` 与 `V0004__image_resource_variants.sql`，把资源类型规范扩展为 `original` / `thumbnail` / `preview` / `download`
-- 采集主链路在原图入库后生成缩略图、详情预览图和下载图；公开列表默认使用缩略图，公开详情区分预览图与下载图
+- 采集主链路在原图入库后生成缩略图、详情预览图和下载图；其中 Bing 来源现会把同一壁纸的多种官方分辨率分别保存为多条 `download` 资源，公开列表默认使用缩略图，公开详情区分预览图、默认下载图和多分辨率下载列表
 - 资源状态联动与资源巡检已按多版本资源完整性统一判断，并保留对历史仅原图数据的保守回退
 
 当前 `T3.4` 已补齐内容：
@@ -208,6 +208,9 @@ curl http://127.0.0.1:30003/api/public/wallpapers/1
 curl -X POST http://127.0.0.1:30003/api/public/download-events \
   -H 'Content-Type: application/json' \
   -d '{"wallpaper_id":1,"download_channel":"public_detail"}'
+curl -X POST http://127.0.0.1:30003/api/public/download-events \
+  -H 'Content-Type: application/json' \
+  -d '{"wallpaper_id":1,"resource_id":101,"download_channel":"public_detail"}'
 ```
 
 公开前端最小验证示例：

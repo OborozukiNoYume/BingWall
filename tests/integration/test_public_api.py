@@ -184,6 +184,89 @@ def test_public_wallpaper_detail_distinguishes_preview_and_download_resources(
     )
 
 
+def test_public_wallpaper_detail_returns_all_download_resolution_variants(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="All download variants",
+        include_download_resource=True,
+        download_variant_specs=[
+            ("UHD", 3840, 2160),
+            ("1920x1080", 1920, 1080),
+            ("480x800", 480, 800),
+        ],
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get(f"/api/public/wallpapers/{wallpaper_id}")
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["data"]["download_url"] == (
+        "/images/bing/2026/03/en-US/all-download-variants--download-uhd.jpg"
+    )
+    assert [item["variant_key"] for item in payload["data"]["download_variants"]] == [
+        "UHD",
+        "1920x1080",
+        "480x800",
+    ]
+    assert [item["width"] for item in payload["data"]["download_variants"]] == [3840, 1920, 480]
+
+
+def test_public_download_event_can_target_specific_download_variant_resource(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    wallpaper_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Specific download variant",
+        include_download_resource=True,
+        download_variant_specs=[
+            ("UHD", 3840, 2160),
+            ("1920x1080", 1920, 1080),
+        ],
+    )
+    connection = sqlite3.connect(database_path)
+    try:
+        variant_resource_id = int(
+            connection.execute(
+                """
+                SELECT id
+                FROM image_resources
+                WHERE wallpaper_id = ?
+                  AND resource_type = 'download'
+                  AND variant_key = '1920x1080'
+                LIMIT 1;
+                """,
+                (wallpaper_id,),
+            ).fetchone()[0]
+        )
+    finally:
+        connection.close()
+
+    with build_client(tmp_path) as client:
+        response = client.post(
+            "/api/public/download-events",
+            json={
+                "wallpaper_id": wallpaper_id,
+                "resource_id": variant_resource_id,
+                "download_channel": "public_detail",
+            },
+        )
+
+    payload = response.json()
+    assert response.status_code == 200
+    assert payload["data"]["redirect_url"] == (
+        "/images/bing/2026/03/en-US/specific-download-variant--download-1920x1080.jpg"
+    )
+
+
 def test_public_today_wallpaper_prefers_default_market_for_current_utc_date(
     tmp_path: Path,
 ) -> None:
@@ -838,6 +921,7 @@ def seed_wallpaper(
     publish_start_at_utc: str = "2000-01-01T00:00:00Z",
     publish_end_at_utc: str | None = "2100-01-01T00:00:00Z",
     include_download_resource: bool = False,
+    download_variant_specs: list[tuple[str, int, int]] | None = None,
     original_storage_backend: str = "local",
     thumbnail_storage_backend: str | None = None,
     preview_storage_backend: str | None = None,
@@ -976,19 +1060,24 @@ def seed_wallpaper(
             failure_reason=failure_reason,
         )
         if is_downloadable and include_download_resource:
-            _seed_variant_resource(
-                connection=connection,
-                wallpaper_id=wallpaper_id,
-                resource_type="download",
-                storage_backend=download_storage_backend or original_storage_backend,
-                relative_path=f"bing/2026/03/{market_code}/{slug}--download.jpg",
-                file_size_bytes=1024,
-                width=1920,
-                height=1080,
-                now_utc=now_utc,
-                image_status=image_status,
-                failure_reason=failure_reason,
-            )
+            if download_variant_specs is None:
+                download_variant_specs = [("", 1920, 1080)]
+            for variant_key, width, height in download_variant_specs:
+                suffix = f"-{variant_key.lower()}" if variant_key else ""
+                _seed_variant_resource(
+                    connection=connection,
+                    wallpaper_id=wallpaper_id,
+                    resource_type="download",
+                    storage_backend=download_storage_backend or original_storage_backend,
+                    relative_path=f"bing/2026/03/{market_code}/{slug}--download{suffix}.jpg",
+                    file_size_bytes=1024,
+                    width=width,
+                    height=height,
+                    now_utc=now_utc,
+                    image_status=image_status,
+                    failure_reason=failure_reason,
+                    variant_key=variant_key,
+                )
         connection.execute(
             "UPDATE wallpapers SET default_resource_id = ?, updated_at_utc = ? WHERE id = ?;",
             (resource_id, now_utc, wallpaper_id),
@@ -1016,12 +1105,14 @@ def _seed_variant_resource(
     now_utc: str,
     image_status: str,
     failure_reason: str | None,
+    variant_key: str = "",
 ) -> None:
     connection.execute(
         """
         INSERT INTO image_resources (
             wallpaper_id,
             resource_type,
+            variant_key,
             storage_backend,
             relative_path,
             filename,
@@ -1041,11 +1132,12 @@ def _seed_variant_resource(
             created_at_utc,
             updated_at_utc
         )
-        VALUES (?, ?, ?, ?, ?, 'jpg', 'image/jpeg', ?, ?, ?, NULL, NULL, ?, ?, 'passed', ?, ?, ?, ?, ?);
+        VALUES (?, ?, ?, ?, ?, ?, 'jpg', 'image/jpeg', ?, ?, ?, NULL, NULL, ?, ?, 'passed', ?, ?, ?, ?, ?);
         """,
         (
             wallpaper_id,
             resource_type,
+            variant_key,
             storage_backend,
             relative_path,
             Path(relative_path).name,

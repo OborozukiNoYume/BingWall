@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 2026-03-28T15:30:09Z
+
+### 变更内容
+
+- 更新 [app/domain/collection.py](app/domain/collection.py)、[app/collectors/bing.py](app/collectors/bing.py)、[app/services/source_collection.py](app/services/source_collection.py) 与 [app/services/bing_collection.py](app/services/bing_collection.py)，为采集元数据新增多分辨率下载变体描述，并把 Bing 抓取链路从“只抓一张下载图”扩展为“按已知官方分辨率逐个尝试、成功的全部落盘落库”；同一张 Bing 壁纸现在会保留多条 `download` 资源，默认原图优先使用最高可用分辨率
+- 新增迁移 [app/repositories/migrations/versions/V0007__image_resource_download_resolution_variants.sql](app/repositories/migrations/versions/V0007__image_resource_download_resolution_variants.sql)，为 `image_resources` 增加 `variant_key` 字段，并把唯一约束从 `(wallpaper_id, resource_type)` 调整为 `(wallpaper_id, resource_type, variant_key)`，允许同一壁纸存在多条不同分辨率的下载资源
+- 更新 [app/repositories/download_repository.py](app/repositories/download_repository.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/downloads.py](app/services/downloads.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/schemas/public.py](app/schemas/public.py)，公开详情现在会返回 `download_variants` 多分辨率列表，`download_url` 保留为默认下载地址，`POST /api/public/download-events` 则支持按指定 `resource_id` 跳转对应分辨率
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_public_api.py](tests/integration/test_public_api.py)、[tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py) 等测试，补齐 Bing 多分辨率入库、公开详情返回全部分辨率、指定资源下载登记、迁移结构和资源状态兼容回归
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md)、[docs/data-model.md](docs/data-model.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录本次多分辨率抓取、接口返回、数据结构、验证方式和回滚说明
+
+### 变更原因
+
+- 现有 Bing 抓取链路只保存单一下载尺寸，无法满足“同一张图抓取 Bing 所有分辨率”的需求
+- 在现有设计里，`image_resources` 对同一 `resource_type` 只允许一条记录，这会直接阻止多分辨率下载资源入库
+- 因此本次采用最保守且可交付的方案：保留现有 `original / thumbnail / preview` 语义不变，只把多分辨率能力扩展到 `download` 资源，并复用既有公开详情和下载登记链路
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增数据库迁移：`V0007__image_resource_download_resolution_variants.sql`
+- 变更时间：`2026-03-28T15:30:09Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Bing 采集、图片资源唯一约束、公开详情返回结构、下载登记目标解析、资源状态汇总逻辑，以及相关集成测试和文档
+- 公开详情接口现在会同时返回默认 `download_url` 与 `download_variants`；旧客户端继续使用默认下载地址不会中断，新客户端可以按 `resource_id` 选择具体分辨率
+- 本次不包含公开页面多分辨率选择器改版、后台详情页分辨率列表展示、对象存储写入链路替换或其他来源的多分辨率适配
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_bing_collection_service.py tests/integration/test_public_api.py tests/integration/test_sqlite_migrations.py tests/integration/test_download_statistics.py tests/integration/test_health_checks.py`
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_admin_collection.py tests/integration/test_multi_source_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可回退 `V0007` 迁移、删除 `variant_key` 相关仓储与公开接口扩展、恢复 Bing 单一下载图逻辑，并回退对应测试与文档更新，或执行 `git revert` 回退本次提交
+- 回滚后系统会恢复为“每张壁纸只保留一条下载资源记录、公开详情只返回单个 `download_url`、不支持按指定分辨率资源下载”的状态
+
 ## 2026-03-28T14:34:00Z
 
 ### 变更内容

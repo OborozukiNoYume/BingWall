@@ -89,6 +89,7 @@
 | `id` | integer / uuid | 是 | 主键 |
 | `wallpaper_id` | integer / uuid | 是 | 所属壁纸 ID |
 | `resource_type` | string | 是 | 资源类型，当前使用 `original`、`thumbnail`、`preview`、`download` |
+| `variant_key` | string | 是 | 同一 `resource_type` 下的分辨率或变体标识；无分辨率区分时固定为空字符串 |
 | `storage_backend` | string | 是 | 存储后端，当前支持 `local`、`oss` |
 | `relative_path` | string | 是 | 存储相对路径 |
 | `filename` | string | 是 | 文件名 |
@@ -112,7 +113,8 @@
 
 - 一个壁纸至少应有一个 `original` 类型资源
 - 当内容允许下载时，建议同时生成 `download` 资源；公开列表和详情依赖 `thumbnail` / `preview`
-- 同一壁纸下每种 `resource_type` 只能存在一条资源记录，避免公开端和巡检链路取到重复版本
+- `original`、`thumbnail`、`preview` 当前仍保持单条资源；`download` 允许按不同 `variant_key` 保存多条分辨率资源
+- 同一壁纸下 `(resource_type, variant_key)` 组合必须唯一，避免同一种分辨率资源重复入库
 - `relative_path` 必须是系统生成路径，不能接收外部直接输入；迁移到 OSS 时继续沿用同一相对路径语义
 - `image_status = ready` 时，`storage_backend = local` 的文件必须已存在于正式资源目录；`storage_backend = oss` 的对象键必须可通过统一资源定位方式访问
 - 资源状态变化后，必须同步刷新所属 `wallpapers.resource_status` 快照，并更新 `updated_at_utc`
@@ -345,6 +347,7 @@
 - 新资源默认 `pending`
 - 资源失败时，关联内容不得进入公开状态
 - `is_downloadable = false` 时，内容可以继续公开展示，但下载地址不得返回给公开端
+- Bing 当前会把同一壁纸的多种官方分辨率作为多条 `download` 资源保存；公开详情对外返回默认下载地址和完整分辨率列表
 - 已启用内容若资源巡检失败，应自动降级为 `disabled` 或从公开查询排除
 - 管理员执行“启用”操作前，领域服务必须校验目标内容的 `resource_status = ready`
 - `deleted` 内容不要求立即物理删文件，但必须与公开业务隔离
@@ -360,7 +363,7 @@
 
 ### `image_resources`
 
-- `(wallpaper_id, resource_type)` 唯一索引
+- `(wallpaper_id, resource_type, variant_key)` 唯一索引
 - `(image_status, last_processed_at_utc)` 巡检与重试索引
 - `(source_url_hash)` 技术辅助去重索引
 - `(content_hash)` 后续增强去重索引

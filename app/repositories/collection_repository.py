@@ -6,8 +6,8 @@ import sqlite3
 from typing import cast
 from typing import Any
 
+from app.domain.resource_variants import derive_resource_status
 from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
-from app.domain.resource_variants import expected_resource_types
 from app.repositories.sqlite import connect_sqlite
 
 
@@ -41,6 +41,7 @@ class ResourceCreateInput:
     source_url: str | None
     source_url_hash: str | None
     created_at_utc: str
+    variant_key: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -480,6 +481,7 @@ class CollectionRepository:
             INSERT INTO image_resources (
                 wallpaper_id,
                 resource_type,
+                variant_key,
                 storage_backend,
                 relative_path,
                 filename,
@@ -491,11 +493,12 @@ class CollectionRepository:
                 created_at_utc,
                 updated_at_utc
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?);
             """,
             (
                 item.wallpaper_id,
                 item.resource_type,
+                item.variant_key,
                 item.storage_backend,
                 item.relative_path,
                 item.filename,
@@ -513,6 +516,48 @@ class CollectionRepository:
             msg = "Failed to create image resource."
             raise RuntimeError(msg)
         return int(lastrowid)
+
+    def update_wallpaper_origin_metadata(
+        self,
+        *,
+        wallpaper_id: int,
+        origin_image_url: str,
+        origin_width: int | None,
+        origin_height: int | None,
+        updated_at_utc: str,
+    ) -> None:
+        self.connection.execute(
+            """
+            UPDATE wallpapers
+            SET origin_image_url = ?,
+                origin_width = ?,
+                origin_height = ?,
+                updated_at_utc = ?
+            WHERE id = ?;
+            """,
+            (origin_image_url, origin_width, origin_height, updated_at_utc, wallpaper_id),
+        )
+        self.connection.commit()
+
+    def update_image_resource_source(
+        self,
+        *,
+        resource_id: int,
+        source_url: str | None,
+        source_url_hash: str | None,
+        updated_at_utc: str,
+    ) -> None:
+        self.connection.execute(
+            """
+            UPDATE image_resources
+            SET source_url = ?,
+                source_url_hash = ?,
+                updated_at_utc = ?
+            WHERE id = ?;
+            """,
+            (source_url, source_url_hash, updated_at_utc, resource_id),
+        )
+        self.connection.commit()
 
     def mark_image_resource_ready(
         self,
@@ -627,25 +672,13 @@ class CollectionRepository:
             """,
             (wallpaper_id,),
         ).fetchall()
-        ready_resource_types = {
-            str(row["resource_type"])
-            for row in resource_rows
-            if str(row["image_status"]) == "ready"
-        }
-        failed_resource_types = {
-            str(row["resource_type"])
-            for row in resource_rows
-            if str(row["image_status"]) == "failed"
-        }
-        expected_types = set(
-            expected_resource_types(is_downloadable=bool(wallpaper_row["is_downloadable"]))
+        resource_status = derive_resource_status(
+            resources=[
+                (str(row["resource_type"]), str(row["image_status"]))
+                for row in resource_rows
+            ],
+            is_downloadable=bool(wallpaper_row["is_downloadable"]),
         )
-
-        resource_status = "pending"
-        if expected_types.issubset(ready_resource_types):
-            resource_status = "ready"
-        elif expected_types.intersection(failed_resource_types):
-            resource_status = "failed"
 
         default_resource_id: int | None = None
         for row in resource_rows:

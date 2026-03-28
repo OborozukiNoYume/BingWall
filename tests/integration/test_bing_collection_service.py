@@ -1,9 +1,12 @@
 from pathlib import Path
 import sqlite3
+from typing import Sequence
 
 from _pytest.monkeypatch import MonkeyPatch
 
+from app.collectors.bing import BingImageDownloadError
 from app.domain.collection import BingImageMetadata
+from app.domain.collection import CollectedDownloadVariant
 from app.domain.collection import DownloadedImage
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.file_storage import FileStorage
@@ -14,18 +17,25 @@ from tests.support.image_factory import build_test_jpeg_bytes
 
 class FakeBingClient:
     def __init__(
-        self, *, metadata: list[BingImageMetadata], downloads: list[DownloadedImage]
+        self,
+        *,
+        metadata: list[BingImageMetadata],
+        downloads: Sequence[DownloadedImage | Exception],
     ) -> None:
         self.metadata = metadata
-        self.downloads = downloads
+        self.downloads = list(downloads)
         self.download_calls = 0
+        self.requested_urls: list[str] = []
 
     def fetch_metadata(self, market_code: str, count: int) -> list[BingImageMetadata]:
         return self.metadata[:count]
 
     def download_image(self, image_url: str) -> DownloadedImage:
+        self.requested_urls.append(image_url)
         item = self.downloads[self.download_calls]
         self.download_calls += 1
+        if isinstance(item, Exception):
+            raise item
         return item
 
 
@@ -88,6 +98,150 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert any(path.is_file() for path in public_files)
     assert len([path for path in public_files if path.is_file()]) == 4
     assert all(path.suffix == ".jpg" for path in public_files if path.is_file())
+
+
+def test_bing_collection_service_persists_all_available_bing_download_resolutions(
+    tmp_path: Path,
+) -> None:
+    uhd_url = "https://www.bing.com/th?id=OHR.Success_UHD.jpg&pid=hp"
+    hd_url = "https://www.bing.com/th?id=OHR.Success_1920x1080.jpg&pid=hp"
+    mobile_url = "https://www.bing.com/th?id=OHR.Success_480x800.jpg&pid=hp"
+    service, database_path, _storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.SuccessAll",
+                source_url=hd_url,
+                download_variants=(
+                    CollectedDownloadVariant(
+                        variant_key="UHD",
+                        source_url=uhd_url,
+                        width=3840,
+                        height=2160,
+                    ),
+                    CollectedDownloadVariant(
+                        variant_key="1920x1080",
+                        source_url=hd_url,
+                        width=1920,
+                        height=1080,
+                    ),
+                    CollectedDownloadVariant(
+                        variant_key="480x800",
+                        source_url=mobile_url,
+                        width=480,
+                        height=800,
+                    ),
+                ),
+            )
+        ],
+        downloads=[
+            DownloadedImage(content=build_test_jpeg_bytes(width=3840, height=2160), mime_type="image/jpeg"),
+            DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
+            DownloadedImage(content=build_test_jpeg_bytes(width=480, height=800), mime_type="image/jpeg"),
+        ],
+    )
+
+    fake_client = getattr(service.delegate.adapter, "client")
+
+    try:
+        summary = service.collect(
+            market_code="en-US", count=1, trigger_type="manual", triggered_by="test"
+        )
+    finally:
+        service.repository.close()
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper = connection.execute("SELECT * FROM wallpapers LIMIT 1;").fetchone()
+        download_rows = connection.execute(
+            """
+            SELECT variant_key, width, height, source_url
+            FROM image_resources
+            WHERE resource_type = 'download'
+            ORDER BY width DESC, height DESC, id ASC;
+            """
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert summary.task_status == "succeeded"
+    assert wallpaper is not None
+    assert wallpaper["origin_image_url"] == uhd_url
+    assert wallpaper["origin_width"] == 3840
+    assert wallpaper["origin_height"] == 2160
+    assert fake_client.requested_urls == [uhd_url, hd_url, mobile_url]
+    assert [
+        (str(row["variant_key"]), int(row["width"]), int(row["height"]), str(row["source_url"]))
+        for row in download_rows
+    ] == [
+        ("UHD", 3840, 2160, uhd_url),
+        ("1920x1080", 1920, 1080, hd_url),
+        ("480x800", 480, 800, mobile_url),
+    ]
+
+
+def test_bing_collection_service_skips_missing_download_resolution_without_failing_wallpaper(
+    tmp_path: Path,
+) -> None:
+    missing_url = "https://www.bing.com/th?id=OHR.Success_UHD.jpg&pid=hp"
+    hd_url = "https://www.bing.com/th?id=OHR.Success_1920x1080.jpg&pid=hp"
+    service, database_path, _storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.SkipMissing",
+                source_url=hd_url,
+                download_variants=(
+                    CollectedDownloadVariant(
+                        variant_key="UHD",
+                        source_url=missing_url,
+                        width=3840,
+                        height=2160,
+                    ),
+                    CollectedDownloadVariant(
+                        variant_key="1920x1080",
+                        source_url=hd_url,
+                        width=1920,
+                        height=1080,
+                    ),
+                ),
+            )
+        ],
+        downloads=[
+            BingImageDownloadError(
+                "image request failed with HTTP 404: missing",
+                status_code=404,
+            ),
+            DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
+        ],
+    )
+
+    try:
+        summary = service.collect(
+            market_code="en-US", count=1, trigger_type="manual", triggered_by="test"
+        )
+    finally:
+        service.repository.close()
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper = connection.execute("SELECT * FROM wallpapers LIMIT 1;").fetchone()
+        download_count = connection.execute(
+            "SELECT COUNT(*) FROM image_resources WHERE resource_type = 'download';"
+        ).fetchone()[0]
+    finally:
+        connection.close()
+
+    assert summary.task_status == "succeeded"
+    assert wallpaper is not None
+    assert wallpaper["origin_image_url"] == hd_url
+    assert download_count == 1
 
 
 def test_bing_collection_service_skips_business_key_duplicates(tmp_path: Path) -> None:
@@ -345,7 +499,7 @@ def build_service(
     *,
     tmp_path: Path,
     metadata: list[BingImageMetadata],
-    downloads: list[DownloadedImage],
+    downloads: list[DownloadedImage | Exception],
     max_download_retries: int = 2,
     auto_publish_enabled: bool = True,
 ) -> tuple[BingCollectionService, Path, FileStorage]:
@@ -373,6 +527,7 @@ def make_metadata(
     wallpaper_date: str,
     source_key: str,
     source_url: str,
+    download_variants: tuple[CollectedDownloadVariant, ...] = (),
 ) -> BingImageMetadata:
     from datetime import date
     import hashlib
@@ -392,6 +547,7 @@ def make_metadata(
         origin_width=1920,
         origin_height=1080,
         raw_extra_json=json.dumps({"source_key": source_key}, ensure_ascii=True),
+        download_variants=download_variants,
     )
 
 

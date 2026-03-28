@@ -39,6 +39,11 @@ class BingSourceAdapter:
     def download_image(self, image_url: str) -> DownloadedImage:
         return self.client.download_image(image_url)
 
+    def is_missing_resource_error(self, exc: Exception) -> bool:
+        from app.collectors.bing import BingImageDownloadError
+
+        return isinstance(exc, BingImageDownloadError) and exc.status_code == 404
+
     def build_relative_path(self, item: BingImageMetadata) -> str:
         from app.collectors.bing import build_bing_relative_path
 

@@ -235,10 +235,26 @@
   "market_code": "en-US",
   "wallpaper_date": "2026-03-22",
   "preview_url": "/images/bing/2026/03/en-US/example--preview.jpg",
-  "download_url": "/images/bing/2026/03/en-US/example--download.jpg",
+  "download_url": "/images/bing/2026/03/en-US/example--download-uhd.jpg",
+  "download_variants": [
+    {
+      "resource_id": 101,
+      "variant_key": "UHD",
+      "width": 3840,
+      "height": 2160,
+      "download_url": "/images/bing/2026/03/en-US/example--download-uhd.jpg"
+    },
+    {
+      "resource_id": 102,
+      "variant_key": "1920x1080",
+      "width": 1920,
+      "height": 1080,
+      "download_url": "/images/bing/2026/03/en-US/example--download-1920x1080.jpg"
+    }
+  ],
   "is_downloadable": true,
-  "width": 1920,
-  "height": 1080,
+  "width": 3840,
+  "height": 2160,
   "source_name": "Bing"
 }
 ```
@@ -246,6 +262,7 @@
 说明：
 
 - `thumbnail_url`、`preview_url`、`download_url` 统一表示“可公开访问的资源地址”
+- `download_variants[*]` 返回当前公开可下载的全部分辨率资源；`download_url` 固定指向默认下载资源，当前优先选择最高分辨率
 - 当资源来自本地正式目录时，地址表现为 `/images/<relative_path>`
 - 当资源来自 OSS/CDN 时，地址表现为配置好的绝对公网地址，例如 `https://cdn.example.com/bingwall/<relative_path>`
 
@@ -451,7 +468,7 @@
 补充约定：
 
 - 公开列表默认返回 `thumbnail_url`，避免列表页直接加载原图或下载图
-- 公开详情中的 `preview_url` 指向详情预览资源，`download_url` 指向下载资源；当内容不可下载时，`download_url = null`
+- 公开详情中的 `preview_url` 指向详情预览资源，`download_url` 指向默认下载资源，`download_variants` 给出全部可下载分辨率；当内容不可下载时，`download_url = null` 且 `download_variants = []`
 - 当前资源类型口径为 `original`、`thumbnail`、`preview`、`download`
 
 ### 10. 后台内容状态切换
@@ -727,13 +744,14 @@
 ```json
 {
   "wallpaper_id": 1,
+  "resource_id": 101,
   "download_channel": "public_detail"
 }
 ```
 
 补充说明：
 
-- `resource_id` 当前实现为可选字段；若客户端不传，服务端会按当前公开详情实际可下载资源自动解析
+- `resource_id` 当前实现为可选字段；若客户端不传，服务端会按当前公开详情默认下载资源自动解析；若客户端显式传入，则会按指定分辨率资源记录跳转
 - 当前 `download_channel` 固定使用 `public_detail`
 
 响应数据结构（`data` 字段）：
