@@ -1,30 +1,30 @@
 # CHANGELOG
 
-## 2026-03-28T15:36:01Z
+## 2026-03-28T15:43:24Z
 
 ### 变更内容
 
-- 更新 [app/collectors/bing.py](app/collectors/bing.py)，把 Bing 多分辨率下载候选列表严格收敛为官方 15 种分辨率：`UHD`、`1920x1200`、`1920x1080`、`1366x768`、`1280x768`、`1280x720`、`1024x768`、`800x600`、`800x480`、`720x1280`、`768x1280`、`640x480`、`480x800`、`400x240`、`240x320`
-- 新增 [tests/unit/test_bing_collector.py](tests/unit/test_bing_collector.py)，直接断言当前候选列表的数量、顺序和宽高，防止后续再次混入非官方尺寸或漏掉官方尺寸
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md)、[docs/data-model.md](docs/data-model.md) 与 [CHANGELOG.md](CHANGELOG.md)，明确当前 Bing 多分辨率抓取采用“官方 15 种分辨率”的固定口径
+- 更新 [app/collectors/bing.py](app/collectors/bing.py)，把 Bing 下载分辨率候选列表进一步收敛为 5 种：`UHD`、`1920x1200`、`1920x1080`、`1366x768`、`720x1280`
+- 更新 [tests/unit/test_bing_collector.py](tests/unit/test_bing_collector.py)，把断言从“15 种官方分辨率”调整为“当前允许的 5 种分辨率”，避免未来误把其他尺寸重新加回
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md)、[docs/data-model.md](docs/data-model.md) 与 [CHANGELOG.md](CHANGELOG.md)，把上一版“15 种”说明统一改为当前 5 种口径
 
 ### 变更原因
 
-- 上一版多分辨率实现虽然已经支持同图多尺寸抓取，但候选表里混入了 `1080x1920`、`640x360`、`480x640`、`360x480`、`320x240` 等不在官方清单中的尺寸，同时遗漏了 `720x1280` 与 `400x240`
-- 这会导致抓取结果和 Bing 官方支持分辨率口径不一致，因此需要立即收敛为明确、可验证的官方 15 种分辨率
+- 你进一步收敛了业务要求：当前只保留 `3840x2160`、`1920x1200`、`1920x1080`、`1366x768`、`720x1280` 这 5 种分辨率
+- 因此上一版“15 种官方分辨率”的实现和文档已经不再符合当前需求，需要立即缩小候选表和测试断言，避免继续抓取不需要的尺寸
 
 ### 依赖变更
 
 - 无新增第三方依赖
-- 无新的数据库迁移或锁文件变更
-- 变更时间：`2026-03-28T15:36:01Z`
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-28T15:43:24Z`
 - 依赖类型：无直接或间接第三方包变更
 
 ### 影响范围
 
-- 影响范围覆盖 Bing 多分辨率候选地址生成逻辑、相关单元测试与项目文档
-- 现在 Bing 抓取将只尝试官方 15 种分辨率，不会再请求额外的非官方尺寸，也不会漏掉 `720x1280` 和 `400x240`
-- 本次不包含数据库结构调整、公开 API 字段变更、前端交互改版或其他来源采集逻辑修改
+- 影响范围覆盖 Bing 下载候选地址生成、对应单元测试和项目文档
+- 现在 Bing 只会尝试 5 种分辨率，不再抓取 `1280x768`、`1280x720`、`1024x768`、`800x600`、`800x480`、`480x800` 等其他尺寸
+- 本次不包含数据库结构调整、公开 API 字段变化或前端页面改版
 
 ### 验证步骤
 
@@ -34,8 +34,8 @@
 
 ### 回滚说明
 
-- 如需回滚本次修正，可恢复 [app/collectors/bing.py](app/collectors/bing.py) 中旧的候选分辨率表，并删除新增单元测试与文档同步内容，或执行 `git revert` 回退本次提交
-- 回滚后系统会重新尝试非官方尺寸，并再次遗漏 `720x1280` 与 `400x240`
+- 如需回滚本次变更，可恢复 [app/collectors/bing.py](app/collectors/bing.py) 中更宽的候选分辨率列表，并回退测试与文档同步内容，或执行 `git revert` 回退本次提交
+- 回滚后系统会重新抓取当前已移除的其他尺寸
 
 ## 2026-03-28T15:30:09Z
 
