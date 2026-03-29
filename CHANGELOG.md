@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-29T18:37:02Z
+
+### 变更内容
+
+- 新增 [.github/workflows/ci.yml](/home/ops/Projects/BingWall/.github/workflows/ci.yml)，在 `push dev` 和 `pull_request -> main` 两条路径下自动执行 `uv sync --python 3.14 --frozen` 与 `make verify`
+- 新增 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)，在 `dev` 分支 `CI` 成功、`dev` 领先于 `main` 且当前不存在未关闭同向 PR 时，自动创建 `dev -> main` 的合并请求
+- 新增 [scripts/github/apply_main_branch_protection.sh](/home/ops/Projects/BingWall/scripts/github/apply_main_branch_protection.sh)，用于通过 GitHub API 一次性应用 `main` 分支保护规则
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，同步记录新的 GitHub 协作流程、校验口径、分支保护目标与当前落地边界
+
+### 变更原因
+
+- 你明确要求把仓库交付流程收敛为“推送 `dev` 后自动跑 CI、CI 成功后自动创建 `dev -> main` PR、`main` 只能在通过校验并完成人工 Review 后合并”
+- 当前仓库原本没有 `.github/workflows`，因此即使推送了 `dev`，GitHub 也不会自动校验或自动创建 PR
+- 本次按最保守范围补齐 CI、自动建 PR 和分支保护应用脚本，并把相关工作流引导同步到 `main`，不改业务逻辑、不改依赖版本、不改运行时基线
+
+### 依赖变更
+
+- 无新增第三方运行时依赖
+- 无 Python 或 Node.js 包版本升级或降级
+- 变更时间：`2026-03-29T18:37:02Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 GitHub Actions 工作流、`main` 分支保护应用脚本以及协作文档说明
+- 仓库代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
+- 当前本机缺少 GitHub 管理令牌，因此仓库内自动化文件与 `main` 引导提交已落地，但远端 `main` 分支保护是否生效仍依赖在具备 `GITHUB_TOKEN` 的环境中执行一次保护脚本
+
+### 验证步骤
+
+- 执行 `uv sync --python 3.14 --frozen`
+- 执行 `make verify`
+- 执行 `bash -n scripts/github/apply_main_branch_protection.sh`
+- 人工复核 [.github/workflows/ci.yml](/home/ops/Projects/BingWall/.github/workflows/ci.yml) 与 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)，确认触发条件分别覆盖 `push dev`、`pull_request -> main` 和 `CI` 成功后的 `workflow_run`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [.github/workflows/ci.yml](/home/ops/Projects/BingWall/.github/workflows/ci.yml)、[.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml) 与 [scripts/github/apply_main_branch_protection.sh](/home/ops/Projects/BingWall/scripts/github/apply_main_branch_protection.sh)，并恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会恢复到“推送 `dev` 不自动校验、不自动建 PR、`main` 保护规则不随仓库维护”的状态
 ## 2026-03-29T16:10:07Z
 
 ### 变更内容
@@ -346,7 +385,6 @@
 
 - 如需回滚本次变更，可将 [.python-version](.python-version) 恢复为 `3.14.2`，并将 [pyproject.toml](pyproject.toml) 中的 `requires-python` 恢复为 `==3.14.2`
 - 回滚后，项目环境准备会重新要求精确使用 `Python 3.14.2`
-
 ## 2026-03-29T07:58:59Z
 
 ### 变更内容
