@@ -64,6 +64,11 @@ make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bin
 make run
 ```
 
+说明：
+
+- 本地开发态的 `make db-migrate`、`make verify`、`make run` 等命令现在统一通过 `uv run python` 执行，不再直接写死 `.venv/bin/python`
+- 生产环境的 `systemd` / `cron` 模板仍保留 `.venv/bin/python` 作为运行入口；这是刻意保留的稳定部署口径，不是遗漏
+
 健康检查：
 
 ```bash
@@ -92,7 +97,7 @@ make verify-deploy
 - 后端目录骨架
 - `.python-version` 与 `.nvmrc` 运行时版本锁定
 - `.env.example` 配置示例与启动期必填校验
-- `uv python install 3.14`、`uv sync --python 3.14 --frozen` 开发环境准备入口，以及等价的 `make setup` 便捷入口；同时保留 `make db-migrate`、`make verify`、`make run` 统一命令入口
+- `uv python install 3.14`、`uv sync --python 3.14 --frozen` 开发环境准备入口，以及等价的 `make setup` 便捷入口；本地 `make db-migrate`、`make verify`、`make run` 等命令内部统一通过 `uv run python` 执行
 - `make collect-bing MARKET=en-US COUNT=1` Bing 手动采集入口
 - `make collect-nasa-apod MARKET=global` NASA APOD 手动采集入口
 - `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口，会按当天 UTC 日期为已启用来源生成 `queued` 的 `cron` 任务；Bing 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场各建一条任务，并把窗口起点按 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 回溯

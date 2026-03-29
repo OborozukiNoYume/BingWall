@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-29T15:15:38Z
+
+### 变更内容
+
+- 更新 [Makefile](/home/ops/Projects/BingWall/Makefile)，把本地开发态和校验类 `make` 目标从直接调用 `.venv/bin/python` 收敛为统一通过 `uv run python` 执行
+- 更新 [scripts/dev/run-api.sh](/home/ops/Projects/BingWall/scripts/dev/run-api.sh)，把本地开发启动脚本改为直接调用 `uv run python -m uvicorn`
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，补充说明“开发入口改为 `uv run`、生产模板仍保留 `.venv/bin/python`”的边界
+
+### 变更原因
+
+- 目前项目的依赖来源已经完成 `pyproject.toml + uv.lock` 收口，但本地开发入口层仍保留大量直接写死 `.venv/bin/python` 的调用，容易继续沿用旧的 `venv` 心智
+- 对开发态来说，统一使用 `uv run python` 更符合 `uv` 原生工作流，也能避免把本地命令执行绑定到固定的 `.venv` 路径
+- 这次按最保守范围只调整本地开发和校验入口，不改业务逻辑、不改依赖版本，也不把生产 `systemd` / `cron` 模板强行切成依赖 `uv` 命令的运行方式
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:15:38Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地开发入口、仓库内校验入口和相关说明文档
+- 现在执行 `make lint`、`make typecheck`、`make test`、`make run`、`make db-migrate` 等命令时，会统一走 `uv run python`
+- 生产环境的 `deploy/systemd/bingwall-api.service`、`deploy/cron/bingwall-cron` 与 `scripts/install_cron.py` 仍保持 `.venv/bin/python` 口径，继续使用已同步好的虚拟环境作为稳定运行时
+
+### 验证步骤
+
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `make test`
+- 执行 `uv run python -m pytest tests/integration/test_install_cron.py tests/unit/test_deploy_templates.py`
+- 执行 `bash -n scripts/dev/run-api.sh`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [Makefile](/home/ops/Projects/BingWall/Makefile)、[scripts/dev/run-api.sh](/home/ops/Projects/BingWall/scripts/dev/run-api.sh)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，项目会继续保持“依赖安装使用 `uv`，但本地执行入口仍直接写死 `.venv/bin/python`”的混合状态
+
 ## 2026-03-29T15:07:34Z
 
 ### 变更内容
