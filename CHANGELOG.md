@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## 2026-03-29T07:41:15Z
+
+### 变更内容
+
+- 更新 [web/public/assets/site.js](web/public/assets/site.js) 与 [web/public/assets/site.css](web/public/assets/site.css)，在公开列表页新增“按市场查看最新壁纸”区域，固定提供 `zh-CN`、`en-US`、`ja-JP` 三个下拉选项；切换后前端会调用 `/api/public/wallpapers/by-market/{market_code}` 并展示该市场最新一张公开壁纸，同时保留下方原有分页列表和筛选表单
+- 更新 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，补充前端静态资源断言，确认公开脚本已引用 `/api/public/wallpapers/by-market/` 且包含固定市场选项，样式文件已包含新区域的类名
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录前端市场选择入口的行为说明、影响范围、验证步骤、回滚口径和时间戳
+
+### 变更原因
+
+- 用户希望前端页面能直接按市场查看壁纸，并明确要求下拉框支持 `zh-CN`、`en-US`、`ja-JP` 三个选项，同时复用已经存在的 `/api/public/wallpapers/by-market/{market_code}` 接口
+- 现有 `/wallpapers` 页面虽然已经支持通过列表接口做地区筛选，但那是“列表查询”语义；如果直接把它替换成单条市场接口，会把现有分页和组合筛选行为改坏
+- 因此本次采用最保守方案：保留现有列表筛选链路不变，只额外增加一个独立市场结果区，单独消费 `by-market` 单条接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T07:41:15Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开前端静态脚本、公开前端样式、公开前端集成测试，以及项目总说明和状态文档
+- 访问 `/wallpapers` 时，页面顶部现在会显示一个固定市场下拉；选择 `zh-CN`、`en-US` 或 `ja-JP` 后，会立即读取该市场最新一张公开壁纸并显示预览、元信息和跳转入口
+- 下方原有的关键词、地区、标签、分辨率和分页列表仍保持原语义，继续调用 `/api/public/wallpapers`，不受市场单条查询区影响
+- 本次不包含后端 API 变更、数据库结构调整、后台页面改版、依赖升级或公开列表接口契约修改
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_frontend.py tests/integration/test_public_api.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [web/public/assets/site.js](web/public/assets/site.js) 中新增的市场选择区与 `/api/public/wallpapers/by-market/` 调用，恢复 [web/public/assets/site.css](web/public/assets/site.css) 的新增样式，并回退 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py) 与相关文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，公开前端会恢复为仅支持列表接口筛选和详情页查看，不再在 `/wallpapers` 页面顶部直接展示固定市场最新壁纸
+
 ## 2026-03-29T07:12:10Z
 
 ### 变更内容
