@@ -14,6 +14,7 @@ from app.collectors.nasa_apod import NasaApodSourceAdapter
 from app.core.config import Settings
 from app.domain.collection import CollectionRunSummary
 from app.domain.collection_sources import COLLECTION_SOURCE_DEFAULT_MARKETS
+from app.domain.collection_sources import COLLECTION_SOURCE_MAX_MANUAL_DAYS
 from app.domain.collection_sources import COLLECTION_SOURCE_TYPES
 from app.domain.collection_sources import CollectionSourceType
 from app.repositories.admin_collection_repository import AdminCollectionRepository
@@ -330,6 +331,11 @@ class ManualCollectionTaskConsumer:
             )
             if not market_code:
                 raise RuntimeError(f"Queued {source_type} collection task is missing market_code.")
+            latest_available_fallback_days: int | None = None
+            if str(task_row["trigger_type"]) == "cron":
+                latest_available_fallback_days = COLLECTION_SOURCE_MAX_MANUAL_DAYS[
+                    cast(CollectionSourceType, source_type)
+                ]
         except Exception as exc:
             return self._mark_task_failed(task_id=task_id, failure_reason=str(exc))
 
@@ -339,6 +345,7 @@ class ManualCollectionTaskConsumer:
             count=count,
             date_from=date_from,
             date_to=date_to,
+            latest_available_fallback_days=latest_available_fallback_days,
         )
 
     def _mark_task_failed(self, *, task_id: int, failure_reason: str) -> CollectionRunSummary:

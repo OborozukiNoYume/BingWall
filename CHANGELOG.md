@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-29T01:06:21Z
+
+### 变更内容
+
+- 更新 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/services/admin_collection.py](app/services/admin_collection.py)，为 `cron` 固定日期采集补充“最近可用日期回退”逻辑：当上游在当天 UTC 边界尚未提供目标日期图片时，消费器会把上游查询窗口扩展到最近 `8` 天，并自动选择不晚于请求日期的最近可用日期继续采集，同时写入 `resolve_date_fallback` 任务日志
+- 更新 [tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py)，新增 Bing / NASA APOD 的 cron 回退测试，以及“后台手动任务仍保持严格日期匹配”的回归测试
+- 更新 [tests/unit/test_config.py](tests/unit/test_config.py)，让配置单测在临时目录中运行，避免仓库根目录 `.env` 干扰“缺少配置应报错”的断言
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录本次修复原因、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 实测“创建当天固定日期任务并立即消费”时，Bing 与 NASA APOD 在 `2026-03-29` 都可能因为上游尚未发布当天图片而直接失败，导致健康检查降级、后台任务记录报错，但直接采集最新可用图片本身是正常的
+- 原有逻辑只要固定日期过滤后为空，就一律记为失败，没有区分“真正无数据”与“UTC 切日早于上游发布日期”的场景
+- 因此本次采用最保守修复：仅对 `cron` 单日任务增加最近可用日期回退；后台手动任务和既有日期范围语义保持不变
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T01:06:21Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖固定日期采集任务消费逻辑、cron 任务日志可观测性、对应集成测试，以及运行说明文档
+- 现在 `cron` 固定日期任务在当天无图时，会自动回退到最近 `8` 天窗口内的最近可用日期继续采集，而不是直接失败；日志中可通过 `resolve_date_fallback` 明确看到回退事实
+- 本次不包含数据库结构调整、公开 API 字段变化、后台页面改版、手动采集日期规则放宽或新的外部依赖引入
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_admin_collection.py tests/integration/test_bing_collection_service.py tests/integration/test_multi_source_collection.py tests/integration/test_scheduled_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app/services/source_collection.py app/services/admin_collection.py tests/integration/test_admin_collection.py`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/services/admin_collection.py](app/services/admin_collection.py) 中“固定日期未命中即直接失败”的旧逻辑，并回退新增测试与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，`cron` 固定日期任务在 UTC 切日早于上游发布日期的场景下会重新直接失败，健康检查和后台任务列表也会再次暴露这类失败记录
+
 ## 2026-03-29T00:40:29Z
 
 ### 变更内容

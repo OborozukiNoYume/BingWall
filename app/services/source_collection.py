@@ -4,18 +4,22 @@ from dataclasses import dataclass
 from datetime import UTC
 from datetime import date
 from datetime import datetime
+from datetime import timedelta
 import hashlib
 import json
 import logging
 from pathlib import Path
 import re
 from typing import Protocol
+from typing import cast
 from urllib.parse import parse_qs
 from urllib.parse import urlparse
 
 from app.domain.collection import CollectedImageMetadata
 from app.domain.collection import CollectionRunSummary
 from app.domain.collection import DownloadedImage
+from app.domain.collection_sources import COLLECTION_SOURCE_MAX_MANUAL_DAYS
+from app.domain.collection_sources import CollectionSourceType
 from app.domain.resource_variants import RESOURCE_TYPE_DOWNLOAD
 from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
 from app.domain.resource_variants import RESOURCE_TYPE_PREVIEW
@@ -96,7 +100,13 @@ class SourceCollectionService:
         triggered_by: str | None,
         date_from: date | None = None,
         date_to: date | None = None,
+        latest_available_fallback_days: int | None = None,
     ) -> CollectionRunSummary:
+        fallback_days = latest_available_fallback_days
+        if fallback_days is None and trigger_type == "cron":
+            fallback_days = COLLECTION_SOURCE_MAX_MANUAL_DAYS[
+                cast(CollectionSourceType, self.adapter.source_type)
+            ]
         started_at_utc = utc_now_isoformat()
         request_snapshot_json = json.dumps(
             {
@@ -123,6 +133,7 @@ class SourceCollectionService:
             count=count,
             date_from=date_from,
             date_to=date_to,
+            latest_available_fallback_days=fallback_days,
         )
 
     def collect_existing_task(
@@ -133,6 +144,7 @@ class SourceCollectionService:
         count: int,
         date_from: date | None = None,
         date_to: date | None = None,
+        latest_available_fallback_days: int | None = None,
     ) -> CollectionRunSummary:
         return self._run_collection(
             task_id=task_id,
@@ -140,6 +152,7 @@ class SourceCollectionService:
             count=count,
             date_from=date_from,
             date_to=date_to,
+            latest_available_fallback_days=latest_available_fallback_days,
         )
 
     def _run_collection(
@@ -150,6 +163,7 @@ class SourceCollectionService:
         count: int,
         date_from: date | None,
         date_to: date | None,
+        latest_available_fallback_days: int | None,
     ) -> CollectionRunSummary:
         self.storage.ensure_directories()
 
@@ -159,17 +173,42 @@ class SourceCollectionService:
         failure_reasons: list[str] = []
 
         try:
-            metadata_items = self.adapter.fetch_metadata(
+            fetch_date_from, fetch_date_to = resolve_fetch_date_window(
+                date_from=date_from,
+                date_to=date_to,
+                latest_available_fallback_days=latest_available_fallback_days,
+            )
+            fetched_metadata_items = self.adapter.fetch_metadata(
                 market_code=market_code,
                 count=count,
+                date_from=fetch_date_from,
+                date_to=fetch_date_to,
+            )
+            metadata_items, fallback_date = select_metadata_items_for_collection(
+                metadata_items=fetched_metadata_items,
                 date_from=date_from,
                 date_to=date_to,
+                latest_available_fallback_days=latest_available_fallback_days,
             )
-            metadata_items = filter_metadata_items(
-                metadata_items=metadata_items,
-                date_from=date_from,
-                date_to=date_to,
-            )
+            if fallback_date is not None and date_from is not None:
+                fallback_message = (
+                    f"{self.adapter.display_name} 定时采集未命中请求日期 {date_from.isoformat()}，"
+                    f"已回退到最近可用日期 {fallback_date.isoformat()}。"
+                )
+                self.repository.create_task_item(
+                    TaskItemCreateInput(
+                        task_id=task_id,
+                        source_item_key=None,
+                        action_name="resolve_date_fallback",
+                        result_status="succeeded",
+                        dedupe_hit_type=None,
+                        db_write_result="used_latest_available_date",
+                        file_write_result=None,
+                        failure_reason=fallback_message,
+                        occurred_at_utc=utc_now_isoformat(),
+                    )
+                )
+                logger.warning(fallback_message)
             if not metadata_items:
                 if date_from is not None and date_to is not None:
                     msg = f"{self.adapter.display_name} 上游结果中没有命中请求日期范围的图片。"
@@ -977,6 +1016,69 @@ def filter_metadata_items(
     if date_from is None or date_to is None:
         return metadata_items
     return [item for item in metadata_items if date_from <= item.wallpaper_date <= date_to]
+
+
+def resolve_fetch_date_window(
+    *,
+    date_from: date | None,
+    date_to: date | None,
+    latest_available_fallback_days: int | None,
+) -> tuple[date | None, date | None]:
+    if not should_use_latest_available_fallback(
+        date_from=date_from,
+        date_to=date_to,
+        latest_available_fallback_days=latest_available_fallback_days,
+    ):
+        return date_from, date_to
+    assert date_from is not None
+    assert latest_available_fallback_days is not None
+    return date_from - timedelta(days=latest_available_fallback_days - 1), date_to
+
+
+def select_metadata_items_for_collection(
+    *,
+    metadata_items: list[CollectedImageMetadata],
+    date_from: date | None,
+    date_to: date | None,
+    latest_available_fallback_days: int | None,
+) -> tuple[list[CollectedImageMetadata], date | None]:
+    filtered_items = filter_metadata_items(
+        metadata_items=metadata_items,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    if filtered_items:
+        return filtered_items, None
+    if not should_use_latest_available_fallback(
+        date_from=date_from,
+        date_to=date_to,
+        latest_available_fallback_days=latest_available_fallback_days,
+    ):
+        return filtered_items, None
+    assert date_from is not None
+    fallback_candidates = [item for item in metadata_items if item.wallpaper_date <= date_from]
+    if not fallback_candidates:
+        return [], None
+    fallback_date = max(item.wallpaper_date for item in fallback_candidates)
+    return (
+        [item for item in fallback_candidates if item.wallpaper_date == fallback_date],
+        fallback_date,
+    )
+
+
+def should_use_latest_available_fallback(
+    *,
+    date_from: date | None,
+    date_to: date | None,
+    latest_available_fallback_days: int | None,
+) -> bool:
+    return (
+        latest_available_fallback_days is not None
+        and latest_available_fallback_days > 1
+        and date_from is not None
+        and date_to is not None
+        and date_from == date_to
+    )
 
 
 def date_to_isoformat(value: date | None) -> str | None:

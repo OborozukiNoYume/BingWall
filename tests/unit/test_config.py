@@ -1,10 +1,17 @@
+from pathlib import Path
 import os
 
+from _pytest.monkeypatch import MonkeyPatch
 import pytest
 from pydantic import ValidationError
 
 from app.core.config import load_bootstrap_admin_settings, load_settings, reset_settings_cache
 from tests.conftest import clear_bingwall_env
+
+
+@pytest.fixture(autouse=True)
+def isolate_from_repo_env(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
 
 
 def set_valid_env() -> None:
