@@ -71,6 +71,29 @@ def test_settings_load_valid_configuration() -> None:
     clear_bingwall_env()
 
 
+def test_settings_allow_missing_oss_public_base_url() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ.pop("BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL", None)
+    reset_settings_cache()
+
+    settings = load_settings()
+
+    assert settings.storage_oss_public_base_url is None
+
+    clear_bingwall_env()
+
+
+def test_settings_reject_empty_oss_public_base_url() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ["BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL"] = ""
+    reset_settings_cache()
+
+    with pytest.raises(ValidationError):
+        load_settings()
+
+
 def test_bootstrap_admin_settings_require_username_and_password_together() -> None:
     clear_bingwall_env()
     os.environ["BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME"] = "admin"

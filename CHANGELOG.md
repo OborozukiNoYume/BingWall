@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-03-29T01:44:31Z
+
+### 变更内容
+
+- 更新 [`.env.example`](.env.example) 与 [`deploy/systemd/bingwall.env.example`](deploy/systemd/bingwall.env.example)，把 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 从空字符串示例改为默认注释掉，仅在资源使用 `storage_backend = oss` 时再填写真实公网地址
+- 更新 [`tests/unit/test_config.py`](tests/unit/test_config.py)，补充“变量未设置时允许加载”和“变量为空字符串时必须报错”的配置回归测试
+- 更新 [`README.md`](README.md)、[`PROJECT_STATE.md`](PROJECT_STATE.md)、[`docs/deployment-runbook.md`](docs/deployment-runbook.md) 与 [`CHANGELOG.md`](CHANGELOG.md)，同步记录本次修复原因、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 之前两个环境示例文件都把 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 写成了空字符串，占位方式与当前配置模型不一致
+- 当前配置模型允许该变量完全不设置，但不允许设置为空字符串；部署人员若直接复制示例文件，容易在本地文件存储场景下触发启动期配置校验失败
+- 因此本次采用最保守修复：保持现有配置校验逻辑不变，只修正示例文件、补足测试并统一文档口径
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T01:44:31Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地与生产环境变量示例、配置加载单元测试，以及运行与部署文档说明
+- 现在复制示例环境文件后，默认不会再因为 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL=` 空值而触发配置校验失败；仅在启用 OSS / CDN 公网访问时才需要显式填写该变量
+- 本次不包含配置模型放宽、公开 API 字段变化、数据库结构调整或资源定位逻辑重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_config.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [`.env.example`](.env.example) 与 [`deploy/systemd/bingwall.env.example`](deploy/systemd/bingwall.env.example) 中原先的空字符串示例，并回退新增单测与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，部署人员再次直接复制示例文件时，仍可能因为把 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 留空写入环境文件而触发启动失败
+
 ## 2026-03-29T01:06:21Z
 
 ### 变更内容
