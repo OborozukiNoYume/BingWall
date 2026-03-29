@@ -28,6 +28,7 @@ jobs:
       - name: Create dev to main pull request when needed
         uses: actions/github-script@v8
         with:
+          github-token: ${{ secrets.GH_PR_TOKEN != '' && secrets.GH_PR_TOKEN || github.token }}
           script: |
             const owner = context.repo.owner;
             const repo = context.repo.repo;

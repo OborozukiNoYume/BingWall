@@ -1,5 +1,77 @@
 # CHANGELOG
 
+## 2026-03-29T19:47:19Z
+
+### 变更内容
+
+- 在 `dev` 分支合并 `origin/main`，解决 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的合并冲突
+- 保留 `dev` 上已落地的 `GH_PR_TOKEN` Secret 注入方案与对应文档说明，同时吸收 `main` 的最新提交历史，恢复 `dev -> main` PR 的可合并基础
+
+### 变更原因
+
+- 你明确要求继续推进 `dev -> main` 合并，但 GitHub 已提示当前 PR 存在必须先解决的冲突
+- 本次采用最保守路径，只在 `dev` 上吸收 `main` 并处理冲突，不直接改写 `main` 历史，不扩大到业务代码或依赖变更
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T19:47:19Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 GitHub 工作流与项目文档的合并冲突整理
+- 仓库业务代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
+- 推送本次 `dev` 更新后，现有 `dev -> main` PR 应可重新进入正常校验和人工合并流程
+
+### 验证步骤
+
+- 执行 `rg -n "^(<<<<<<<|=======|>>>>>>>)" .github/workflows/auto-create-pr.yml README.md PROJECT_STATE.md CHANGELOG.md`
+- 执行 `make verify`
+- 执行 `git status --short`
+
+### 回滚说明
+
+- 如需回滚本次变更，可回退本次合并提交，或把上述 4 个文件恢复到合并前版本后重新整理冲突
+- 回滚后，`dev -> main` PR 会重新回到 GitHub 提示“必须先解决冲突”的状态
+
+## 2026-03-29T19:09:38Z
+
+### 变更内容
+
+- 更新 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)，为 `actions/github-script` 增加 `github-token` 输入，优先读取仓库 Secret `GH_PR_TOKEN`，未配置时回退到默认 `GITHUB_TOKEN`
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，补充自动建 PR 的令牌注入方式与安全边界，明确 PAT 必须通过 GitHub Secret 配置，不能直接写入工作流文件
+
+### 变更原因
+
+- 你希望先把自动建 PR 所需的令牌接入点放进仓库，后续再手动补齐具体 Secret
+- 直接把明文 PAT 写进 `.github/workflows/*.yml` 会造成敏感凭据泄露，风险高且不符合仓库安全要求
+- 本次采用最保守实现，只补齐 Secret 注入入口和说明文档，不改业务代码、不改依赖版本、不扩大 GitHub 流程范围
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T19:09:38Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖自动建 PR 工作流与相关协作文档
+- 仓库业务代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
+- 配置 `GH_PR_TOKEN` 后，`Auto Create PR` 会优先使用该 Secret；未配置时仍会尝试使用默认 `GITHUB_TOKEN`
+
+### 验证步骤
+
+- 执行 `python - <<'PY'\nfrom pathlib import Path\nimport yaml\nprint(yaml.safe_load(Path('.github/workflows/auto-create-pr.yml').read_text(encoding='utf-8'))['jobs']['create_pull_request']['steps'][0]['with']['github-token'])\nPY`
+- 执行 `rg -n "GH_PR_TOKEN|GITHUB_TOKEN|Secret" README.md PROJECT_STATE.md .github/workflows/auto-create-pr.yml`
+- 人工复核 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)，确认未写入任何明文令牌，仅保留 Secret 引用表达式
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，自动建 PR 工作流将重新只依赖默认 `GITHUB_TOKEN`，不再预留独立 `GH_PR_TOKEN` Secret 注入入口
 ## 2026-03-29T18:44:40Z
 
 ### 变更内容
@@ -53,20 +125,20 @@
 
 - 你明确要求把仓库交付流程收敛为“推送 `dev` 后自动跑 CI、CI 成功后自动创建 `dev -> main` PR、`main` 只能在通过校验并完成人工 Review 后合并”
 - 当前仓库原本没有 `.github/workflows`，因此即使推送了 `dev`，GitHub 也不会自动校验或自动创建 PR
-- 本次按最保守范围补齐 CI、自动建 PR 和分支保护应用脚本，并把相关工作流引导同步到 `main`，不改业务逻辑、不改依赖版本、不改运行时基线
+- 本次按最保守范围补齐 CI、自动建 PR 和分支保护应用脚本，不改业务逻辑、不改依赖版本、不改运行时基线
 
 ### 依赖变更
 
 - 无新增第三方运行时依赖
 - 无 Python 或 Node.js 包版本升级或降级
-- 变更时间：`2026-03-29T18:37:02Z`
+- 变更时间：`2026-03-29T18:31:42Z`
 - 依赖类型：无直接或间接第三方包变更
 
 ### 影响范围
 
 - 影响范围覆盖 GitHub Actions 工作流、`main` 分支保护应用脚本以及协作文档说明
 - 仓库代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
-- 当前本机缺少 GitHub 管理令牌，因此仓库内自动化文件与 `main` 引导提交已落地，但远端 `main` 分支保护是否生效仍依赖在具备 `GITHUB_TOKEN` 的环境中执行一次保护脚本
+- 当前本机缺少 GitHub 管理令牌，因此仓库内自动化文件已落地，但远端 `main` 分支保护是否生效仍依赖在具备 `GITHUB_TOKEN` 的环境中执行一次保护脚本
 
 ### 验证步骤
 
