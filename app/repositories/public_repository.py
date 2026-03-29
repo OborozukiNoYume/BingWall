@@ -112,6 +112,33 @@ class PublicRepository:
             order_by="CASE WHEN w.market_code = ? THEN 0 ELSE 1 END ASC, w.id DESC",
         )
 
+    def get_latest_visible_wallpaper_for_market(
+        self,
+        *,
+        current_time_utc: str,
+        market_code: str,
+    ) -> sqlite3.Row | None:
+        return self._get_visible_wallpaper_detail(
+            current_time_utc=current_time_utc,
+            extra_clauses=["w.market_code = ?"],
+            extra_parameters=(market_code,),
+            order_by="w.wallpaper_date DESC, w.id DESC",
+        )
+
+    def get_visible_wallpaper_for_date(
+        self,
+        *,
+        current_time_utc: str,
+        wallpaper_date: str,
+        default_market_code: str,
+    ) -> sqlite3.Row | None:
+        return self._get_visible_wallpaper_detail(
+            current_time_utc=current_time_utc,
+            extra_clauses=["w.wallpaper_date = ?"],
+            extra_parameters=(wallpaper_date, default_market_code),
+            order_by="CASE WHEN w.market_code = ? THEN 0 ELSE 1 END ASC, w.id DESC",
+        )
+
     def get_random_visible_wallpaper(self, *, current_time_utc: str) -> sqlite3.Row | None:
         return self._get_visible_wallpaper_detail(
             current_time_utc=current_time_utc,

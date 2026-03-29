@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC
+from datetime import date
 from datetime import datetime
 import math
 from sqlite3 import Row
@@ -74,6 +75,42 @@ class PublicCatalogService:
         row = self.repository.get_visible_wallpaper_for_today(
             current_time_utc=current_time_utc,
             current_date=utc_today_isoformat(),
+            default_market_code=default_market_code,
+        )
+        wallpaper_row = self._require_visible_wallpaper(row)
+        return self._build_wallpaper_detail(
+            wallpaper_row,
+            self.repository.list_visible_download_resources(
+                wallpaper_id=int(wallpaper_row["id"]),
+                current_time_utc=current_time_utc,
+            ),
+        )
+
+    def get_latest_wallpaper_by_market(self, *, market_code: str) -> PublicWallpaperDetailData:
+        current_time_utc = utc_now_isoformat()
+        row = self.repository.get_latest_visible_wallpaper_for_market(
+            current_time_utc=current_time_utc,
+            market_code=market_code,
+        )
+        wallpaper_row = self._require_visible_wallpaper(row)
+        return self._build_wallpaper_detail(
+            wallpaper_row,
+            self.repository.list_visible_download_resources(
+                wallpaper_id=int(wallpaper_row["id"]),
+                current_time_utc=current_time_utc,
+            ),
+        )
+
+    def get_wallpaper_by_date(
+        self,
+        *,
+        wallpaper_date: date,
+        default_market_code: str,
+    ) -> PublicWallpaperDetailData:
+        current_time_utc = utc_now_isoformat()
+        row = self.repository.get_visible_wallpaper_for_date(
+            current_time_utc=current_time_utc,
+            wallpaper_date=wallpaper_date.isoformat(),
             default_market_code=default_market_code,
         )
         wallpaper_row = self._require_visible_wallpaper(row)

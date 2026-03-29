@@ -398,22 +398,26 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
 
 ## 已实现功能补充
 
-### 今日壁纸 / 随机壁纸 API
+### 单条壁纸快捷 API
 
 **已实现端点**：
 | 端点 | 方法 | 功能 |
 |------|------|------|
 | `/api/public/wallpapers/today` | GET | 返回今日壁纸，按 UTC 当天匹配 `wallpaper_date`，并优先站点默认市场 |
 | `/api/public/wallpapers/random` | GET | 返回随机壁纸，仅从当前公开可见内容中随机选取 |
+| `/api/public/wallpapers/by-market/{market_code}` | GET | 返回指定地区当前最新一张公开壁纸 |
+| `/api/public/wallpapers/by-date/{wallpaper_date}` | GET | 按指定日期精确返回一张公开壁纸，优先站点默认市场 |
 
-**返回格式**：与 `/api/public/wallpapers/{id}` 一致，返回单个壁纸详情（含图片资源 URL）
+**返回格式**：与 `/api/public/wallpapers/{id}` 一致，返回单个壁纸详情（含图片资源 URL、默认下载地址和 `download_variants` 全部分辨率链接）
 
 **行为说明**：
-1. 两个接口都复用现有公开可见规则：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据
+1. 四个接口都复用现有公开可见规则：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据
 2. `/api/public/wallpapers/today` 在当天存在多条候选时，先选默认市场；默认市场缺失时回退到当天排序最靠前的一条
-3. 当无符合条件的内容时，两个接口都返回统一 `404`：`PUBLIC_WALLPAPER_NOT_FOUND`
+3. `/api/public/wallpapers/by-market/{market_code}` 只在指定地区内选取，返回该地区最新一条公开内容
+4. `/api/public/wallpapers/by-date/{wallpaper_date}` 只在指定日期内选取，若同日有多地区候选则优先默认市场
+5. 当无符合条件的内容时，这四个接口都返回统一 `404`：`PUBLIC_WALLPAPER_NOT_FOUND`
 
-**状态**：已实现（2026-03-27 更新）
+**状态**：已实现（2026-03-29 更新）
 
 ---
 

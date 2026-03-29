@@ -395,6 +395,131 @@ def test_public_today_wallpaper_returns_not_found_when_current_utc_date_has_no_v
     assert payload["error_code"] == "PUBLIC_WALLPAPER_NOT_FOUND"
 
 
+def test_public_wallpaper_by_market_returns_latest_visible_detail_with_all_download_variants(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-23",
+        market_code="en-US",
+        title="Older Market Candidate",
+    )
+    expected_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Latest Market Candidate",
+        include_download_resource=True,
+        download_variant_specs=[
+            ("UHD", 3840, 2160),
+            ("1920x1080", 1920, 1080),
+        ],
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-25",
+        market_code="en-US",
+        title="Hidden Newer Market Candidate",
+        content_status="draft",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/by-market/en-US")
+        detail_response = client.get(f"/api/public/wallpapers/{expected_id}")
+
+    payload = response.json()
+    detail_payload = detail_response.json()
+    assert response.status_code == 200
+    assert payload["data"] == detail_payload["data"]
+    assert [item["variant_key"] for item in payload["data"]["download_variants"]] == [
+        "UHD",
+        "1920x1080",
+    ]
+
+
+def test_public_wallpaper_by_market_returns_not_found_when_market_has_no_visible_candidate(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Hidden Market Candidate",
+        content_status="draft",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/by-market/en-US")
+
+    payload = response.json()
+    assert response.status_code == 404
+    assert payload["error_code"] == "PUBLIC_WALLPAPER_NOT_FOUND"
+
+
+def test_public_wallpaper_by_date_prefers_default_market_and_returns_all_download_variants(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="fr-FR",
+        title="Fallback Exact Date Candidate",
+    )
+    expected_id = seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="en-US",
+        title="Default Exact Date Candidate",
+        include_download_resource=True,
+        download_variant_specs=[
+            ("UHD", 3840, 2160),
+            ("1920x1200", 1920, 1200),
+        ],
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/by-date/2026-03-24")
+        detail_response = client.get(f"/api/public/wallpapers/{expected_id}")
+
+    payload = response.json()
+    detail_payload = detail_response.json()
+    assert response.status_code == 200
+    assert payload["data"] == detail_payload["data"]
+    assert [item["variant_key"] for item in payload["data"]["download_variants"]] == [
+        "UHD",
+        "1920x1200",
+    ]
+
+
+def test_public_wallpaper_by_date_returns_not_found_when_exact_date_has_no_visible_candidate(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-23",
+        market_code="en-US",
+        title="Only Previous Date",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-24",
+        market_code="fr-FR",
+        title="Hidden Exact Date",
+        content_status="draft",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/by-date/2026-03-24")
+
+    payload = response.json()
+    assert response.status_code == 404
+    assert payload["error_code"] == "PUBLIC_WALLPAPER_NOT_FOUND"
+
+
 def test_public_random_wallpaper_returns_a_visible_detail(tmp_path: Path) -> None:
     database_path = prepare_database(tmp_path)
     expected_id = seed_wallpaper(

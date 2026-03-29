@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-29T06:32:02Z
+
+### 变更内容
+
+- 更新 [app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/api/public/routes.py](app/api/public/routes.py)，新增 `/api/public/wallpapers/by-market/{market_code}` 与 `/api/public/wallpapers/by-date/{wallpaper_date}` 两个公开单条查询接口，分别支持按地区获取最新公开壁纸、按日期精确获取公开壁纸
+- 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐新接口的可见性过滤、默认市场优先、404 返回以及 `download_variants` 全部分辨率下载链接回归测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新接口用途、返回结构、验证示例、影响范围和回滚口径
+
+### 变更原因
+
+- 现有公开 API 虽然已经支持列表筛选、今日壁纸、随机壁纸和按 `wallpaper_id` 查详情，但缺少两个最直接的单条读取入口：按地区拿最新壁纸、按日期精确拿壁纸
+- 现有公开详情已经能返回 `download_variants` 全部分辨率链接，因此本次最保守做法是不改列表结构，只补两个单条接口并统一复用详情返回契约
+- 因此本次改动聚焦在公开 API 查询能力补齐，不扩展数据库结构、不新增依赖、不改后台接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T06:32:02Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开 API 路由、公开查询服务与仓储、公开 API 集成测试，以及公开接口说明文档
+- 新增 `/api/public/wallpapers/by-market/{market_code}` 后，调用方可以不先查列表，直接按地区拿到最新一张公开壁纸
+- 新增 `/api/public/wallpapers/by-date/{wallpaper_date}` 后，调用方可以按 `YYYY-MM-DD` 精确读取一张公开壁纸；若同日有多地区候选，仍优先站点默认市场
+- 两个新接口都返回与既有公开详情一致的结构，继续包含 `download_url` 和 `download_variants`，因此调用方可以直接拿到全部可下载分辨率链接
+- 本次不包含数据库结构调整、公开列表字段扩展、后台页面改版、下载登记协议变更或对象存储写入链路改写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m ruff check app/api/public/routes.py app/services/public_catalog.py app/repositories/public_repository.py tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m mypy app/api/public/routes.py app/services/public_catalog.py app/repositories/public_repository.py tests/integration/test_public_api.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [app/api/public/routes.py](app/api/public/routes.py) 中新增的两个公开接口，并回退 [app/services/public_catalog.py](app/services/public_catalog.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py) 与对应测试、文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，调用方将重新只能通过公开列表、今日、随机或按 `wallpaper_id` 详情间接获取目标内容，不能再直接按地区或按日期精确读取单条壁纸
+
 ## 2026-03-29T04:33:18Z
 
 ### 变更内容
