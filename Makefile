@@ -2,10 +2,15 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources archive-wallpapers backup restore verify-backup-restore run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources archive-wallpapers backup restore install-cron verify-backup-restore run clean
 
 MARKET ?= en-US
 COUNT ?= 1
+CRON_APP_DIR ?= /opt/bingwall/app
+CRON_VENV_PYTHON ?= $(CRON_APP_DIR)/.venv/bin/python
+CRON_LOG_DIR ?= /var/log/bingwall
+CRON_ENV_FILE ?= /etc/bingwall/bingwall.env
+CRONTAB_BIN ?= crontab
 
 setup:
 	$(PYTHON_BIN) -m venv $(VENV)
@@ -21,7 +26,7 @@ lint:
 	$(VENV_PYTHON) -m ruff check .
 
 typecheck:
-	$(VENV_PYTHON) -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py
+	$(VENV_PYTHON) -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/install_cron.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py
 
 test:
 	$(VENV_PYTHON) -m pytest
@@ -62,6 +67,9 @@ backup:
 restore:
 	@if [ -z "$(SNAPSHOT)" ]; then echo "SNAPSHOT is required, e.g. make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1"; exit 1; fi
 	@if [ -n "$(TARGET_ROOT)" ]; then $(VENV_PYTHON) scripts/run_restore.py --snapshot "$(SNAPSHOT)" --target-root "$(TARGET_ROOT)" $(if $(FORCE),--force,); else $(VENV_PYTHON) scripts/run_restore.py --snapshot "$(SNAPSHOT)" $(if $(FORCE),--force,); fi
+
+install-cron:
+	$(PYTHON_BIN) scripts/install_cron.py --install --app-dir "$(CRON_APP_DIR)" --venv-python "$(CRON_VENV_PYTHON)" --log-dir "$(CRON_LOG_DIR)" --env-file "$(CRON_ENV_FILE)" --crontab-bin "$(CRONTAB_BIN)"
 
 verify-backup-restore:
 	$(VENV_PYTHON) scripts/verify_t2_5.py

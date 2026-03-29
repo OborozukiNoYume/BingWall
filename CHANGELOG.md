@@ -1,5 +1,47 @@
 # CHANGELOG
 
+## 2026-03-29T07:12:10Z
+
+### 变更内容
+
+- 新增 [scripts/install_cron.py](scripts/install_cron.py) 与 [Makefile](Makefile) 中的 `make install-cron`，提供目标机 `cron` 一键安装入口；脚本会校验输入路径、渲染模板中的真实路径、备份当前用户已有 `crontab`，再安装新的 BingWall 计划任务
+- 更新 [deploy/cron/bingwall-cron](deploy/cron/bingwall-cron)，把模板改为占位符形式，固定加入 `CRON_TZ=UTC`、`MAILTO=""`，并让每条任务在执行前显式加载 `/etc/bingwall/bingwall.env`；同时补齐“建任务、消费队列、资源巡检、资源归档、备份”五条默认表达式
+- 新增 [tests/integration/test_install_cron.py](tests/integration/test_install_cron.py)，补齐模板渲染、伪造 `crontab` 安装与相对路径拒绝三类回归测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步记录新入口、行为说明、目标机执行步骤、验证方式、影响范围和回滚口径
+
+### 变更原因
+
+- 之前仓库虽然已经有 `deploy/cron/bingwall-cron`，但仍需要人工改路径、手动执行 `crontab` 安装，而且模板只覆盖“建任务”和“消费队列”两条示例，不够支撑项目当前已落地的巡检、归档和备份闭环
+- 更关键的是，生产环境配置当前约定保存在 `/etc/bingwall/bingwall.env`，而旧模板没有在 `cron` 中显式加载这份环境文件，目标机即使安装成功，也可能因为拿不到正式环境变量而运行在错误配置下
+- 因此本次采用最保守修复：不改采集逻辑、不改数据库结构，只补齐 `cron` 安装入口、模板渲染与环境加载链路，并把已经存在的运维命令接入默认计划任务
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T07:12:10Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖目标机 `cron` 安装脚本、`Makefile` 运维入口、`cron` 模板、对应集成测试，以及运行与部署文档
+- 现在目标机可以直接以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`，不再需要人工编辑模板后再手动调用 `crontab`
+- 新模板默认会安装 5 条计划任务，并固定按 UTC 解释表达式；同时所有命令都显式加载 `/etc/bingwall/bingwall.env`，避免 `cron` 与 `systemd` 使用不同环境配置
+- 安装前会先备份当前用户旧 `crontab` 到日志目录中的时间戳文件，便于在出问题时直接回滚
+- 本次不包含系统用户创建、Nginx 部署方式调整、`systemd` 服务改版、日志轮转策略落地或更广义的运维编排替换
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_install_cron.py`
+- 执行 `./.venv/bin/python -m ruff check scripts/install_cron.py tests/integration/test_install_cron.py`
+- 执行 `./.venv/bin/python -m mypy scripts/install_cron.py tests/integration/test_install_cron.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [scripts/install_cron.py](scripts/install_cron.py)、恢复 [deploy/cron/bingwall-cron](deploy/cron/bingwall-cron) 为旧版两条示例、移除 [Makefile](Makefile) 中的 `make install-cron` 入口，并回退对应测试与文档记录，或执行 `git revert` 回退本次提交
+- 若已经在目标机执行过新安装脚本，可使用安装输出中的 `backup_path` 重新执行 `crontab <backup_path>`，把当前用户 `crontab` 回退到安装前状态
+
 ## 2026-03-29T06:32:02Z
 
 ### 变更内容

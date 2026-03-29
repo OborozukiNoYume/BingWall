@@ -1,13 +1,25 @@
-# BingWall cron 示例
+# BingWall cron 模板
 #
-# 部署前请根据目标机实际路径调整以下内容：
-# - 应用目录：/opt/bingwall/app
-# - Python 虚拟环境：/opt/bingwall/app/.venv/bin/python
-# - 日志目录：/var/log/bingwall
+# 渲染占位：
+# - __BINGWALL_APP_DIR__
+# - __BINGWALL_VENV_PYTHON__
+# - __BINGWALL_LOG_DIR__
+# - __BINGWALL_ENV_FILE__
 #
 # 说明：
+# - 使用 `CRON_TZ=UTC`，确保每日固定日期任务与项目内 UTC 日期口径一致
+# - 每条命令都会先加载 `__BINGWALL_ENV_FILE__`，避免 cron 脱离 `/etc/bingwall/bingwall.env` 后吃不到生产配置
 # - 第 1 条每天创建“当天固定日期”的 cron 采集任务
 # - 第 2 条每分钟消费一次任务队列，真正执行下载
+# - 第 3 条每天巡检正式资源目录与数据库一致性
+# - 第 4 条每天归档历史 ready 资源并清理脏文件
+# - 第 5 条每天执行一次一致性备份
 
-15 3 * * * cd /opt/bingwall/app && ./.venv/bin/python scripts/create_scheduled_collection_tasks.py >> /var/log/bingwall/create-scheduled-collection-tasks.log 2>&1
-* * * * * cd /opt/bingwall/app && ./.venv/bin/python -m app.collectors.manual_tasks --max-tasks 5 >> /var/log/bingwall/consume-collection-tasks.log 2>&1
+CRON_TZ=UTC
+MAILTO=""
+
+15 3 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/create_scheduled_collection_tasks.py >> __BINGWALL_LOG_DIR__/create-scheduled-collection-tasks.log 2>&1
+* * * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ -m app.collectors.manual_tasks --max-tasks 5 >> __BINGWALL_LOG_DIR__/consume-collection-tasks.log 2>&1
+45 3 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/run_resource_inspection.py >> __BINGWALL_LOG_DIR__/inspect-resources.log 2>&1
+15 4 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/run_wallpaper_archive.py >> __BINGWALL_LOG_DIR__/archive-wallpapers.log 2>&1
+45 4 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/run_backup.py >> __BINGWALL_LOG_DIR__/backup.log 2>&1
