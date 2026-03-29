@@ -8,6 +8,7 @@ from typing import Any
 from app.collectors.nasa_apod import NasaApodSourceAdapter
 from app.domain.collection import CollectedImageMetadata
 from app.domain.collection import BingImageMetadata
+from app.domain.collection import CollectionRunSummary
 from app.domain.collection import DownloadedImage
 from app.services.bing_collection import BingSourceAdapter
 from tests.integration.test_admin_auth import build_client
@@ -68,6 +69,7 @@ def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
         "market_code": "en-US",
         "date_from": "2026-03-23",
         "date_to": "2026-03-24",
+        "backtrack_days": None,
         "force_refresh": False,
         "count": None,
         "trigger_type": None,
@@ -443,6 +445,166 @@ def test_manual_collection_consumer_supports_nasa_apod_tasks(tmp_path: Path) -> 
     assert logs_payload["data"]["items"][0]["result_status"] == "succeeded"
 
 
+def test_manual_collection_consumer_falls_back_to_latest_available_date_for_cron_bing(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    task_id = seed_queued_collection_task(
+        database_path=database_path,
+        source_type="bing",
+        trigger_type="cron",
+        task_type="scheduled_collect",
+        request_snapshot={
+            "source_type": "bing",
+            "market_code": "en-US",
+            "date_from": "2026-03-29",
+            "date_to": "2026-03-29",
+            "force_refresh": False,
+            "count": 8,
+            "trigger_type": "cron",
+        },
+    )
+
+    summary = run_manual_consumer(
+        tmp_path=tmp_path,
+        source_type="bing",
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-28",
+                source_key="bing:en-US:2026-03-28:OHR.Yesterday",
+                source_url="https://www.bing.com/th?id=OHR.Yesterday_1920x1080.jpg",
+            )
+        ],
+    )
+
+    assert summary.task_id == task_id
+    assert summary.task_status == "succeeded"
+    assert summary.success_count == 1
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper_row = connection.execute(
+            "SELECT wallpaper_date FROM wallpapers WHERE id = 1;"
+        ).fetchone()
+        fallback_row = connection.execute(
+            """
+            SELECT result_status, db_write_result, failure_reason
+            FROM collection_task_items
+            WHERE task_id = ?
+              AND action_name = 'resolve_date_fallback'
+            LIMIT 1;
+            """,
+            (task_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert wallpaper_row is not None
+    assert wallpaper_row["wallpaper_date"] == "2026-03-28"
+    assert fallback_row is not None
+    assert fallback_row["result_status"] == "succeeded"
+    assert fallback_row["db_write_result"] == "used_latest_available_date"
+    assert "2026-03-29" in str(fallback_row["failure_reason"])
+    assert "2026-03-28" in str(fallback_row["failure_reason"])
+
+
+def test_manual_collection_consumer_falls_back_to_latest_available_date_for_cron_nasa_apod(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    task_id = seed_queued_collection_task(
+        database_path=database_path,
+        source_type="nasa_apod",
+        trigger_type="cron",
+        task_type="scheduled_collect",
+        request_snapshot={
+            "source_type": "nasa_apod",
+            "market_code": "global",
+            "date_from": "2026-03-29",
+            "date_to": "2026-03-29",
+            "force_refresh": False,
+            "count": 1,
+            "trigger_type": "cron",
+        },
+    )
+
+    summary = run_manual_consumer(
+        tmp_path=tmp_path,
+        source_type="nasa_apod",
+        metadata=[
+            make_nasa_metadata(
+                wallpaper_date="2026-03-28",
+                source_key="nasa_apod:global:2026-03-28:moonrise",
+                source_url="https://apod.nasa.gov/apod/image/2603/moonrise.jpg",
+            )
+        ],
+    )
+
+    assert summary.task_id == task_id
+    assert summary.task_status == "succeeded"
+
+    client = FakeNasaApodClient.last_created
+    assert client is not None
+    assert client.last_date_from == "2026-03-22"
+    assert client.last_date_to == "2026-03-29"
+
+
+def test_manual_collection_consumer_keeps_manual_date_matching_strict(tmp_path: Path) -> None:
+    database_path = prepare_database(tmp_path)
+    task_id = seed_queued_collection_task(
+        database_path=database_path,
+        source_type="bing",
+        trigger_type="admin",
+        task_type="manual_collect",
+        request_snapshot={
+            "source_type": "bing",
+            "market_code": "en-US",
+            "date_from": "2026-03-29",
+            "date_to": "2026-03-29",
+            "force_refresh": False,
+            "count": 1,
+            "trigger_type": "admin",
+        },
+    )
+
+    summary = run_manual_consumer(
+        tmp_path=tmp_path,
+        source_type="bing",
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-28",
+                source_key="bing:en-US:2026-03-28:OHR.YesterdayOnly",
+                source_url="https://www.bing.com/th?id=OHR.YesterdayOnly_1920x1080.jpg",
+            )
+        ],
+        expect_task_status="failed",
+    )
+
+    assert summary.task_id == task_id
+    assert summary.error_summary == "Bing 上游结果中没有命中请求日期范围的图片。"
+
+    connection = sqlite3.connect(database_path)
+    try:
+        wallpaper_count = connection.execute("SELECT COUNT(*) FROM wallpapers;").fetchone()
+        fallback_count = connection.execute(
+            """
+            SELECT COUNT(*)
+            FROM collection_task_items
+            WHERE task_id = ?
+              AND action_name = 'resolve_date_fallback';
+            """,
+            (task_id,),
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert wallpaper_count == (0,)
+    assert fallback_count == (0,)
+
+
 def test_admin_collection_task_create_rejects_out_of_window_date_range(tmp_path: Path) -> None:
     database_path = prepare_database(tmp_path)
     seed_admin_user(
@@ -476,7 +638,8 @@ def run_manual_consumer(
     tmp_path: Path,
     source_type: str,
     metadata: list[BingImageMetadata | CollectedImageMetadata],
-) -> None:
+    expect_task_status: str = "succeeded",
+) -> CollectionRunSummary:
     from app.repositories.collection_repository import CollectionRepository
     from app.repositories.file_storage import FileStorage
     from app.services.admin_collection import ManualCollectionTaskConsumer
@@ -523,19 +686,25 @@ def run_manual_consumer(
         repository.close()
 
     assert summary is not None
-    assert summary.task_status == "succeeded"
+    assert summary.task_status == expect_task_status
+    return summary
 
 
 class FakeNasaApodClient:
+    last_created: FakeNasaApodClient | None = None
+
     def __init__(
         self,
         *,
         metadata: list[BingImageMetadata | CollectedImageMetadata],
         downloads: list[DownloadedImage],
     ) -> None:
+        FakeNasaApodClient.last_created = self
         self.metadata = metadata
         self.downloads = downloads
         self.download_calls = 0
+        self.last_date_from: str | None = None
+        self.last_date_to: str | None = None
 
     def fetch_metadata(
         self,
@@ -546,9 +715,16 @@ class FakeNasaApodClient:
         date_to: object,
     ) -> list[CollectedImageMetadata]:
         del market_code
-        del date_from
-        del date_to
-        return [item for item in self.metadata[:count] if isinstance(item, CollectedImageMetadata)]
+        self.last_date_from = str(date_from) if date_from is not None else None
+        self.last_date_to = str(date_to) if date_to is not None else None
+        items = [item for item in self.metadata if isinstance(item, CollectedImageMetadata)]
+        if date_from is not None and date_to is not None:
+            items = [
+                item
+                for item in items
+                if str(date_from) <= item.wallpaper_date.isoformat() <= str(date_to)
+            ]
+        return items[:count]
 
     def download_image(self, image_url: str) -> DownloadedImage:
         del image_url
@@ -626,6 +802,54 @@ def seed_collection_task(
                 error_summary,
                 "2026-03-24T09:59:00Z",
                 "2026-03-24T10:01:00Z",
+            ),
+        )
+        connection.commit()
+        assert cursor.lastrowid is not None
+        return int(cursor.lastrowid)
+    finally:
+        connection.close()
+
+
+def seed_queued_collection_task(
+    *,
+    database_path: Path,
+    source_type: str,
+    trigger_type: str,
+    task_type: str,
+    request_snapshot: dict[str, object],
+) -> int:
+    connection = sqlite3.connect(database_path)
+    try:
+        cursor = connection.execute(
+            """
+            INSERT INTO collection_tasks (
+                task_type,
+                source_type,
+                trigger_type,
+                triggered_by,
+                task_status,
+                request_snapshot_json,
+                started_at_utc,
+                finished_at_utc,
+                success_count,
+                duplicate_count,
+                failure_count,
+                error_summary,
+                retry_of_task_id,
+                created_at_utc,
+                updated_at_utc
+            )
+            VALUES (?, ?, ?, ?, 'queued', ?, NULL, NULL, 0, 0, 0, NULL, NULL, ?, ?);
+            """,
+            (
+                task_type,
+                source_type,
+                trigger_type,
+                trigger_type,
+                json.dumps(request_snapshot, ensure_ascii=False, sort_keys=True),
+                "2026-03-29T00:00:00Z",
+                "2026-03-29T00:00:00Z",
             ),
         )
         connection.commit()

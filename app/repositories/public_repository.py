@@ -4,9 +4,9 @@ from pathlib import Path
 import sqlite3
 from typing import cast
 
-from app.domain.resource_variants import PUBLIC_DETAIL_DOWNLOAD_RESOURCE_TYPE
 from app.domain.resource_variants import PUBLIC_DETAIL_PREVIEW_RESOURCE_TYPE
 from app.domain.resource_variants import PUBLIC_LIST_RESOURCE_TYPE
+from app.domain.resource_variants import RESOURCE_TYPE_DOWNLOAD
 from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
 from app.repositories.sqlite import connect_sqlite
 from app.schemas.public import PublicWallpaperListQuery
@@ -112,6 +112,33 @@ class PublicRepository:
             order_by="CASE WHEN w.market_code = ? THEN 0 ELSE 1 END ASC, w.id DESC",
         )
 
+    def get_latest_visible_wallpaper_for_market(
+        self,
+        *,
+        current_time_utc: str,
+        market_code: str,
+    ) -> sqlite3.Row | None:
+        return self._get_visible_wallpaper_detail(
+            current_time_utc=current_time_utc,
+            extra_clauses=["w.market_code = ?"],
+            extra_parameters=(market_code,),
+            order_by="w.wallpaper_date DESC, w.id DESC",
+        )
+
+    def get_visible_wallpaper_for_date(
+        self,
+        *,
+        current_time_utc: str,
+        wallpaper_date: str,
+        default_market_code: str,
+    ) -> sqlite3.Row | None:
+        return self._get_visible_wallpaper_detail(
+            current_time_utc=current_time_utc,
+            extra_clauses=["w.wallpaper_date = ?"],
+            extra_parameters=(wallpaper_date, default_market_code),
+            order_by="CASE WHEN w.market_code = ? THEN 0 ELSE 1 END ASC, w.id DESC",
+        )
+
     def get_random_visible_wallpaper(self, *, current_time_utc: str) -> sqlite3.Row | None:
         return self._get_visible_wallpaper_detail(
             current_time_utc=current_time_utc,
@@ -150,13 +177,8 @@ class PublicRepository:
                     AS preview_relative_path,
                 COALESCE(preview_resource.storage_backend, original_resource.storage_backend)
                     AS preview_storage_backend,
-                COALESCE(download_resource.relative_path, original_resource.relative_path)
-                    AS download_relative_path,
-                COALESCE(download_resource.storage_backend, original_resource.storage_backend)
-                    AS download_storage_backend,
-                COALESCE(download_resource.width, original_resource.width, w.origin_width) AS width,
-                COALESCE(download_resource.height, original_resource.height, w.origin_height)
-                    AS height
+                COALESCE(original_resource.width, w.origin_width) AS width,
+                COALESCE(original_resource.height, w.origin_height) AS height
             FROM wallpapers AS w
             INNER JOIN image_resources AS original_resource
                 ON original_resource.wallpaper_id = w.id
@@ -166,10 +188,6 @@ class PublicRepository:
                 ON preview_resource.wallpaper_id = w.id
                AND preview_resource.resource_type = ?
                AND preview_resource.image_status = 'ready'
-            LEFT JOIN image_resources AS download_resource
-                ON download_resource.wallpaper_id = w.id
-               AND download_resource.resource_type = ?
-               AND download_resource.image_status = 'ready'
             WHERE {filters}
             ORDER BY {order_by}
             LIMIT 1;
@@ -177,12 +195,75 @@ class PublicRepository:
             (
                 RESOURCE_TYPE_ORIGINAL,
                 PUBLIC_DETAIL_PREVIEW_RESOURCE_TYPE,
-                PUBLIC_DETAIL_DOWNLOAD_RESOURCE_TYPE,
                 *parameters,
                 *extra_parameters,
             ),
         ).fetchone()
         return cast(sqlite3.Row | None, row)
+
+    def list_visible_download_resources(
+        self,
+        *,
+        wallpaper_id: int,
+        current_time_utc: str,
+    ) -> list[sqlite3.Row]:
+        filters, parameters = self._build_visibility_filters(
+            query=PublicWallpaperListQuery(),
+            current_time_utc=current_time_utc,
+        )
+        rows = self.connection.execute(
+            f"""
+            SELECT
+                r.id,
+                r.variant_key,
+                r.relative_path,
+                r.storage_backend,
+                COALESCE(r.width, w.origin_width) AS width,
+                COALESCE(r.height, w.origin_height) AS height
+            FROM wallpapers AS w
+            INNER JOIN image_resources AS r
+                ON r.wallpaper_id = w.id
+               AND r.resource_type = ?
+               AND r.image_status = 'ready'
+            WHERE {filters}
+              AND w.id = ?
+            ORDER BY COALESCE(r.width, 0) * COALESCE(r.height, 0) DESC, r.id ASC;
+            """,
+            (
+                RESOURCE_TYPE_DOWNLOAD,
+                *parameters,
+                wallpaper_id,
+            ),
+        ).fetchall()
+        if rows:
+            return list(rows)
+
+        legacy_row = self.connection.execute(
+            f"""
+            SELECT
+                original_resource.id,
+                '' AS variant_key,
+                original_resource.relative_path,
+                original_resource.storage_backend,
+                COALESCE(original_resource.width, w.origin_width) AS width,
+                COALESCE(original_resource.height, w.origin_height) AS height
+            FROM wallpapers AS w
+            INNER JOIN image_resources AS original_resource
+                ON original_resource.wallpaper_id = w.id
+               AND original_resource.resource_type = ?
+               AND original_resource.image_status = 'ready'
+            WHERE {filters}
+              AND w.id = ?
+              AND w.is_downloadable = 1
+            LIMIT 1;
+            """,
+            (
+                RESOURCE_TYPE_ORIGINAL,
+                *parameters,
+                wallpaper_id,
+            ),
+        ).fetchall()
+        return list(legacy_row)
 
     def list_visible_market_codes(self, *, current_time_utc: str) -> list[str]:
         filters, parameters = self._build_visibility_filters(

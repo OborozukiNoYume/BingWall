@@ -125,6 +125,10 @@ class NasaApodSourceAdapter:
     def download_image(self, image_url: str) -> DownloadedImage:
         return self.client.download_image(image_url)
 
+    def is_missing_resource_error(self, exc: Exception) -> bool:
+        del exc
+        return False
+
     def build_relative_path(self, item: CollectedImageMetadata) -> str:
         return build_source_relative_path(
             source_type=self.source_type,

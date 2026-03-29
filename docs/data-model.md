@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-26T12:30:40Z
+- 更新时间：2026-03-29T03:19:48Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期实施前的数据实体、字段分组、状态模型、约束和索引说明
 
@@ -61,6 +61,7 @@
 | `origin_image_url` | string | 否 | 原始图片地址 |
 | `origin_width` | integer | 否 | 原始宽度 |
 | `origin_height` | integer | 否 | 原始高度 |
+| `portrait_image_url` | string | 否 | Bing 竖版下载图地址，便于后续客户端直接使用 |
 | `resource_status` | string | 是 | 当前可用资源状态快照 |
 | `raw_extra_json` | text | 否 | 来源扩展信息 |
 | `sort_weight` | integer | 是 | 排序权重，默认 `0` |
@@ -74,6 +75,7 @@
 - 非删除内容才能参与公开查询
 - 当 `content_status = enabled` 时，`resource_status` 必须为 `ready`
 - `resource_status` 由领域服务或巡检任务根据当前对外可用的资源记录同步刷新，不允许由公开接口直接写入
+- Bing 来源当前还会补充 `subtitle`、`description`、`location_text`、`published_at_utc` 与 `portrait_image_url`，用于公开检索、后台展示和移动端竖版图适配
 - 当前关键词搜索基于 `title`、`subtitle`、`copyright_text`、`description` 与已绑定标签实现，不单独新增搜索索引表
 
 ## 2. 图片资源 `image_resources`
@@ -89,6 +91,7 @@
 | `id` | integer / uuid | 是 | 主键 |
 | `wallpaper_id` | integer / uuid | 是 | 所属壁纸 ID |
 | `resource_type` | string | 是 | 资源类型，当前使用 `original`、`thumbnail`、`preview`、`download` |
+| `variant_key` | string | 是 | 同一 `resource_type` 下的分辨率或变体标识；无分辨率区分时固定为空字符串 |
 | `storage_backend` | string | 是 | 存储后端，当前支持 `local`、`oss` |
 | `relative_path` | string | 是 | 存储相对路径 |
 | `filename` | string | 是 | 文件名 |
@@ -112,7 +115,8 @@
 
 - 一个壁纸至少应有一个 `original` 类型资源
 - 当内容允许下载时，建议同时生成 `download` 资源；公开列表和详情依赖 `thumbnail` / `preview`
-- 同一壁纸下每种 `resource_type` 只能存在一条资源记录，避免公开端和巡检链路取到重复版本
+- `original`、`thumbnail`、`preview` 当前仍保持单条资源；`download` 允许按不同 `variant_key` 保存多条分辨率资源
+- 同一壁纸下 `(resource_type, variant_key)` 组合必须唯一，避免同一种分辨率资源重复入库
 - `relative_path` 必须是系统生成路径，不能接收外部直接输入；迁移到 OSS 时继续沿用同一相对路径语义
 - `image_status = ready` 时，`storage_backend = local` 的文件必须已存在于正式资源目录；`storage_backend = oss` 的对象键必须可通过统一资源定位方式访问
 - 资源状态变化后，必须同步刷新所属 `wallpapers.resource_status` 快照，并更新 `updated_at_utc`
@@ -143,6 +147,11 @@
 | `retry_of_task_id` | integer / uuid | 否 | 被重试任务 ID |
 | `created_at_utc` | datetime | 是 | 创建时间 |
 | `updated_at_utc` | datetime | 是 | 更新时间 |
+
+补充说明：
+
+- `scheduled_collect` 类型任务的 `request_snapshot_json` 当前至少会保存 `source_type`、`market_code`、`date_from`、`date_to`、`force_refresh`、`count`、`trigger_type`
+- Bing 的 `scheduled_collect` 任务还会额外保存 `backtrack_days`，用于区分不同回溯窗口，避免同市场同日任务重复创建
 
 ## 4. 采集明细 `collection_task_items`
 
@@ -345,6 +354,7 @@
 - 新资源默认 `pending`
 - 资源失败时，关联内容不得进入公开状态
 - `is_downloadable = false` 时，内容可以继续公开展示，但下载地址不得返回给公开端
+- Bing 当前会把同一壁纸按 5 种约定分辨率保存为多条 `download` 资源：`UHD`、`1920x1200`、`1920x1080`、`1366x768`、`720x1280`；公开详情对外返回默认下载地址和完整分辨率列表
 - 已启用内容若资源巡检失败，应自动降级为 `disabled` 或从公开查询排除
 - 管理员执行“启用”操作前，领域服务必须校验目标内容的 `resource_status = ready`
 - `deleted` 内容不要求立即物理删文件，但必须与公开业务隔离
@@ -360,7 +370,7 @@
 
 ### `image_resources`
 
-- `(wallpaper_id, resource_type)` 唯一索引
+- `(wallpaper_id, resource_type, variant_key)` 唯一索引
 - `(image_status, last_processed_at_utc)` 巡检与重试索引
 - `(source_url_hash)` 技术辅助去重索引
 - `(content_hash)` 后续增强去重索引

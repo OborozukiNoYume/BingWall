@@ -1,5 +1,14 @@
 from dataclasses import dataclass
+from dataclasses import field
 from datetime import date
+
+
+@dataclass(frozen=True, slots=True)
+class CollectedDownloadVariant:
+    variant_key: str
+    source_url: str
+    width: int | None
+    height: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -17,6 +26,12 @@ class CollectedImageMetadata:
     origin_width: int | None
     origin_height: int | None
     raw_extra_json: str
+    subtitle: str | None = None
+    description: str | None = None
+    location_text: str | None = None
+    published_at_utc: str | None = None
+    portrait_image_url: str | None = None
+    download_variants: tuple[CollectedDownloadVariant, ...] = field(default_factory=tuple)
 
 
 BingImageMetadata = CollectedImageMetadata

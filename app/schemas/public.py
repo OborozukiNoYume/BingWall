@@ -66,6 +66,14 @@ class PublicWallpaperListData(BaseModel):
     items: list[PublicWallpaperSummary]
 
 
+class PublicWallpaperDownloadVariant(BaseModel):
+    resource_id: int
+    variant_key: str
+    width: int | None
+    height: int | None
+    download_url: str
+
+
 class PublicWallpaperDetailData(BaseModel):
     id: int
     title: str
@@ -76,6 +84,7 @@ class PublicWallpaperDetailData(BaseModel):
     wallpaper_date: str
     preview_url: str
     download_url: str | None
+    download_variants: list[PublicWallpaperDownloadVariant]
     is_downloadable: bool
     width: int | None
     height: int | None

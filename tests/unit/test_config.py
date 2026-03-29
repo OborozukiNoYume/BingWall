@@ -1,10 +1,17 @@
+from pathlib import Path
 import os
 
+from _pytest.monkeypatch import MonkeyPatch
 import pytest
 from pydantic import ValidationError
 
 from app.core.config import load_bootstrap_admin_settings, load_settings, reset_settings_cache
 from tests.conftest import clear_bingwall_env
+
+
+@pytest.fixture(autouse=True)
+def isolate_from_repo_env(tmp_path: Path, monkeypatch: MonkeyPatch) -> None:
+    monkeypatch.chdir(tmp_path)
 
 
 def set_valid_env() -> None:
@@ -20,6 +27,8 @@ def set_valid_env() -> None:
     os.environ["BINGWALL_BACKUP_DIR"] = "./var/backups"
     os.environ["BINGWALL_COLLECT_BING_ENABLED"] = "true"
     os.environ["BINGWALL_COLLECT_BING_DEFAULT_MARKET"] = "en-US"
+    os.environ["BINGWALL_COLLECT_BING_MARKETS"] = "en-US,zh-CN,ja-JP"
+    os.environ["BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS"] = "5"
     os.environ["BINGWALL_COLLECT_BING_TIMEOUT_SECONDS"] = "10"
     os.environ["BINGWALL_COLLECT_BING_MAX_DOWNLOAD_RETRIES"] = "3"
     os.environ["BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED"] = "true"
@@ -56,12 +65,47 @@ def test_settings_load_valid_configuration() -> None:
     assert settings.app_host == "127.0.0.1"
     assert settings.app_port == 8000
     assert settings.collect_bing_default_market == "en-US"
+    assert settings.collect_bing_markets == ("en-US", "zh-CN", "ja-JP")
+    assert settings.collect_bing_scheduled_backtrack_days == 5
     assert settings.collect_bing_max_download_retries == 3
     assert settings.collect_auto_publish_enabled is True
     assert str(settings.storage_oss_public_base_url) == "https://cdn.example.com/bingwall"
     assert settings.security_session_ttl_hours == 12
 
     clear_bingwall_env()
+
+
+def test_settings_allow_missing_oss_public_base_url() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ.pop("BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL", None)
+    reset_settings_cache()
+
+    settings = load_settings()
+
+    assert settings.storage_oss_public_base_url is None
+
+    clear_bingwall_env()
+
+
+def test_settings_reject_empty_oss_public_base_url() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ["BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL"] = ""
+    reset_settings_cache()
+
+    with pytest.raises(ValidationError):
+        load_settings()
+
+
+def test_settings_reject_blank_bing_markets() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ["BINGWALL_COLLECT_BING_MARKETS"] = " , "
+    reset_settings_cache()
+
+    with pytest.raises(ValidationError):
+        load_settings()
 
 
 def test_bootstrap_admin_settings_require_username_and_password_together() -> None:

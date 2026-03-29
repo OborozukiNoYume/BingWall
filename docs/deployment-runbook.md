@@ -2,13 +2,13 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-25T14:24:30Z
+- 更新时间：2026-03-29T07:12:10Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
 ## 当前状态说明
 
-当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查与资源巡检闭环、阶段二 `T2.5` 的备份恢复脚本与恢复演练入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
+当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查、资源巡检与本地资源归档清理闭环、阶段二 `T2.5` 的备份恢复脚本与恢复演练入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
 
 ## 1. 部署目标
 
@@ -40,6 +40,7 @@
 - 当前仓库已生成 `.python-version`、`.nvmrc` 和 `requirements.lock.txt`
 - 当前仓库已生成 `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example`
 - 当前已确认 `Python 3.14.2` 为一期开发基线，阶段一初始化代码时必须围绕该版本生成运行时与依赖锁定文件
+- 当前后端依赖基线已固定为 `FastAPI 0.118.3`，该版本官方支持 `Python 3.14`，并兼容当前锁定的 `Starlette 0.47.3`
 - 当前已确认 `Node.js 24.13.0` 为前端与构建运行时基线；若后续引入 Node.js 构建链路，必须补充对应版本锁定文件
 - SQLite、Nginx、cron 的精确版本必须在目标部署环境创建时记录到部署清单
 
@@ -86,7 +87,7 @@
 | 服务配置 | 监听地址、端口、基础 URL |
 | 数据库配置 | SQLite 文件路径 |
 | 存储配置 | 临时目录、正式目录、备份目录 |
-| 采集配置 | 来源开关、市场、超时、重试次数 |
+| 采集配置 | 来源开关、默认市场、市场列表、定时回溯天数、超时、重试次数 |
 | 安全配置 | 会话密钥、登录过期时间、密码策略 |
 | 日志配置 | 级别、目录、保留天数 |
 | 告警配置 | 邮件或 Webhook 地址 |
@@ -126,6 +127,13 @@
 - 任何敏感值都不能写入仓库
 - 所有时间相关配置内部按 UTC 处理
 
+### Bing 采集配置补充
+
+- `BINGWALL_COLLECT_BING_DEFAULT_MARKET` 仍表示公开站点和手动采集默认使用的 Bing 市场代码，必须使用 `en-US` 这类带连字符的 Bing 市场格式
+- `BINGWALL_COLLECT_BING_MARKETS` 用于 cron 定时建任务；值为逗号分隔的市场列表，例如 `en-US,zh-CN,ja-JP`，系统会自动去重并忽略空白项
+- `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 用于 Bing 定时任务快照中的回溯窗口，当前只允许 `3`、`5`、`7`
+- 如果未单独配置 `BINGWALL_COLLECT_BING_MARKETS`，环境示例默认只创建 `en-US` 一个 Bing 定时任务
+
 ## 5. 服务拓扑
 
 ### Nginx
@@ -161,6 +169,7 @@
 - 手动采集任务消费
 - 失败重试
 - 资源巡检
+- 资源归档清理
 - 备份任务
 
 ## 6. 启动与运行要求
@@ -176,10 +185,14 @@
 - 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 自动公开开关：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`，默认 `true`；开启时，新采集内容会在资源全部就绪后自动公开
 - 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
+- 定时固定日期建任务命令：`make create-scheduled-collection-tasks`
+- 本地联调便捷命令：`make scheduled-collect`
 - 手动采集任务消费命令：`make consume-collection-tasks`
 - 资源巡检命令：`make inspect-resources`
+- 资源归档命令：`make archive-wallpapers`
 - 备份命令：`make backup`
 - 恢复命令：`make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1`
+- `cron` 一键安装命令：`make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env`
 - 本地开发验证命令：`make verify`
 - 仓库内自动化部署验收命令：`make verify-deploy`
 - 仓库内恢复演练命令：`make verify-backup-restore`
@@ -189,6 +202,8 @@
 - `systemd` 服务模板：`deploy/systemd/bingwall-api.service`
 - 目录权限模板：`deploy/systemd/bingwall.tmpfiles.conf`
 - Nginx 路由模板：`deploy/nginx/bingwall.conf`
+- `cron` 示例模板：`deploy/cron/bingwall-cron`
+- `cron` 安装脚本：`scripts/install_cron.py`
 
 ### 仓库内自动化部署验收
 
@@ -215,10 +230,11 @@
 
 1. 把仓库代码部署到 `/opt/bingwall/app`
 2. 使用 `python3.14` 在 `/opt/bingwall/app/.venv` 创建虚拟环境并安装 `pip install -e .`
-3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径
+3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `.venv/bin/python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
 6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`、`nginx -t`、`systemctl reload nginx`
+7. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
 
 ### 生产环境模板说明
 
@@ -234,7 +250,10 @@
 - 统一创建数据库、图片、日志、备份和配置目录
 - 正式资源目录使用 `bingwall:www-data` 和 `2750`
 - 临时目录、失败目录、数据库目录不对 Nginx 开放
+- 仅本地文件存储时，应保持 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 未设置，不要写成空字符串
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
+- 如需让 Bing 定时采集覆盖多个地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=en-US,zh-CN,ja-JP`
+- 如需调整 Bing 定时采集回溯窗口，可把 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 设为 `3`、`5` 或 `7`
 - 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
 - 如需保留“采集后先人工审核再发布”的旧策略，可在环境文件中把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`
 
@@ -248,12 +267,34 @@
 
 ### 定时任务
 
-后续必须补齐：
+当前仓库已提供：
 
-- 自动采集 cron 表达式
-- 手动任务消费 cron 表达式
-- 巡检 cron 表达式
-- 备份 cron 表达式
+- `scripts/create_scheduled_collection_tasks.py`：按当天 UTC 日期为每个已启用来源创建 `queued` 的 `scheduled_collect` 任务；其中 Bing 会按市场列表分别建任务，并把 `date_from`、`date_to`、`backtrack_days` 一并写入任务快照
+- `deploy/cron/bingwall-cron`：目标机 `cron` 配置模板，当前默认包含“每日创建固定日期采集任务”“每分钟消费采集队列”“每日资源巡检”“每日资源归档”“每日一致性备份”五条任务，并固定写入 `CRON_TZ=UTC`
+- `scripts/install_cron.py` 与 `make install-cron`：渲染模板中的真实路径、校验输入、备份当前用户已有 `crontab`，再把完整计划任务安装到当前用户 `crontab`
+
+行为说明：
+
+- cron 消费固定日期任务时，若上游在当天 UTC 边界尚未提供对应日期图片，系统会在最近 `8` 天窗口内自动回退到最近可用日期，并写入 `resolve_date_fallback` 任务日志；手动任务仍保持严格日期匹配
+- Bing 定时任务会按 `BINGWALL_COLLECT_BING_MARKETS` 逐个市场建任务，并把 `count` 与 `backtrack_days` 同步写入任务快照；当前回溯天数只允许 `3`、`5`、`7`
+- Bing 定时任务会先读取回溯窗口内的元数据，再优先匹配固定日期；若当天无图，则回退到窗口内最近可用日期
+- NASA APOD 定时任务写入 `count=1`，但消费阶段会把上游查询窗口扩展到最近 `8` 天，并在当天无图时回退到最近可用日期
+- 若同来源同市场同 `date_from/date_to/backtrack_days` 组合已存在 `queued`、`running`、`succeeded` 或 `partially_failed` 的 `cron` 任务，新脚本会跳过创建，避免重复堆积；若历史任务为 `failed`，则允许重建
+- 模板中的每条命令都会先加载 `/etc/bingwall/bingwall.env`，确保 `cron` 与 `systemd` 使用同一套生产环境变量，而不是退回仓库根目录 `.env`
+
+建议部署步骤：
+
+1. 确认 `/opt/bingwall/app`、`/opt/bingwall/app/.venv/bin/python`、`/var/log/bingwall` 与 `/etc/bingwall/bingwall.env` 已存在且权限正确
+2. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
+3. 观察安装输出中的 `backup_path`，记录当前用户旧 `crontab` 备份位置，便于回滚
+4. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
+5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
+6. 观察 `/var/log/bingwall/create-scheduled-collection-tasks.log`、`consume-collection-tasks.log`、`inspect-resources.log`、`archive-wallpapers.log` 与 `backup.log`，确认首轮计划任务结果
+
+当前目标机仍需补齐：
+
+- 执行一次真实目标机安装并确认首轮任务运行
+- 生产机日志轮转确认
 
 ### 健康检查
 
@@ -263,6 +304,7 @@
 - `GET /api/health/ready`：确认配置、数据库和关键目录可用；失败时返回 `503`
 - `GET /api/health/deep`：返回最近一次采集任务摘要、磁盘使用率和资源目录摘要；严重异常时返回 `503`
 - `make inspect-resources`：巡检数据库就绪资源与正式资源目录的一致性，发现资源缺失时自动刷新资源与内容状态
+- `make archive-wallpapers`：把本地 ready 资源迁移到统一结构化路径，清理临时目录遗留文件、空文件和重复孤儿文件，并把损坏资源隔离到失败目录；若发现损坏资源或目标路径存在内容冲突，命令会返回非零退出码
 
 ## 7. 日志要求
 
@@ -352,7 +394,8 @@
 4. 恢复完成后启动或重启应用与代理服务
 5. 执行 `curl http://127.0.0.1/api/health/deep`
 6. 执行 `make inspect-resources`
-7. 验证 `curl http://127.0.0.1/`、`curl http://127.0.0.1/api/public/site-info` 和后台登录/后台列表接口
+7. 执行 `make archive-wallpapers`
+8. 验证 `curl http://127.0.0.1/`、`curl http://127.0.0.1/api/public/site-info` 和后台登录/后台列表接口
 
 ## 10. 上线前检查清单
 
@@ -377,7 +420,8 @@
 8. 执行 `curl http://127.0.0.1/`
 9. 如已有正式资源，执行 `curl -I http://127.0.0.1/images/<正式资源相对路径>`
 10. 执行 `make inspect-resources`
-11. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
+11. 执行 `make archive-wallpapers`
+12. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
 
 ### 完整上线检查（阶段二目标）
 
@@ -394,7 +438,7 @@
 
 ## 11. 当前已知缺口
 
-- 尚未完成目标机 cron 安装与计划配置
+- 尚未完成目标机执行 `make install-cron` 后的首轮运行确认
 
 补充说明：
 

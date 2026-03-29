@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 import logging
 from collections.abc import Iterator
 from typing import Annotated
@@ -7,6 +8,7 @@ from typing import Any
 
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import Path
 from fastapi import Request
 
 from app.api.errors import build_success_response
@@ -133,6 +135,53 @@ def get_public_random_wallpaper(
     )
     data = service.get_random_wallpaper()
     logger.info("Public random wallpaper served.")
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/wallpapers/by-market/{market_code}",
+    response_model=SuccessEnvelope[PublicWallpaperDetailData],
+    responses=ERROR_RESPONSES,
+)
+def get_public_wallpaper_by_market(
+    market_code: Annotated[str, Path(min_length=2, max_length=32)],
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
+    data = service.get_latest_wallpaper_by_market(market_code=market_code)
+    logger.info("Public wallpaper by market served: market=%s", market_code)
+    return build_success_response(request=request, data=data.model_dump())
+
+
+@router.get(
+    "/wallpapers/by-date/{wallpaper_date}",
+    response_model=SuccessEnvelope[PublicWallpaperDetailData],
+    responses=ERROR_RESPONSES,
+)
+def get_public_wallpaper_by_date(
+    wallpaper_date: date,
+    request: Request,
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[PublicRepository, Depends(get_public_repository)],
+) -> dict[str, object]:
+    service = PublicCatalogService(
+        repository,
+        resource_locator=ResourceLocator.from_settings(settings),
+    )
+    data = service.get_wallpaper_by_date(
+        wallpaper_date=wallpaper_date,
+        default_market_code=settings.collect_bing_default_market,
+    )
+    logger.info(
+        "Public wallpaper by date served: wallpaper_date=%s default_market=%s",
+        wallpaper_date.isoformat(),
+        settings.collect_bing_default_market,
+    )
     return build_success_response(request=request, data=data.model_dump())
 
 

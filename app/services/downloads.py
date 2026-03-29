@@ -44,6 +44,7 @@ class DownloadService:
     ) -> PublicDownloadEventData:
         target = self.repository.get_public_download_target(
             wallpaper_id=payload.wallpaper_id,
+            resource_id=payload.resource_id,
             current_time_utc=utc_now_isoformat(),
         )
         if target is None:
@@ -54,12 +55,6 @@ class DownloadService:
             )
 
         resource_id = int(target["resource_id"])
-        if payload.resource_id is not None and payload.resource_id != resource_id:
-            raise ApiError(
-                status_code=409,
-                error_code="PUBLIC_DOWNLOAD_RESOURCE_MISMATCH",
-                message="下载资源已更新，请刷新页面后重试",
-            )
 
         redirect_url = self.resource_locator.build_required_url(
             storage_backend=str(target["storage_backend"]) if target["storage_backend"] else None,

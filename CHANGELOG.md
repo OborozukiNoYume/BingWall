@@ -1,5 +1,517 @@
 # CHANGELOG
 
+## 2026-03-29T07:58:59Z
+
+### 变更内容
+
+- 更新 [web/public/assets/site.js](web/public/assets/site.js) 与 [web/public/assets/site.css](web/public/assets/site.css)，在公开列表页新增“按日期查找壁纸”区域，加入日期选择器和提交按钮；提交后前端会单独调用 `/api/public/wallpapers/by-date/{wallpaper_date}`，展示该日期对应的一张公开壁纸，同时保留现有“按市场查看最新壁纸”区和下方分页列表不变
+- 更新 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，补充前端静态资源断言，确认公开脚本已引用 `/api/public/wallpapers/by-date/` 与 `date_lookup` 状态字段，样式文件已包含日期查找区类名
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录前端日期查找入口的行为说明、影响范围、验证步骤、回滚口径和时间戳
+
+### 变更原因
+
+- 用户希望前端页面增加“按日期筛选 / 查找壁纸”能力，并明确要求复用已经存在的 `/api/public/wallpapers/by-date/{date}` 接口
+- 现有 `/wallpapers` 页面已经同时承担分页列表、关键词、标签、地区和分辨率组合筛选；如果把“按日期精确查一张”直接混入列表筛选，会改变当前分页查询语义，增加回归风险
+- 因此本次采用最保守方案：保留原有列表查询链路不变，只额外增加一个独立日期查找区，单独消费 `by-date` 单条接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T07:58:59Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开前端静态脚本、公开前端样式、公开前端集成测试，以及项目总说明和状态文档
+- 访问 `/wallpapers` 时，页面顶部现在除市场下拉外，还会显示一个日期选择器；选择日期并提交后，会读取该日期对应的一张公开壁纸并显示预览、元信息和跳转入口
+- 所选日期会保存在当前页面 URL 查询串中，刷新页面后仍可继续查看该日期结果
+- 下方原有的关键词、地区、标签、分辨率和分页列表仍保持原语义，继续调用 `/api/public/wallpapers`，不受日期单条查询区影响
+- 本次不包含后端 API 变更、数据库结构调整、后台页面改版、依赖升级或公开列表接口契约修改
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_frontend.py tests/integration/test_public_api.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [web/public/assets/site.js](web/public/assets/site.js) 中新增的日期查找区与 `/api/public/wallpapers/by-date/` 调用，恢复 [web/public/assets/site.css](web/public/assets/site.css) 的新增样式，并回退 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py) 与相关文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，公开前端会恢复为仅支持市场单条查看、列表筛选和详情页查看，不再在 `/wallpapers` 页面顶部直接提供按日期精确查找公开壁纸的入口
+
+## 2026-03-29T07:41:15Z
+
+### 变更内容
+
+- 更新 [web/public/assets/site.js](web/public/assets/site.js) 与 [web/public/assets/site.css](web/public/assets/site.css)，在公开列表页新增“按市场查看最新壁纸”区域，固定提供 `zh-CN`、`en-US`、`ja-JP` 三个下拉选项；切换后前端会调用 `/api/public/wallpapers/by-market/{market_code}` 并展示该市场最新一张公开壁纸，同时保留下方原有分页列表和筛选表单
+- 更新 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，补充前端静态资源断言，确认公开脚本已引用 `/api/public/wallpapers/by-market/` 且包含固定市场选项，样式文件已包含新区域的类名
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录前端市场选择入口的行为说明、影响范围、验证步骤、回滚口径和时间戳
+
+### 变更原因
+
+- 用户希望前端页面能直接按市场查看壁纸，并明确要求下拉框支持 `zh-CN`、`en-US`、`ja-JP` 三个选项，同时复用已经存在的 `/api/public/wallpapers/by-market/{market_code}` 接口
+- 现有 `/wallpapers` 页面虽然已经支持通过列表接口做地区筛选，但那是“列表查询”语义；如果直接把它替换成单条市场接口，会把现有分页和组合筛选行为改坏
+- 因此本次采用最保守方案：保留现有列表筛选链路不变，只额外增加一个独立市场结果区，单独消费 `by-market` 单条接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T07:41:15Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开前端静态脚本、公开前端样式、公开前端集成测试，以及项目总说明和状态文档
+- 访问 `/wallpapers` 时，页面顶部现在会显示一个固定市场下拉；选择 `zh-CN`、`en-US` 或 `ja-JP` 后，会立即读取该市场最新一张公开壁纸并显示预览、元信息和跳转入口
+- 下方原有的关键词、地区、标签、分辨率和分页列表仍保持原语义，继续调用 `/api/public/wallpapers`，不受市场单条查询区影响
+- 本次不包含后端 API 变更、数据库结构调整、后台页面改版、依赖升级或公开列表接口契约修改
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_frontend.py tests/integration/test_public_api.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [web/public/assets/site.js](web/public/assets/site.js) 中新增的市场选择区与 `/api/public/wallpapers/by-market/` 调用，恢复 [web/public/assets/site.css](web/public/assets/site.css) 的新增样式，并回退 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py) 与相关文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，公开前端会恢复为仅支持列表接口筛选和详情页查看，不再在 `/wallpapers` 页面顶部直接展示固定市场最新壁纸
+
+## 2026-03-29T07:12:10Z
+
+### 变更内容
+
+- 新增 [scripts/install_cron.py](scripts/install_cron.py) 与 [Makefile](Makefile) 中的 `make install-cron`，提供目标机 `cron` 一键安装入口；脚本会校验输入路径、渲染模板中的真实路径、备份当前用户已有 `crontab`，再安装新的 BingWall 计划任务
+- 更新 [deploy/cron/bingwall-cron](deploy/cron/bingwall-cron)，把模板改为占位符形式，固定加入 `CRON_TZ=UTC`、`MAILTO=""`，并让每条任务在执行前显式加载 `/etc/bingwall/bingwall.env`；同时补齐“建任务、消费队列、资源巡检、资源归档、备份”五条默认表达式
+- 新增 [tests/integration/test_install_cron.py](tests/integration/test_install_cron.py)，补齐模板渲染、伪造 `crontab` 安装与相对路径拒绝三类回归测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步记录新入口、行为说明、目标机执行步骤、验证方式、影响范围和回滚口径
+
+### 变更原因
+
+- 之前仓库虽然已经有 `deploy/cron/bingwall-cron`，但仍需要人工改路径、手动执行 `crontab` 安装，而且模板只覆盖“建任务”和“消费队列”两条示例，不够支撑项目当前已落地的巡检、归档和备份闭环
+- 更关键的是，生产环境配置当前约定保存在 `/etc/bingwall/bingwall.env`，而旧模板没有在 `cron` 中显式加载这份环境文件，目标机即使安装成功，也可能因为拿不到正式环境变量而运行在错误配置下
+- 因此本次采用最保守修复：不改采集逻辑、不改数据库结构，只补齐 `cron` 安装入口、模板渲染与环境加载链路，并把已经存在的运维命令接入默认计划任务
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T07:12:10Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖目标机 `cron` 安装脚本、`Makefile` 运维入口、`cron` 模板、对应集成测试，以及运行与部署文档
+- 现在目标机可以直接以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`，不再需要人工编辑模板后再手动调用 `crontab`
+- 新模板默认会安装 5 条计划任务，并固定按 UTC 解释表达式；同时所有命令都显式加载 `/etc/bingwall/bingwall.env`，避免 `cron` 与 `systemd` 使用不同环境配置
+- 安装前会先备份当前用户旧 `crontab` 到日志目录中的时间戳文件，便于在出问题时直接回滚
+- 本次不包含系统用户创建、Nginx 部署方式调整、`systemd` 服务改版、日志轮转策略落地或更广义的运维编排替换
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_install_cron.py`
+- 执行 `./.venv/bin/python -m ruff check scripts/install_cron.py tests/integration/test_install_cron.py`
+- 执行 `./.venv/bin/python -m mypy scripts/install_cron.py tests/integration/test_install_cron.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [scripts/install_cron.py](scripts/install_cron.py)、恢复 [deploy/cron/bingwall-cron](deploy/cron/bingwall-cron) 为旧版两条示例、移除 [Makefile](Makefile) 中的 `make install-cron` 入口，并回退对应测试与文档记录，或执行 `git revert` 回退本次提交
+- 若已经在目标机执行过新安装脚本，可使用安装输出中的 `backup_path` 重新执行 `crontab <backup_path>`，把当前用户 `crontab` 回退到安装前状态
+
+## 2026-03-29T06:32:02Z
+
+### 变更内容
+
+- 更新 [app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/api/public/routes.py](app/api/public/routes.py)，新增 `/api/public/wallpapers/by-market/{market_code}` 与 `/api/public/wallpapers/by-date/{wallpaper_date}` 两个公开单条查询接口，分别支持按地区获取最新公开壁纸、按日期精确获取公开壁纸
+- 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐新接口的可见性过滤、默认市场优先、404 返回以及 `download_variants` 全部分辨率下载链接回归测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新接口用途、返回结构、验证示例、影响范围和回滚口径
+
+### 变更原因
+
+- 现有公开 API 虽然已经支持列表筛选、今日壁纸、随机壁纸和按 `wallpaper_id` 查详情，但缺少两个最直接的单条读取入口：按地区拿最新壁纸、按日期精确拿壁纸
+- 现有公开详情已经能返回 `download_variants` 全部分辨率链接，因此本次最保守做法是不改列表结构，只补两个单条接口并统一复用详情返回契约
+- 因此本次改动聚焦在公开 API 查询能力补齐，不扩展数据库结构、不新增依赖、不改后台接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T06:32:02Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开 API 路由、公开查询服务与仓储、公开 API 集成测试，以及公开接口说明文档
+- 新增 `/api/public/wallpapers/by-market/{market_code}` 后，调用方可以不先查列表，直接按地区拿到最新一张公开壁纸
+- 新增 `/api/public/wallpapers/by-date/{wallpaper_date}` 后，调用方可以按 `YYYY-MM-DD` 精确读取一张公开壁纸；若同日有多地区候选，仍优先站点默认市场
+- 两个新接口都返回与既有公开详情一致的结构，继续包含 `download_url` 和 `download_variants`，因此调用方可以直接拿到全部可下载分辨率链接
+- 本次不包含数据库结构调整、公开列表字段扩展、后台页面改版、下载登记协议变更或对象存储写入链路改写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m ruff check app/api/public/routes.py app/services/public_catalog.py app/repositories/public_repository.py tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m mypy app/api/public/routes.py app/services/public_catalog.py app/repositories/public_repository.py tests/integration/test_public_api.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [app/api/public/routes.py](app/api/public/routes.py) 中新增的两个公开接口，并回退 [app/services/public_catalog.py](app/services/public_catalog.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py) 与对应测试、文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，调用方将重新只能通过公开列表、今日、随机或按 `wallpaper_id` 详情间接获取目标内容，不能再直接按地区或按日期精确读取单条壁纸
+
+## 2026-03-29T04:33:18Z
+
+### 变更内容
+
+- 更新 [app/services/source_collection.py](app/services/source_collection.py)、[app/services/image_variants.py](app/services/image_variants.py)、[app/services/resource_paths.py](app/services/resource_paths.py)、[app/repositories/collection_repository.py](app/repositories/collection_repository.py) 与 [app/repositories/health_repository.py](app/repositories/health_repository.py)，把本地资源相对路径统一收敛为 `source/year/month/day_market_type_resolution.ext` 结构化格式，并补齐原图、缩略图、预览图和下载图的统一路径生成、尺寸计算与路径更新能力
+- 新增 [app/services/resource_archive.py](app/services/resource_archive.py)、[scripts/run_wallpaper_archive.py](scripts/run_wallpaper_archive.py) 与 [Makefile](Makefile) 中的 `make archive-wallpapers`，提供历史 ready 资源归档、临时目录清理、空文件删除、重复孤儿文件删除、孤儿文件隔离与损坏资源降级入口
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_resource_archive.py](tests/integration/test_resource_archive.py)、[tests/unit/test_resource_locator.py](tests/unit/test_resource_locator.py) 与 [tests/unit/test_resource_paths.py](tests/unit/test_resource_paths.py)，补齐结构化路径落库断言、历史资源迁移、孤儿文件清理、损坏资源隔离和路径构造回归测试
+- 更新 [app/api/admin/routes.py](app/api/admin/routes.py)、[app/collectors/bing.py](app/collectors/bing.py)、[app/domain/resource_variants.py](app/domain/resource_variants.py)、[app/services/public_catalog.py](app/services/public_catalog.py)、[app/services/scheduled_collection.py](app/services/scheduled_collection.py) 与 [scripts/verify_t1_6.py](scripts/verify_t1_6.py)，清理仓库内原有的格式化阻塞，并为部署验收脚本补齐精确返回类型，确保全仓格式与类型校验可通过
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步记录新的归档命令、行为说明、验证步骤和回滚口径
+
+### 变更原因
+
+- 现有采集链路的资源文件名仍混用旧占位和历史路径风格，导致后续巡检、归档和人工排障时，难以从路径直接判断来源、日期、资源类型和分辨率
+- 历史正式资源目录中还可能残留临时文件、空文件、重复孤儿文件，或者数据库仍显示 `ready` 但本地图片已损坏的脏状态，需要一个保守、可重复执行的清理入口
+- 仓库内还存在少量与本次交付无关的历史格式化/类型标注遗留问题，会阻塞全仓质量门禁，因此一并做最小修正以恢复可提交状态
+- 因此本次采用最保守修复：不改数据库结构、不改公开接口契约，只统一本地资源路径规则并新增归档清理脚本与回归测试
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T04:33:18Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地资源相对路径生成规则、采集后资源落盘位置、历史资源归档清理脚本、对应单元/集成测试，以及运行文档
+- 额外影响到 6 个历史文件的代码格式，以及 `scripts/verify_t1_6.py` 的静态类型声明；这些改动不改变运行时业务行为，只用于恢复全仓校验可用性
+- 现在本地资源会统一命名为 `source/year/month/day_market_type_resolution.ext` 形式；对原图会省略 `resource_type` 段，其他派生版本会显式带上 `thumbnail`、`preview`、`download`
+- `make archive-wallpapers` 会清理临时目录遗留文件、空文件和重复孤儿文件，把无法关联的有效孤儿文件移动到失败目录，并在发现损坏 ready 资源时同步将数据库资源状态与壁纸公开状态降级
+- 本次不包含数据库迁移、公开 API 字段调整、后台页面改版、对象存储写入链路重写或更广义的健康检查改版
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_resource_paths.py tests/unit/test_resource_locator.py tests/integration/test_bing_collection_service.py tests/integration/test_resource_archive.py`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t1_6.py scripts/verify_t2_5.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [app/services/resource_archive.py](app/services/resource_archive.py)、[app/services/resource_paths.py](app/services/resource_paths.py) 与 [scripts/run_wallpaper_archive.py](scripts/run_wallpaper_archive.py)，恢复 [app/services/source_collection.py](app/services/source_collection.py) 中旧的相对路径生成方式，并回退对应测试与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，新采集资源会重新使用旧路径风格，历史 ready 资源不会自动归档到统一结构化路径，临时/空/重复孤儿文件和损坏 ready 资源也不会通过独立命令集中处理
+
+## 2026-03-29T03:33:52Z
+
+### 变更内容
+
+- 更新 [pyproject.toml](pyproject.toml)，将直接依赖 `fastapi` 从 `0.116.1` 升级到 `0.118.3`，保持其他直接依赖版本不变
+- 更新 [requirements.lock.txt](requirements.lock.txt)，用现有 `pip` 工具链重建锁文件，使依赖声明与虚拟环境实际安装结果保持一致
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/README.md](docs/README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新的 FastAPI 基线、兼容性依据、安装排障方式、验证步骤与回滚口径
+
+### 变更原因
+
+- 当前仓库运行时已经固定为 `Python 3.14.2`，但直接依赖仍停留在 `fastapi==0.116.1`，与官方后续补齐的 Python `3.14` 支持口径不一致
+- 项目锁文件当前已固定 `starlette==0.47.3`，因此本次优先选择能继续兼容该版本范围、同时满足 Python `3.14` 支持的最小 FastAPI 版本，避免直接追到最新版带来额外行为变更风险
+
+### 依赖变更
+
+- 直接依赖：`fastapi` 从 `0.116.1` 升级到 `0.118.3`
+- 间接依赖：保持 `starlette==0.47.3` 不变，仍满足 FastAPI `0.118.3` 的依赖范围
+- 变更时间：`2026-03-29T03:33:52Z`
+- 依赖类型：直接依赖升级，无新增第三方依赖
+
+### 影响范围
+
+- 影响范围覆盖 Python 包依赖声明、锁文件、运行与部署说明、项目状态记录和环境搭建排障文档
+- 本次不包含业务接口改版、数据库迁移、技术栈替换、其他依赖连带升级或前后端功能扩展
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pip install -e ".[dev]"`
+- 执行 `./.venv/bin/python -m pip freeze --all --exclude-editable > requirements.lock.txt`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可将 `fastapi` 恢复到 `0.116.1`，重新安装依赖并重建 `requirements.lock.txt`，再回退本次新增的文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，项目将重新回到“Python `3.14.2` 运行时 + FastAPI `0.116.1`”的旧依赖组合，不再保持与官方 Python `3.14` 支持声明一致
+
+## 2026-03-29T03:19:48Z
+
+### 变更内容
+
+- 更新 [app/core/config.py](app/core/config.py)、[app/services/scheduled_collection.py](app/services/scheduled_collection.py) 与 [tests/unit/test_config.py](tests/unit/test_config.py)，新增 `BINGWALL_COLLECT_BING_MARKETS`、`BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 两个配置项及其校验，让 Bing 定时建任务可按市场列表逐个创建，并把回溯窗口写入任务快照
+- 更新 [app/collectors/bing.py](app/collectors/bing.py)、[app/domain/collection.py](app/domain/collection.py)、[app/repositories/collection_repository.py](app/repositories/collection_repository.py)、[app/services/source_collection.py](app/services/source_collection.py) 与 [app/repositories/migrations/versions/V0008__wallpapers_bing_portrait_image_url.sql](app/repositories/migrations/versions/V0008__wallpapers_bing_portrait_image_url.sql)，补齐 Bing 的 `subtitle`、`description`、`location_text`、`published_at_utc`、`portrait_image_url` 落库，并在重复续采时先校验现有本地资源是否缺失、尺寸不符或内容损坏，必要时自动清理并重建
+- 更新 [tests/integration/test_scheduled_collection.py](tests/integration/test_scheduled_collection.py)、[tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)、[tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py) 与 [tests/conftest.py](tests/conftest.py)，补齐多市场 cron 任务快照、回溯窗口、迁移字段、跨市场去重边界以及损坏资源自动修复的回归测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/data-model.md](docs/data-model.md)、[.env.example](.env.example) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，同步记录新增配置、任务行为、数据字段、验证方式和回滚说明
+
+### 变更原因
+
+- 之前的 Bing 定时建任务仍按“单市场、单日固定窗口”记录快照，已经不符合当前实现中“按市场列表逐个调度、窗口长度可配置”的行为
+- 之前的 Bing 落库字段还缺少若干已在采集链路中可提取的元数据，文档和数据库结构也没有同步记录竖版图地址
+- 现有重复续采只覆盖“零资源半成品补齐”，还没有覆盖“数据库显示 ready，但本地文件已损坏或不完整”的情况，因此需要在不扩大范围的前提下把修复口径补齐
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增数据库迁移：`V0008__wallpapers_bing_portrait_image_url.sql`
+- 变更时间：`2026-03-29T03:19:48Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Bing 配置加载、cron 定时任务快照、Bing 壁纸元数据落库、资源续采修复逻辑、数据库迁移结构、环境示例与运行文档
+- 现在 Bing cron 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场分别建任务，并把 `backtrack_days`、`date_from`、`date_to` 明确写入任务详情；同时，已存在但文件损坏的本地资源会在后续同键采集时自动重建
+- 本次不包含公开 API 新字段扩展、后台页面改版、技术栈调整、外部依赖升级或更广义的重试策略重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_config.py tests/integration/test_scheduled_collection.py tests/integration/test_bing_collection_service.py`
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_sqlite_migrations.py tests/integration/test_admin_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可回退 `V0008` 迁移、恢复 Bing 定时建任务的旧快照结构、删除新增配置项和元数据字段写入逻辑，并回退对应测试与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，Bing cron 会恢复为单市场固定窗口口径，后台任务详情将不再记录 `backtrack_days`，且已存在但文件损坏的本地资源不会在重复采集时自动重建
+
+## 2026-03-29T01:44:31Z
+
+### 变更内容
+
+- 更新 [`.env.example`](.env.example) 与 [`deploy/systemd/bingwall.env.example`](deploy/systemd/bingwall.env.example)，把 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 从空字符串示例改为默认注释掉，仅在资源使用 `storage_backend = oss` 时再填写真实公网地址
+- 更新 [`tests/unit/test_config.py`](tests/unit/test_config.py)，补充“变量未设置时允许加载”和“变量为空字符串时必须报错”的配置回归测试
+- 更新 [`README.md`](README.md)、[`PROJECT_STATE.md`](PROJECT_STATE.md)、[`docs/deployment-runbook.md`](docs/deployment-runbook.md) 与 [`CHANGELOG.md`](CHANGELOG.md)，同步记录本次修复原因、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 之前两个环境示例文件都把 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 写成了空字符串，占位方式与当前配置模型不一致
+- 当前配置模型允许该变量完全不设置，但不允许设置为空字符串；部署人员若直接复制示例文件，容易在本地文件存储场景下触发启动期配置校验失败
+- 因此本次采用最保守修复：保持现有配置校验逻辑不变，只修正示例文件、补足测试并统一文档口径
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T01:44:31Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地与生产环境变量示例、配置加载单元测试，以及运行与部署文档说明
+- 现在复制示例环境文件后，默认不会再因为 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL=` 空值而触发配置校验失败；仅在启用 OSS / CDN 公网访问时才需要显式填写该变量
+- 本次不包含配置模型放宽、公开 API 字段变化、数据库结构调整或资源定位逻辑重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_config.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [`.env.example`](.env.example) 与 [`deploy/systemd/bingwall.env.example`](deploy/systemd/bingwall.env.example) 中原先的空字符串示例，并回退新增单测与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，部署人员再次直接复制示例文件时，仍可能因为把 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 留空写入环境文件而触发启动失败
+
+## 2026-03-29T01:06:21Z
+
+### 变更内容
+
+- 更新 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/services/admin_collection.py](app/services/admin_collection.py)，为 `cron` 固定日期采集补充“最近可用日期回退”逻辑：当上游在当天 UTC 边界尚未提供目标日期图片时，消费器会把上游查询窗口扩展到最近 `8` 天，并自动选择不晚于请求日期的最近可用日期继续采集，同时写入 `resolve_date_fallback` 任务日志
+- 更新 [tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py)，新增 Bing / NASA APOD 的 cron 回退测试，以及“后台手动任务仍保持严格日期匹配”的回归测试
+- 更新 [tests/unit/test_config.py](tests/unit/test_config.py)，让配置单测在临时目录中运行，避免仓库根目录 `.env` 干扰“缺少配置应报错”的断言
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录本次修复原因、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 实测“创建当天固定日期任务并立即消费”时，Bing 与 NASA APOD 在 `2026-03-29` 都可能因为上游尚未发布当天图片而直接失败，导致健康检查降级、后台任务记录报错，但直接采集最新可用图片本身是正常的
+- 原有逻辑只要固定日期过滤后为空，就一律记为失败，没有区分“真正无数据”与“UTC 切日早于上游发布日期”的场景
+- 因此本次采用最保守修复：仅对 `cron` 单日任务增加最近可用日期回退；后台手动任务和既有日期范围语义保持不变
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T01:06:21Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖固定日期采集任务消费逻辑、cron 任务日志可观测性、对应集成测试，以及运行说明文档
+- 现在 `cron` 固定日期任务在当天无图时，会自动回退到最近 `8` 天窗口内的最近可用日期继续采集，而不是直接失败；日志中可通过 `resolve_date_fallback` 明确看到回退事实
+- 本次不包含数据库结构调整、公开 API 字段变化、后台页面改版、手动采集日期规则放宽或新的外部依赖引入
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_admin_collection.py tests/integration/test_bing_collection_service.py tests/integration/test_multi_source_collection.py tests/integration/test_scheduled_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app/services/source_collection.py app/services/admin_collection.py tests/integration/test_admin_collection.py`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/services/admin_collection.py](app/services/admin_collection.py) 中“固定日期未命中即直接失败”的旧逻辑，并回退新增测试与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，`cron` 固定日期任务在 UTC 切日早于上游发布日期的场景下会重新直接失败，健康检查和后台任务列表也会再次暴露这类失败记录
+
+## 2026-03-29T00:40:29Z
+
+### 变更内容
+
+- 更新 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/repositories/collection_repository.py](app/repositories/collection_repository.py)，把同业务键去重逻辑收紧为“仅对已存在资源记录的壁纸直接判定为重复”；若历史异常中断后只留下壁纸主体、尚未写入任何 `image_resources`，则后续采集会继续补齐资源而不是直接跳过
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)，新增“已有零资源半成品记录时可修复式重试”的集成测试，确保修复不会破坏既有重复跳过行为
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录本次修复的原因、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 本地数据库在缺少 `V0007` 迁移时执行过一次 Bing 采集，导致壁纸主体已写入，但 `image_resources` 因表结构旧版本报错而未能创建
+- 现有去重逻辑只要命中同业务键就直接跳过，没有区分“完整已采集数据”和“只有主体、没有资源的半成品记录”
+- 因此本次采用最保守修复：不改变既有完整重复数据的跳过规则，只为“零资源半成品”补一个可恢复的重试入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T00:40:29Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖采集服务的业务键去重判定、采集仓储的资源存在性判断，以及对应的 Bing 采集集成测试和项目文档
+- 现在当历史异常中断留下零资源半成品时，再次执行同业务键采集会继续生成原图、缩略图、预览图和下载图，而不是直接记为重复
+- 本次不包含数据库结构变更、公开 API 字段调整、后台页面改版或更广义的失败重试策略重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_bing_collection_service.py`
+- 执行 `./.venv/bin/python -m ruff check app/services/source_collection.py app/repositories/collection_repository.py tests/integration/test_bing_collection_service.py`
+- 执行 `./.venv/bin/python -m mypy app/services/source_collection.py app/repositories/collection_repository.py tests/integration/test_bing_collection_service.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/services/source_collection.py](app/services/source_collection.py) 中“命中同业务键即直接跳过”的旧逻辑，并回退新增测试和文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，历史异常留下的零资源半成品记录会再次被当成重复数据直接跳过，仍需人工清理或手动修库后再采集
+
+## 2026-03-28T15:43:24Z
+
+### 变更内容
+
+- 更新 [app/collectors/bing.py](app/collectors/bing.py)，把 Bing 下载分辨率候选列表进一步收敛为 5 种：`UHD`、`1920x1200`、`1920x1080`、`1366x768`、`720x1280`
+- 更新 [tests/unit/test_bing_collector.py](tests/unit/test_bing_collector.py)，把断言从“15 种官方分辨率”调整为“当前允许的 5 种分辨率”，避免未来误把其他尺寸重新加回
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md)、[docs/data-model.md](docs/data-model.md) 与 [CHANGELOG.md](CHANGELOG.md)，把上一版“15 种”说明统一改为当前 5 种口径
+
+### 变更原因
+
+- 你进一步收敛了业务要求：当前只保留 `3840x2160`、`1920x1200`、`1920x1080`、`1366x768`、`720x1280` 这 5 种分辨率
+- 因此上一版“15 种官方分辨率”的实现和文档已经不再符合当前需求，需要立即缩小候选表和测试断言，避免继续抓取不需要的尺寸
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-28T15:43:24Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Bing 下载候选地址生成、对应单元测试和项目文档
+- 现在 Bing 只会尝试 5 种分辨率，不再抓取 `1280x768`、`1280x720`、`1024x768`、`800x600`、`800x480`、`480x800` 等其他尺寸
+- 本次不包含数据库结构调整、公开 API 字段变化或前端页面改版
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_bing_collector.py tests/integration/test_bing_collection_service.py tests/integration/test_public_api.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/collectors/bing.py](app/collectors/bing.py) 中更宽的候选分辨率列表，并回退测试与文档同步内容，或执行 `git revert` 回退本次提交
+- 回滚后系统会重新抓取当前已移除的其他尺寸
+
+## 2026-03-28T15:30:09Z
+
+### 变更内容
+
+- 更新 [app/domain/collection.py](app/domain/collection.py)、[app/collectors/bing.py](app/collectors/bing.py)、[app/services/source_collection.py](app/services/source_collection.py) 与 [app/services/bing_collection.py](app/services/bing_collection.py)，为采集元数据新增多分辨率下载变体描述，并把 Bing 抓取链路从“只抓一张下载图”扩展为“按已知官方分辨率逐个尝试、成功的全部落盘落库”；同一张 Bing 壁纸现在会保留多条 `download` 资源，默认原图优先使用最高可用分辨率
+- 新增迁移 [app/repositories/migrations/versions/V0007__image_resource_download_resolution_variants.sql](app/repositories/migrations/versions/V0007__image_resource_download_resolution_variants.sql)，为 `image_resources` 增加 `variant_key` 字段，并把唯一约束从 `(wallpaper_id, resource_type)` 调整为 `(wallpaper_id, resource_type, variant_key)`，允许同一壁纸存在多条不同分辨率的下载资源
+- 更新 [app/repositories/download_repository.py](app/repositories/download_repository.py)、[app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/downloads.py](app/services/downloads.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/schemas/public.py](app/schemas/public.py)，公开详情现在会返回 `download_variants` 多分辨率列表，`download_url` 保留为默认下载地址，`POST /api/public/download-events` 则支持按指定 `resource_id` 跳转对应分辨率
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_public_api.py](tests/integration/test_public_api.py)、[tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py) 等测试，补齐 Bing 多分辨率入库、公开详情返回全部分辨率、指定资源下载登记、迁移结构和资源状态兼容回归
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md)、[docs/data-model.md](docs/data-model.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录本次多分辨率抓取、接口返回、数据结构、验证方式和回滚说明
+
+### 变更原因
+
+- 现有 Bing 抓取链路只保存单一下载尺寸，无法满足“同一张图抓取 Bing 所有分辨率”的需求
+- 在现有设计里，`image_resources` 对同一 `resource_type` 只允许一条记录，这会直接阻止多分辨率下载资源入库
+- 因此本次采用最保守且可交付的方案：保留现有 `original / thumbnail / preview` 语义不变，只把多分辨率能力扩展到 `download` 资源，并复用既有公开详情和下载登记链路
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增数据库迁移：`V0007__image_resource_download_resolution_variants.sql`
+- 变更时间：`2026-03-28T15:30:09Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Bing 采集、图片资源唯一约束、公开详情返回结构、下载登记目标解析、资源状态汇总逻辑，以及相关集成测试和文档
+- 公开详情接口现在会同时返回默认 `download_url` 与 `download_variants`；旧客户端继续使用默认下载地址不会中断，新客户端可以按 `resource_id` 选择具体分辨率
+- 本次不包含公开页面多分辨率选择器改版、后台详情页分辨率列表展示、对象存储写入链路替换或其他来源的多分辨率适配
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_bing_collection_service.py tests/integration/test_public_api.py tests/integration/test_sqlite_migrations.py tests/integration/test_download_statistics.py tests/integration/test_health_checks.py`
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_admin_collection.py tests/integration/test_multi_source_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可回退 `V0007` 迁移、删除 `variant_key` 相关仓储与公开接口扩展、恢复 Bing 单一下载图逻辑，并回退对应测试与文档更新，或执行 `git revert` 回退本次提交
+- 回滚后系统会恢复为“每张壁纸只保留一条下载资源记录、公开详情只返回单个 `download_url`、不支持按指定分辨率资源下载”的状态
+
+## 2026-03-28T14:34:00Z
+
+### 变更内容
+
+- 新增 [app/services/scheduled_collection.py](app/services/scheduled_collection.py)、[scripts/create_scheduled_collection_tasks.py](scripts/create_scheduled_collection_tasks.py) 与 [deploy/cron/bingwall-cron](deploy/cron/bingwall-cron)，补齐“按当天 UTC 日期创建固定日期采集任务”的定时入口；脚本会为已启用来源写入 `trigger_type = cron`、`task_type = scheduled_collect`、`date_from = date_to = 当天` 的 `queued` 任务，并在同来源同日期已有非失败 cron 任务时保守跳过
+- 更新 [app/repositories/admin_collection_repository.py](app/repositories/admin_collection_repository.py) 与 [Makefile](Makefile)，补充定时建任务所需的近期任务查询方法、`make create-scheduled-collection-tasks` 命令，以及本地联调便捷入口 `make scheduled-collect`
+- 新增 [tests/integration/test_scheduled_collection.py](tests/integration/test_scheduled_collection.py)，覆盖定时任务创建、同日非失败任务跳过、失败任务允许重建三个关键场景
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步本次定时采集落地方式、影响范围、验证步骤、部署示例与回滚说明
+
+### 变更原因
+
+- 当前后台手动采集已经支持固定日期范围，但仓库里缺少“每天自动按当天日期建任务”的脚本和 `cron` 模板，导致自动采集仍停留在设计层，没有形成可直接部署的闭环
+- 直接新起一套独立下载逻辑风险较高，会绕开现有任务状态、日志、重试与后台观测链路
+- 因此本次采用更保守的方案：只新增“定时建任务”这一层薄封装，继续复用现有任务消费器执行实际下载
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-28T14:34:00Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖定时采集任务创建脚本、目标机 `cron` 示例模板、命令入口、后台任务记录与对应的集成测试
+- 管理后台现在可以看到由 `cron` 自动创建的固定日期采集任务，任务详情中的 `date_from` / `date_to` 会明确显示具体日期，而不是只表现为“最近 N 张”
+- 本次不包含后台页面改版、数据库结构调整、调度系统替换、消息队列引入或现有采集下载主链路重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_scheduled_collection.py tests/integration/test_admin_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 `scripts/create_scheduled_collection_tasks.py`、`deploy/cron/bingwall-cron`、`make create-scheduled-collection-tasks` / `make scheduled-collect` 入口，以及对应测试和文档更新，或执行 `git revert` 回退本次提交
+- 回滚后仓库将恢复为“只能后台手动创建固定日期任务，或由现有消费器执行 queued 任务，但不提供每日自动创建当天任务脚本”的状态
+
 ## 2026-03-27T16:46:29Z
 
 ### 变更内容

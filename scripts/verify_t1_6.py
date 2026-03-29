@@ -15,6 +15,7 @@ import time
 import urllib.error
 import urllib.request
 import uuid
+from typing import TypedDict
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -39,6 +40,12 @@ class VerificationPaths:
     public_dir: Path
     log_dir: Path
     nginx_config_path: Path
+
+
+class HttpResponse(TypedDict):
+    status: int
+    headers: dict[str, str]
+    body: bytes
 
 
 def parse_args() -> argparse.Namespace:
@@ -329,19 +336,17 @@ def start_uvicorn_under_systemd(*, paths: VerificationPaths, unit_name: str) -> 
     ]
     for key, value in env_vars.items():
         command.append(f"--setenv={key}={value}")
-    command.extend(
-        [
-            str(VENV_PYTHON),
-            "-m",
-            "uvicorn",
-            "app.main:create_app",
-            "--factory",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            str(APP_PORT),
-        ]
-    )
+    command.extend([
+        str(VENV_PYTHON),
+        "-m",
+        "uvicorn",
+        "app.main:create_app",
+        "--factory",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        str(APP_PORT),
+    ])
     run_command(command, description="systemd-run uvicorn")
     wait_for_url(f"http://127.0.0.1:{APP_PORT}/api/health/live", expected_status=200)
 
@@ -484,7 +489,7 @@ def wait_for_url(url: str, *, expected_status: int) -> None:
     raise VerificationError(f"Timed out waiting for {url} to return HTTP {expected_status}.")
 
 
-def fetch(url: str) -> dict[str, object]:
+def fetch(url: str) -> HttpResponse:
     request = urllib.request.Request(url, method="GET")
     try:
         with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:

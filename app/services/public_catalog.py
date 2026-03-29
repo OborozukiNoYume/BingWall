@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC
+from datetime import date
 from datetime import datetime
 import math
 from sqlite3 import Row
@@ -13,6 +14,7 @@ from app.schemas.public import PublicSiteInfoData
 from app.schemas.public import PublicSortFilterOption
 from app.schemas.public import PublicTagFilterOption
 from app.schemas.public import PublicTagListData
+from app.schemas.public import PublicWallpaperDownloadVariant
 from app.schemas.public import PublicWallpaperDetailData
 from app.schemas.public import PublicWallpaperFiltersData
 from app.schemas.public import PublicWallpaperListData
@@ -54,11 +56,19 @@ class PublicCatalogService:
         return PublicWallpaperListData(items=items), pagination
 
     def get_wallpaper_detail(self, *, wallpaper_id: int) -> PublicWallpaperDetailData:
+        current_time_utc = utc_now_isoformat()
         row = self.repository.get_visible_wallpaper_by_id(
             wallpaper_id=wallpaper_id,
-            current_time_utc=utc_now_isoformat(),
+            current_time_utc=current_time_utc,
         )
-        return self._build_wallpaper_detail(self._require_visible_wallpaper(row))
+        wallpaper_row = self._require_visible_wallpaper(row)
+        return self._build_wallpaper_detail(
+            wallpaper_row,
+            self.repository.list_visible_download_resources(
+                wallpaper_id=int(wallpaper_row["id"]),
+                current_time_utc=current_time_utc,
+            ),
+        )
 
     def get_today_wallpaper(self, *, default_market_code: str) -> PublicWallpaperDetailData:
         current_time_utc = utc_now_isoformat()
@@ -67,11 +77,62 @@ class PublicCatalogService:
             current_date=utc_today_isoformat(),
             default_market_code=default_market_code,
         )
-        return self._build_wallpaper_detail(self._require_visible_wallpaper(row))
+        wallpaper_row = self._require_visible_wallpaper(row)
+        return self._build_wallpaper_detail(
+            wallpaper_row,
+            self.repository.list_visible_download_resources(
+                wallpaper_id=int(wallpaper_row["id"]),
+                current_time_utc=current_time_utc,
+            ),
+        )
+
+    def get_latest_wallpaper_by_market(self, *, market_code: str) -> PublicWallpaperDetailData:
+        current_time_utc = utc_now_isoformat()
+        row = self.repository.get_latest_visible_wallpaper_for_market(
+            current_time_utc=current_time_utc,
+            market_code=market_code,
+        )
+        wallpaper_row = self._require_visible_wallpaper(row)
+        return self._build_wallpaper_detail(
+            wallpaper_row,
+            self.repository.list_visible_download_resources(
+                wallpaper_id=int(wallpaper_row["id"]),
+                current_time_utc=current_time_utc,
+            ),
+        )
+
+    def get_wallpaper_by_date(
+        self,
+        *,
+        wallpaper_date: date,
+        default_market_code: str,
+    ) -> PublicWallpaperDetailData:
+        current_time_utc = utc_now_isoformat()
+        row = self.repository.get_visible_wallpaper_for_date(
+            current_time_utc=current_time_utc,
+            wallpaper_date=wallpaper_date.isoformat(),
+            default_market_code=default_market_code,
+        )
+        wallpaper_row = self._require_visible_wallpaper(row)
+        return self._build_wallpaper_detail(
+            wallpaper_row,
+            self.repository.list_visible_download_resources(
+                wallpaper_id=int(wallpaper_row["id"]),
+                current_time_utc=current_time_utc,
+            ),
+        )
 
     def get_random_wallpaper(self) -> PublicWallpaperDetailData:
-        row = self.repository.get_random_visible_wallpaper(current_time_utc=utc_now_isoformat())
-        return self._build_wallpaper_detail(self._require_visible_wallpaper(row))
+        current_time_utc = utc_now_isoformat()
+        row = self.repository.get_random_visible_wallpaper(current_time_utc=current_time_utc)
+        wallpaper_row = self._require_visible_wallpaper(row)
+        return self._build_wallpaper_detail(
+            wallpaper_row,
+            self.repository.list_visible_download_resources(
+                wallpaper_id=int(wallpaper_row["id"]),
+                current_time_utc=current_time_utc,
+            ),
+        )
 
     def get_filters(self) -> PublicWallpaperFiltersData:
         market_codes = self.repository.list_visible_market_codes(
@@ -126,15 +187,33 @@ class PublicCatalogService:
             tag_category=_optional_text(row["tag_category"]),
         )
 
-    def _build_wallpaper_detail(self, row: Row) -> PublicWallpaperDetailData:
+    def _build_wallpaper_detail(
+        self,
+        row: Row,
+        download_variant_rows: list[Row],
+    ) -> PublicWallpaperDetailData:
         preview_url = self.resource_locator.build_required_url(
             storage_backend=_optional_text(row["preview_storage_backend"]),
             relative_path=str(row["preview_relative_path"]),
         )
-        download_url = self.resource_locator.build_required_url(
-            storage_backend=_optional_text(row["download_storage_backend"]),
-            relative_path=str(row["download_relative_path"]),
-        )
+        download_variants = [
+            PublicWallpaperDownloadVariant(
+                resource_id=int(variant_row["id"]),
+                variant_key=_present_variant_key(
+                    variant_key=_optional_text(variant_row["variant_key"]),
+                    width=_optional_int(variant_row["width"]),
+                    height=_optional_int(variant_row["height"]),
+                ),
+                width=_optional_int(variant_row["width"]),
+                height=_optional_int(variant_row["height"]),
+                download_url=self.resource_locator.build_required_url(
+                    storage_backend=_optional_text(variant_row["storage_backend"]),
+                    relative_path=str(variant_row["relative_path"]),
+                ),
+            )
+            for variant_row in download_variant_rows
+        ]
+        default_download = download_variants[0] if download_variants else None
         return PublicWallpaperDetailData(
             id=int(row["id"]),
             title=present_title(row),
@@ -144,10 +223,19 @@ class PublicCatalogService:
             market_code=str(row["market_code"]),
             wallpaper_date=str(row["wallpaper_date"]),
             preview_url=preview_url,
-            download_url=download_url if bool(row["is_downloadable"]) else None,
+            download_url=(
+                default_download.download_url
+                if bool(row["is_downloadable"]) and default_download is not None
+                else None
+            ),
+            download_variants=download_variants if bool(row["is_downloadable"]) else [],
             is_downloadable=bool(row["is_downloadable"]),
-            width=_optional_int(row["width"]),
-            height=_optional_int(row["height"]),
+            width=default_download.width
+            if default_download is not None
+            else _optional_int(row["width"]),
+            height=default_download.height
+            if default_download is not None
+            else _optional_int(row["height"]),
             source_name=str(row["source_name"]),
         )
 
@@ -194,3 +282,11 @@ def _optional_int(value: object) -> int | None:
         return int(value)
     msg = f"Unsupported integer value type: {type(value)!r}"
     raise TypeError(msg)
+
+
+def _present_variant_key(*, variant_key: str | None, width: int | None, height: int | None) -> str:
+    if variant_key:
+        return variant_key
+    if width is not None and height is not None:
+        return f"{width}x{height}"
+    return "default"

@@ -101,6 +101,7 @@ class AdminCollectionTaskSnapshot(BaseModel):
     market_code: str
     date_from: str | None = None
     date_to: str | None = None
+    backtrack_days: int | None = None
     force_refresh: bool | None = None
     count: int | None = None
     trigger_type: str | None = None

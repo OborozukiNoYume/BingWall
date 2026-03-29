@@ -4,18 +4,21 @@ from dataclasses import dataclass
 from datetime import UTC
 from datetime import date
 from datetime import datetime
+from datetime import timedelta
 import hashlib
 import json
 import logging
 from pathlib import Path
-import re
 from typing import Protocol
+from typing import cast
 from urllib.parse import parse_qs
 from urllib.parse import urlparse
 
 from app.domain.collection import CollectedImageMetadata
 from app.domain.collection import CollectionRunSummary
 from app.domain.collection import DownloadedImage
+from app.domain.collection_sources import COLLECTION_SOURCE_MAX_MANUAL_DAYS
+from app.domain.collection_sources import CollectionSourceType
 from app.domain.resource_variants import RESOURCE_TYPE_DOWNLOAD
 from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
 from app.domain.resource_variants import RESOURCE_TYPE_PREVIEW
@@ -27,12 +30,12 @@ from app.repositories.collection_repository import TaskItemCreateInput
 from app.repositories.collection_repository import WallpaperCreateInput
 from app.repositories.file_storage import FileStorage
 from app.services.image_variants import LoadedImage
+from app.services.image_variants import calculate_variant_dimensions
 from app.services.image_variants import generate_variant_image
 from app.services.image_variants import load_image_bytes
+from app.services.resource_paths import build_resource_relative_path
 
 logger = logging.getLogger(__name__)
-
-SAFE_PATH_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +43,15 @@ class VariantResourceRecord:
     resource_id: int
     resource_type: ResourceType
     relative_path: str
+    variant_key: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class DownloadedVariantRecord:
+    variant_key: str
+    source_url: str
+    downloaded: DownloadedImage
+    loaded_image: LoadedImage
 
 
 class CollectionSourceAdapter(Protocol):
@@ -56,6 +68,8 @@ class CollectionSourceAdapter(Protocol):
     ) -> list[CollectedImageMetadata]: ...
 
     def download_image(self, image_url: str) -> DownloadedImage: ...
+
+    def is_missing_resource_error(self, exc: Exception) -> bool: ...
 
     def build_relative_path(self, item: CollectedImageMetadata) -> str: ...
 
@@ -85,7 +99,13 @@ class SourceCollectionService:
         triggered_by: str | None,
         date_from: date | None = None,
         date_to: date | None = None,
+        latest_available_fallback_days: int | None = None,
     ) -> CollectionRunSummary:
+        fallback_days = latest_available_fallback_days
+        if fallback_days is None and trigger_type == "cron":
+            fallback_days = COLLECTION_SOURCE_MAX_MANUAL_DAYS[
+                cast(CollectionSourceType, self.adapter.source_type)
+            ]
         started_at_utc = utc_now_isoformat()
         request_snapshot_json = json.dumps(
             {
@@ -112,6 +132,7 @@ class SourceCollectionService:
             count=count,
             date_from=date_from,
             date_to=date_to,
+            latest_available_fallback_days=fallback_days,
         )
 
     def collect_existing_task(
@@ -122,6 +143,7 @@ class SourceCollectionService:
         count: int,
         date_from: date | None = None,
         date_to: date | None = None,
+        latest_available_fallback_days: int | None = None,
     ) -> CollectionRunSummary:
         return self._run_collection(
             task_id=task_id,
@@ -129,6 +151,7 @@ class SourceCollectionService:
             count=count,
             date_from=date_from,
             date_to=date_to,
+            latest_available_fallback_days=latest_available_fallback_days,
         )
 
     def _run_collection(
@@ -139,6 +162,7 @@ class SourceCollectionService:
         count: int,
         date_from: date | None,
         date_to: date | None,
+        latest_available_fallback_days: int | None,
     ) -> CollectionRunSummary:
         self.storage.ensure_directories()
 
@@ -148,17 +172,42 @@ class SourceCollectionService:
         failure_reasons: list[str] = []
 
         try:
-            metadata_items = self.adapter.fetch_metadata(
+            fetch_date_from, fetch_date_to = resolve_fetch_date_window(
+                date_from=date_from,
+                date_to=date_to,
+                latest_available_fallback_days=latest_available_fallback_days,
+            )
+            fetched_metadata_items = self.adapter.fetch_metadata(
                 market_code=market_code,
                 count=count,
+                date_from=fetch_date_from,
+                date_to=fetch_date_to,
+            )
+            metadata_items, fallback_date = select_metadata_items_for_collection(
+                metadata_items=fetched_metadata_items,
                 date_from=date_from,
                 date_to=date_to,
+                latest_available_fallback_days=latest_available_fallback_days,
             )
-            metadata_items = filter_metadata_items(
-                metadata_items=metadata_items,
-                date_from=date_from,
-                date_to=date_to,
-            )
+            if fallback_date is not None and date_from is not None:
+                fallback_message = (
+                    f"{self.adapter.display_name} 定时采集未命中请求日期 {date_from.isoformat()}，"
+                    f"已回退到最近可用日期 {fallback_date.isoformat()}。"
+                )
+                self.repository.create_task_item(
+                    TaskItemCreateInput(
+                        task_id=task_id,
+                        source_item_key=None,
+                        action_name="resolve_date_fallback",
+                        result_status="succeeded",
+                        dedupe_hit_type=None,
+                        db_write_result="used_latest_available_date",
+                        file_write_result=None,
+                        failure_reason=fallback_message,
+                        occurred_at_utc=utc_now_isoformat(),
+                    )
+                )
+                logger.warning(fallback_message)
             if not metadata_items:
                 if date_from is not None and date_to is not None:
                     msg = f"{self.adapter.display_name} 上游结果中没有命中请求日期范围的图片。"
@@ -247,65 +296,84 @@ class SourceCollectionService:
 
     def _collect_single_item(self, *, task_id: int, item: CollectedImageMetadata) -> str:
         wallpaper_date = item.wallpaper_date.isoformat()
+        created_at_utc = utc_now_isoformat()
+        wallpaper_input = self._build_wallpaper_create_input(
+            item=item,
+            wallpaper_date=wallpaper_date,
+            created_at_utc=created_at_utc,
+        )
         existing_wallpaper = self.repository.find_wallpaper_by_business_key(
             source_type=self.adapter.source_type,
             wallpaper_date=wallpaper_date,
             market_code=item.market_code,
         )
         if existing_wallpaper is not None:
+            existing_wallpaper_id = int(existing_wallpaper["id"])
+            self.repository.update_wallpaper_metadata(
+                wallpaper_id=existing_wallpaper_id,
+                item=wallpaper_input,
+                updated_at_utc=created_at_utc,
+            )
+            needs_resume, resume_reason = self._wallpaper_needs_resume(
+                wallpaper_id=existing_wallpaper_id
+            )
+            if not needs_resume:
+                self.repository.create_task_item(
+                    TaskItemCreateInput(
+                        task_id=task_id,
+                        source_item_key=item.source_key,
+                        action_name="dedupe_check",
+                        result_status="duplicated",
+                        dedupe_hit_type="business_key",
+                        db_write_result="skipped_existing_wallpaper",
+                        file_write_result=None,
+                        failure_reason=None,
+                        occurred_at_utc=utc_now_isoformat(),
+                    )
+                )
+                return "duplicated"
+
+            self._prepare_wallpaper_resume(
+                wallpaper_id=existing_wallpaper_id,
+                resume_reason=resume_reason,
+            )
             self.repository.create_task_item(
                 TaskItemCreateInput(
                     task_id=task_id,
                     source_item_key=item.source_key,
-                    action_name="dedupe_check",
-                    result_status="duplicated",
-                    dedupe_hit_type="business_key",
-                    db_write_result="skipped_existing_wallpaper",
+                    action_name="repair_incomplete_wallpaper",
+                    result_status="succeeded",
+                    dedupe_hit_type=None,
+                    db_write_result="resume_existing_wallpaper_resources",
                     file_write_result=None,
-                    failure_reason=None,
+                    failure_reason=resume_reason,
                     occurred_at_utc=utc_now_isoformat(),
                 )
             )
-            return "duplicated"
-
-        existing_resource = self.repository.find_image_resource_by_source_url_hash(
-            item.source_url_hash
-        )
-        if existing_resource is not None:
-            self.repository.create_task_item(
-                TaskItemCreateInput(
-                    task_id=task_id,
-                    source_item_key=item.source_key,
-                    action_name="dedupe_check",
-                    result_status="duplicated",
-                    dedupe_hit_type="source_url_hash",
-                    db_write_result="skipped_existing_resource",
-                    file_write_result=None,
-                    failure_reason=None,
-                    occurred_at_utc=utc_now_isoformat(),
-                )
-            )
-            return "duplicated"
-
-        created_at_utc = utc_now_isoformat()
-        wallpaper_id = self.repository.create_wallpaper(
-            WallpaperCreateInput(
+            wallpaper_id = existing_wallpaper_id
+        else:
+            existing_resource = self.repository.find_image_resource_by_source_url_hash_in_scope(
+                source_url_hash=item.source_url_hash,
                 source_type=self.adapter.source_type,
-                source_key=item.source_key,
                 market_code=item.market_code,
-                wallpaper_date=wallpaper_date,
-                title=item.title,
-                copyright_text=item.copyright_text,
-                source_name=item.source_name,
-                origin_page_url=item.origin_page_url,
-                origin_image_url=item.origin_image_url,
-                origin_width=item.origin_width,
-                origin_height=item.origin_height,
-                is_downloadable=item.is_downloadable,
-                raw_extra_json=item.raw_extra_json,
-                created_at_utc=created_at_utc,
             )
-        )
+            if existing_resource is not None:
+                self.repository.create_task_item(
+                    TaskItemCreateInput(
+                        task_id=task_id,
+                        source_item_key=item.source_key,
+                        action_name="dedupe_check",
+                        result_status="duplicated",
+                        dedupe_hit_type="source_url_hash",
+                        db_write_result="skipped_existing_resource",
+                        file_write_result=None,
+                        failure_reason=None,
+                        occurred_at_utc=utc_now_isoformat(),
+                    )
+                )
+                return "duplicated"
+
+            wallpaper_id = self.repository.create_wallpaper(wallpaper_input)
         relative_path = self.adapter.build_relative_path(item)
         filename = Path(relative_path).name
         file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"
@@ -346,6 +414,85 @@ class SourceCollectionService:
         )
         return "succeeded"
 
+    def _build_wallpaper_create_input(
+        self,
+        *,
+        item: CollectedImageMetadata,
+        wallpaper_date: str,
+        created_at_utc: str,
+    ) -> WallpaperCreateInput:
+        return WallpaperCreateInput(
+            source_type=self.adapter.source_type,
+            source_key=item.source_key,
+            market_code=item.market_code,
+            wallpaper_date=wallpaper_date,
+            title=item.title,
+            subtitle=item.subtitle,
+            description=item.description,
+            copyright_text=item.copyright_text,
+            source_name=item.source_name,
+            published_at_utc=item.published_at_utc,
+            location_text=item.location_text,
+            origin_page_url=item.origin_page_url,
+            origin_image_url=item.origin_image_url,
+            origin_width=item.origin_width,
+            origin_height=item.origin_height,
+            is_downloadable=item.is_downloadable,
+            portrait_image_url=item.portrait_image_url,
+            raw_extra_json=item.raw_extra_json,
+            created_at_utc=created_at_utc,
+        )
+
+    def _wallpaper_needs_resume(self, *, wallpaper_id: int) -> tuple[bool, str | None]:
+        resource_rows = self.repository.list_image_resources_for_wallpaper(
+            wallpaper_id=wallpaper_id
+        )
+        if not resource_rows:
+            return True, "wallpaper exists without any image resources"
+
+        for row in resource_rows:
+            if str(row["image_status"]) != "ready":
+                return True, f"resource {row['id']} is not ready"
+            if str(row["storage_backend"]) != "local":
+                continue
+            relative_path = str(row["relative_path"])
+            file_path = self.storage.public_dir / relative_path
+            if not file_path.is_file():
+                return True, f"resource file is missing: {relative_path}"
+            if row["file_size_bytes"] is not None and file_path.stat().st_size != int(
+                row["file_size_bytes"]
+            ):
+                return True, f"resource file size does not match: {relative_path}"
+            try:
+                load_image_bytes(file_path.read_bytes(), fallback_mime_type=None)
+            except Exception as exc:
+                return True, f"resource file failed integrity validation: {relative_path}: {exc}"
+        return False, None
+
+    def _prepare_wallpaper_resume(self, *, wallpaper_id: int, resume_reason: str | None) -> None:
+        resource_rows = self.repository.list_image_resources_for_wallpaper(
+            wallpaper_id=wallpaper_id
+        )
+        for row in resource_rows:
+            if str(row["storage_backend"]) != "local":
+                continue
+            relative_path = str(row["relative_path"])
+            cleanup_path(self.storage.public_dir / relative_path)
+            cleanup_path(self.storage.failed_dir / relative_path)
+            cleanup_path(self.storage.tmp_dir / relative_path)
+        self.repository.delete_image_resources_for_wallpaper(wallpaper_id=wallpaper_id)
+        self.repository.reset_wallpaper_for_resource_rebuild(
+            wallpaper_id=wallpaper_id,
+            updated_at_utc=utc_now_isoformat(),
+        )
+        if resume_reason:
+            logger.warning(
+                "Resume collection for %s wallpaper_id=%s because %s",
+                self.adapter.source_type,
+                wallpaper_id,
+                resume_reason,
+            )
+
     def _download_and_store_resource(
         self,
         *,
@@ -356,9 +503,11 @@ class SourceCollectionService:
         relative_path: str,
     ) -> None:
         try:
-            downloaded, loaded_image = self._download_original_image(
-                item=item,
-                relative_path=relative_path,
+            downloaded, loaded_image, actual_source_url, downloaded_variants = (
+                self._download_original_image(
+                    item=item,
+                    relative_path=relative_path,
+                )
             )
         except Exception as exc:
             processed_at_utc = utc_now_isoformat()
@@ -373,11 +522,45 @@ class SourceCollectionService:
             )
             raise
         content_hash = hashlib.sha256(downloaded.content).hexdigest()
+        original_file_ext = extract_file_ext_from_source_url(actual_source_url)
         original_mime_type = guess_mime_type(
-            file_ext=Path(relative_path).suffix.lstrip(".").lower(),
+            file_ext=original_file_ext,
             fallback=loaded_image.mime_type,
         )
         processed_at_utc = utc_now_isoformat()
+        canonical_original_relative_path = build_resource_relative_path(
+            source_type=self.adapter.source_type,
+            wallpaper_date=item.wallpaper_date,
+            market_code=item.market_code,
+            resource_type=RESOURCE_TYPE_ORIGINAL,
+            file_ext=original_file_ext,
+            width=loaded_image.width,
+            height=loaded_image.height,
+        )
+        self.repository.update_wallpaper_origin_metadata(
+            wallpaper_id=wallpaper_id,
+            origin_image_url=actual_source_url,
+            origin_width=loaded_image.width,
+            origin_height=loaded_image.height,
+            updated_at_utc=processed_at_utc,
+        )
+        self.repository.update_image_resource_source(
+            resource_id=original_resource_id,
+            source_url=actual_source_url,
+            source_url_hash=hashlib.sha256(actual_source_url.encode("utf-8")).hexdigest(),
+            updated_at_utc=processed_at_utc,
+        )
+        if canonical_original_relative_path != relative_path:
+            self.repository.update_image_resource_relative_path(
+                resource_id=original_resource_id,
+                relative_path=canonical_original_relative_path,
+                filename=Path(canonical_original_relative_path).name,
+                file_ext=original_file_ext,
+                mime_type=original_mime_type,
+                updated_at_utc=processed_at_utc,
+            )
+            relative_path = canonical_original_relative_path
+
         original_tmp_path = self.storage.tmp_path_for(relative_path)
         cleanup_path(original_tmp_path)
         try:
@@ -411,26 +594,20 @@ class SourceCollectionService:
             )
             raise RuntimeError(failure_reason) from exc
 
-        variant_resources = self._create_variant_resource_records(
+        variant_resources = self._create_non_download_variant_resource_records(
+            wallpaper_id=wallpaper_id,
+            item=item,
+            loaded_image=loaded_image,
+        )
+        download_resources = self._create_download_resource_records(
             wallpaper_id=wallpaper_id,
             item=item,
             original_relative_path=relative_path,
-            loaded_image=loaded_image,
+            original_loaded_image=loaded_image,
+            downloaded_variants=downloaded_variants,
         )
         try:
             for resource in variant_resources:
-                if resource.resource_type == RESOURCE_TYPE_DOWNLOAD:
-                    self._copy_original_as_download(
-                        resource=resource,
-                        original_relative_path=relative_path,
-                        original_content=downloaded.content,
-                        original_mime_type=original_mime_type,
-                        original_width=loaded_image.width,
-                        original_height=loaded_image.height,
-                        content_hash=content_hash,
-                        processed_at_utc=processed_at_utc,
-                    )
-                    continue
                 self._generate_variant_resource(
                     resource=resource,
                     original_image=loaded_image,
@@ -438,9 +615,28 @@ class SourceCollectionService:
                     task_id=task_id,
                     processed_at_utc=processed_at_utc,
                 )
+            for resource, downloaded_variant in zip(download_resources, downloaded_variants):
+                self._store_download_variant_resource(
+                    resource=resource,
+                    downloaded_variant=downloaded_variant,
+                    processed_at_utc=processed_at_utc,
+                )
+            if item.is_downloadable and not downloaded_variants and download_resources:
+                self._copy_original_as_download(
+                    resource=download_resources[0],
+                    original_relative_path=relative_path,
+                    original_content=downloaded.content,
+                    original_mime_type=original_mime_type,
+                    original_width=loaded_image.width,
+                    original_height=loaded_image.height,
+                    content_hash=content_hash,
+                    processed_at_utc=processed_at_utc,
+                )
         except Exception:
             self.repository.mark_pending_image_resources_failed(
-                resource_ids=tuple(resource.resource_id for resource in variant_resources),
+                resource_ids=tuple(
+                    resource.resource_id for resource in (*variant_resources, *download_resources)
+                ),
                 failure_reason="variant processing aborted after an earlier failure",
                 processed_at_utc=utc_now_isoformat(),
             )
@@ -465,29 +661,109 @@ class SourceCollectionService:
         *,
         item: CollectedImageMetadata,
         relative_path: str,
+    ) -> tuple[DownloadedImage, LoadedImage, str, list[DownloadedVariantRecord]]:
+        downloaded_variants = self._download_available_variants(
+            item=item,
+            original_relative_path=relative_path,
+        )
+        if downloaded_variants:
+            primary_variant = downloaded_variants[0]
+            return (
+                primary_variant.downloaded,
+                primary_variant.loaded_image,
+                primary_variant.source_url,
+                downloaded_variants,
+            )
+
+        downloaded, loaded_image = self._download_single_image(
+            image_url=item.origin_image_url,
+            failure_relative_path=relative_path,
+            source_key=item.source_key,
+        )
+        return downloaded, loaded_image, item.origin_image_url, []
+
+    def _download_available_variants(
+        self,
+        *,
+        item: CollectedImageMetadata,
+        original_relative_path: str,
+    ) -> list[DownloadedVariantRecord]:
+        if not item.download_variants:
+            return []
+
+        downloaded_variants: list[DownloadedVariantRecord] = []
+        for variant in item.download_variants:
+            try:
+                variant_file_ext = extract_file_ext_from_source_url(variant.source_url)
+                failure_relative_path = build_resource_relative_path(
+                    source_type=self.adapter.source_type,
+                    wallpaper_date=item.wallpaper_date,
+                    market_code=item.market_code,
+                    resource_type=RESOURCE_TYPE_DOWNLOAD,
+                    file_ext=variant_file_ext,
+                    width=variant.width,
+                    height=variant.height,
+                    variant_key=variant.variant_key,
+                )
+                downloaded, loaded_image = self._download_single_image(
+                    image_url=variant.source_url,
+                    failure_relative_path=failure_relative_path,
+                    source_key=item.source_key,
+                )
+            except Exception as exc:
+                if self.adapter.is_missing_resource_error(exc):
+                    logger.info(
+                        "Download variant unavailable for %s: variant=%s url=%s",
+                        item.source_key,
+                        variant.variant_key,
+                        variant.source_url,
+                    )
+                    continue
+                raise
+            downloaded_variants.append(
+                DownloadedVariantRecord(
+                    variant_key=variant.variant_key,
+                    source_url=variant.source_url,
+                    downloaded=downloaded,
+                    loaded_image=loaded_image,
+                )
+            )
+
+        if item.is_downloadable and item.download_variants and not downloaded_variants:
+            raise RuntimeError("No Bing download variants were available for this wallpaper.")
+        return downloaded_variants
+
+    def _download_single_image(
+        self,
+        *,
+        image_url: str,
+        failure_relative_path: str,
+        source_key: str,
     ) -> tuple[DownloadedImage, LoadedImage]:
         last_error: str | None = None
         for attempt in range(1, self.max_download_retries + 1):
             downloaded: DownloadedImage | None = None
             try:
-                downloaded = self.adapter.download_image(item.origin_image_url)
+                downloaded = self.adapter.download_image(image_url)
                 loaded_image = load_image_bytes(
                     downloaded.content,
                     fallback_mime_type=downloaded.mime_type,
                 )
                 return downloaded, loaded_image
             except Exception as exc:
-                last_error = f"download attempt {attempt} failed: {exc}"
                 if downloaded is not None:
                     self._move_failed_original_download(
-                        relative_path=relative_path,
+                        relative_path=failure_relative_path,
                         content=downloaded.content,
                     )
+                if self.adapter.is_missing_resource_error(exc):
+                    raise
+                last_error = f"download attempt {attempt} failed: {exc}"
                 logger.warning(
                     "Download attempt %s/%s failed for %s: %s",
                     attempt,
                     self.max_download_retries,
-                    item.source_key,
+                    source_key,
                     exc,
                 )
 
@@ -501,38 +777,33 @@ class SourceCollectionService:
         tmp_path.write_bytes(content)
         self.storage.move_to_failed(tmp_path=tmp_path, relative_path=relative_path)
 
-    def _create_variant_resource_records(
+    def _create_non_download_variant_resource_records(
         self,
         *,
         wallpaper_id: int,
         item: CollectedImageMetadata,
-        original_relative_path: str,
         loaded_image: LoadedImage,
     ) -> list[VariantResourceRecord]:
         created_at_utc = utc_now_isoformat()
         thumbnail_preview_ext = default_variant_file_ext(loaded_image=loaded_image)
         resources: list[VariantResourceRecord] = []
-        for resource_type in (
-            RESOURCE_TYPE_THUMBNAIL,
-            RESOURCE_TYPE_PREVIEW,
-            *((RESOURCE_TYPE_DOWNLOAD,) if item.is_downloadable else ()),
-        ):
-            if resource_type == RESOURCE_TYPE_DOWNLOAD:
-                relative_path = build_variant_relative_path(
-                    original_relative_path=original_relative_path,
-                    resource_type=resource_type,
-                    file_ext=Path(original_relative_path).suffix.lstrip(".").lower() or "jpg",
-                )
-                file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"
-                mime_type = guess_mime_type(file_ext=file_ext, fallback=loaded_image.mime_type)
-            else:
-                relative_path = build_variant_relative_path(
-                    original_relative_path=original_relative_path,
-                    resource_type=resource_type,
-                    file_ext=thumbnail_preview_ext,
-                )
-                file_ext = thumbnail_preview_ext
-                mime_type = guess_mime_type(file_ext=file_ext, fallback=None)
+        for resource_type in (RESOURCE_TYPE_THUMBNAIL, RESOURCE_TYPE_PREVIEW):
+            variant_width, variant_height = calculate_variant_dimensions(
+                width=loaded_image.width,
+                height=loaded_image.height,
+                resource_type=resource_type,
+            )
+            relative_path = build_resource_relative_path(
+                source_type=self.adapter.source_type,
+                wallpaper_date=item.wallpaper_date,
+                market_code=item.market_code,
+                resource_type=resource_type,
+                file_ext=thumbnail_preview_ext,
+                width=variant_width,
+                height=variant_height,
+            )
+            file_ext = thumbnail_preview_ext
+            mime_type = guess_mime_type(file_ext=file_ext, fallback=None)
             resource_id = self.repository.create_image_resource(
                 ResourceCreateInput(
                     wallpaper_id=wallpaper_id,
@@ -555,6 +826,97 @@ class SourceCollectionService:
                 )
             )
         return resources
+
+    def _create_download_resource_records(
+        self,
+        *,
+        wallpaper_id: int,
+        item: CollectedImageMetadata,
+        original_relative_path: str,
+        original_loaded_image: LoadedImage,
+        downloaded_variants: list[DownloadedVariantRecord],
+    ) -> list[VariantResourceRecord]:
+        if not item.is_downloadable:
+            return []
+
+        created_at_utc = utc_now_isoformat()
+        resources: list[VariantResourceRecord] = []
+        if downloaded_variants:
+            for variant in downloaded_variants:
+                file_ext = extract_file_ext_from_source_url(variant.source_url)
+                relative_path = build_resource_relative_path(
+                    source_type=self.adapter.source_type,
+                    wallpaper_date=item.wallpaper_date,
+                    market_code=item.market_code,
+                    resource_type=RESOURCE_TYPE_DOWNLOAD,
+                    file_ext=file_ext,
+                    width=variant.loaded_image.width,
+                    height=variant.loaded_image.height,
+                    variant_key=variant.variant_key,
+                )
+                resource_id = self.repository.create_image_resource(
+                    ResourceCreateInput(
+                        wallpaper_id=wallpaper_id,
+                        resource_type=RESOURCE_TYPE_DOWNLOAD,
+                        storage_backend="local",
+                        relative_path=relative_path,
+                        filename=Path(relative_path).name,
+                        file_ext=file_ext,
+                        mime_type=guess_mime_type(
+                            file_ext=file_ext,
+                            fallback=variant.loaded_image.mime_type,
+                        ),
+                        source_url=variant.source_url,
+                        source_url_hash=hashlib.sha256(
+                            variant.source_url.encode("utf-8")
+                        ).hexdigest(),
+                        created_at_utc=created_at_utc,
+                        variant_key=variant.variant_key,
+                    )
+                )
+                resources.append(
+                    VariantResourceRecord(
+                        resource_id=resource_id,
+                        resource_type=RESOURCE_TYPE_DOWNLOAD,
+                        relative_path=relative_path,
+                        variant_key=variant.variant_key,
+                    )
+                )
+            return resources
+
+        relative_path = build_resource_relative_path(
+            source_type=self.adapter.source_type,
+            wallpaper_date=item.wallpaper_date,
+            market_code=item.market_code,
+            resource_type=RESOURCE_TYPE_DOWNLOAD,
+            file_ext=Path(original_relative_path).suffix.lstrip(".").lower() or "jpg",
+            width=original_loaded_image.width,
+            height=original_loaded_image.height,
+        )
+        file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"
+        resource_id = self.repository.create_image_resource(
+            ResourceCreateInput(
+                wallpaper_id=wallpaper_id,
+                resource_type=RESOURCE_TYPE_DOWNLOAD,
+                storage_backend="local",
+                relative_path=relative_path,
+                filename=Path(relative_path).name,
+                file_ext=file_ext,
+                mime_type=guess_mime_type(
+                    file_ext=file_ext, fallback=original_loaded_image.mime_type
+                ),
+                source_url=None,
+                source_url_hash=None,
+                created_at_utc=created_at_utc,
+            )
+        )
+        return [
+            VariantResourceRecord(
+                resource_id=resource_id,
+                resource_type=RESOURCE_TYPE_DOWNLOAD,
+                relative_path=relative_path,
+            )
+        ]
 
     def _copy_original_as_download(
         self,
@@ -585,6 +947,45 @@ class SourceCollectionService:
             )
         except Exception as exc:
             failure_reason = f"download resource copy failed: {exc}"
+            if tmp_path.exists():
+                self.storage.move_to_failed(
+                    tmp_path=tmp_path,
+                    relative_path=resource.relative_path,
+                )
+            self.repository.mark_image_resource_failed(
+                resource_id=resource.resource_id,
+                failure_reason=failure_reason,
+                processed_at_utc=processed_at_utc,
+            )
+            raise RuntimeError(failure_reason) from exc
+
+    def _store_download_variant_resource(
+        self,
+        *,
+        resource: VariantResourceRecord,
+        downloaded_variant: DownloadedVariantRecord,
+        processed_at_utc: str,
+    ) -> None:
+        tmp_path = self.storage.tmp_path_for(resource.relative_path)
+        cleanup_path(tmp_path)
+        try:
+            tmp_path.write_bytes(downloaded_variant.downloaded.content)
+            self.storage.move_to_public(tmp_path=tmp_path, relative_path=resource.relative_path)
+            self.repository.mark_image_resource_ready(
+                resource_id=resource.resource_id,
+                file_size_bytes=len(downloaded_variant.downloaded.content),
+                width=downloaded_variant.loaded_image.width,
+                height=downloaded_variant.loaded_image.height,
+                content_hash=hashlib.sha256(downloaded_variant.downloaded.content).hexdigest(),
+                downloaded_at_utc=processed_at_utc,
+                integrity_check_result="passed",
+                mime_type=guess_mime_type(
+                    file_ext=extract_file_ext_from_source_url(downloaded_variant.source_url),
+                    fallback=downloaded_variant.loaded_image.mime_type,
+                ),
+            )
+        except Exception as exc:
+            failure_reason = f"download variant {resource.variant_key} store failed: {exc}"
             if tmp_path.exists():
                 self.storage.move_to_failed(
                     tmp_path=tmp_path,
@@ -661,11 +1062,15 @@ def build_source_relative_path(
     source_key: str,
     origin_image_url: str,
 ) -> str:
-    safe_source_key = SAFE_PATH_PATTERN.sub("-", source_key.replace(":", "-")).strip("-")
     file_ext = extract_file_ext_from_source_url(origin_image_url)
-    return (
-        f"{source_type}/{wallpaper_date.year:04d}/{wallpaper_date.month:02d}/"
-        f"{market_code}/{safe_source_key}.{file_ext}"
+    return build_resource_relative_path(
+        source_type=source_type,
+        wallpaper_date=wallpaper_date,
+        market_code=market_code,
+        resource_type=RESOURCE_TYPE_ORIGINAL,
+        file_ext=file_ext,
+        width=None,
+        height=None,
     )
 
 
@@ -694,16 +1099,6 @@ def extract_file_ext_from_source_url(source_url: str) -> str:
         if suffix:
             return suffix
     return "jpg"
-
-
-def build_variant_relative_path(
-    *,
-    original_relative_path: str,
-    resource_type: ResourceType,
-    file_ext: str,
-) -> str:
-    path = Path(original_relative_path)
-    return str(path.with_name(f"{path.stem}--{resource_type}.{file_ext}"))
 
 
 def default_variant_file_ext(*, loaded_image: LoadedImage) -> str:
@@ -739,6 +1134,69 @@ def filter_metadata_items(
     if date_from is None or date_to is None:
         return metadata_items
     return [item for item in metadata_items if date_from <= item.wallpaper_date <= date_to]
+
+
+def resolve_fetch_date_window(
+    *,
+    date_from: date | None,
+    date_to: date | None,
+    latest_available_fallback_days: int | None,
+) -> tuple[date | None, date | None]:
+    if not should_use_latest_available_fallback(
+        date_from=date_from,
+        date_to=date_to,
+        latest_available_fallback_days=latest_available_fallback_days,
+    ):
+        return date_from, date_to
+    assert date_from is not None
+    assert latest_available_fallback_days is not None
+    return date_from - timedelta(days=latest_available_fallback_days - 1), date_to
+
+
+def select_metadata_items_for_collection(
+    *,
+    metadata_items: list[CollectedImageMetadata],
+    date_from: date | None,
+    date_to: date | None,
+    latest_available_fallback_days: int | None,
+) -> tuple[list[CollectedImageMetadata], date | None]:
+    filtered_items = filter_metadata_items(
+        metadata_items=metadata_items,
+        date_from=date_from,
+        date_to=date_to,
+    )
+    if filtered_items:
+        return filtered_items, None
+    if not should_use_latest_available_fallback(
+        date_from=date_from,
+        date_to=date_to,
+        latest_available_fallback_days=latest_available_fallback_days,
+    ):
+        return filtered_items, None
+    assert date_from is not None
+    fallback_candidates = [item for item in metadata_items if item.wallpaper_date <= date_from]
+    if not fallback_candidates:
+        return [], None
+    fallback_date = max(item.wallpaper_date for item in fallback_candidates)
+    return (
+        [item for item in fallback_candidates if item.wallpaper_date == fallback_date],
+        fallback_date,
+    )
+
+
+def should_use_latest_available_fallback(
+    *,
+    date_from: date | None,
+    date_to: date | None,
+    latest_available_fallback_days: int | None,
+) -> bool:
+    return (
+        latest_available_fallback_days is not None
+        and latest_available_fallback_days > 1
+        and date_from is not None
+        and date_to is not None
+        and date_from == date_to
+    )
 
 
 def date_to_isoformat(value: date | None) -> str | None:

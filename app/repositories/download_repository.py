@@ -4,7 +4,7 @@ from pathlib import Path
 import sqlite3
 from typing import cast
 
-from app.domain.resource_variants import PUBLIC_DETAIL_DOWNLOAD_RESOURCE_TYPE
+from app.domain.resource_variants import RESOURCE_TYPE_DOWNLOAD
 from app.domain.resource_variants import RESOURCE_TYPE_ORIGINAL
 from app.repositories.sqlite import connect_sqlite
 
@@ -21,8 +21,49 @@ class DownloadRepository:
         self,
         *,
         wallpaper_id: int,
+        resource_id: int | None,
         current_time_utc: str,
     ) -> sqlite3.Row | None:
+        base_parameters: tuple[str | int | None, ...] = (
+            wallpaper_id,
+            current_time_utc,
+            current_time_utc,
+        )
+        if resource_id is not None:
+            row = self.connection.execute(
+                """
+                SELECT
+                    w.id,
+                    w.title,
+                    w.market_code,
+                    w.wallpaper_date,
+                    w.is_downloadable,
+                    r.id AS resource_id,
+                    r.relative_path,
+                    r.storage_backend
+                FROM wallpapers AS w
+                INNER JOIN image_resources AS r
+                    ON r.wallpaper_id = w.id
+                   AND r.image_status = 'ready'
+                WHERE w.id = ?
+                  AND w.content_status = 'enabled'
+                  AND w.is_public = 1
+                  AND w.resource_status = 'ready'
+                  AND (w.publish_start_at_utc IS NULL OR w.publish_start_at_utc <= ?)
+                  AND (w.publish_end_at_utc IS NULL OR w.publish_end_at_utc >= ?)
+                  AND r.id = ?
+                  AND (r.resource_type = ? OR r.resource_type = ?)
+                LIMIT 1;
+                """,
+                (
+                    *base_parameters,
+                    resource_id,
+                    RESOURCE_TYPE_DOWNLOAD,
+                    RESOURCE_TYPE_ORIGINAL,
+                ),
+            ).fetchone()
+            return cast(sqlite3.Row | None, row)
+
         row = self.connection.execute(
             """
             SELECT
@@ -31,20 +72,48 @@ class DownloadRepository:
                 w.market_code,
                 w.wallpaper_date,
                 w.is_downloadable,
-                COALESCE(download_resource.id, original_resource.id) AS resource_id,
-                COALESCE(download_resource.relative_path, original_resource.relative_path)
-                    AS relative_path,
-                COALESCE(download_resource.storage_backend, original_resource.storage_backend)
-                    AS storage_backend
+                download_resource.id AS resource_id,
+                download_resource.relative_path,
+                download_resource.storage_backend
+            FROM wallpapers AS w
+            INNER JOIN image_resources AS download_resource
+                ON download_resource.wallpaper_id = w.id
+               AND download_resource.resource_type = ?
+               AND download_resource.image_status = 'ready'
+            WHERE w.id = ?
+              AND w.content_status = 'enabled'
+              AND w.is_public = 1
+              AND w.resource_status = 'ready'
+              AND (w.publish_start_at_utc IS NULL OR w.publish_start_at_utc <= ?)
+              AND (w.publish_end_at_utc IS NULL OR w.publish_end_at_utc >= ?)
+            ORDER BY COALESCE(download_resource.width, 0) * COALESCE(download_resource.height, 0) DESC,
+                     download_resource.id ASC
+            LIMIT 1;
+            """,
+            (
+                RESOURCE_TYPE_DOWNLOAD,
+                *base_parameters,
+            ),
+        ).fetchone()
+        if row is not None:
+            return cast(sqlite3.Row, row)
+
+        legacy_row = self.connection.execute(
+            """
+            SELECT
+                w.id,
+                w.title,
+                w.market_code,
+                w.wallpaper_date,
+                w.is_downloadable,
+                original_resource.id AS resource_id,
+                original_resource.relative_path,
+                original_resource.storage_backend
             FROM wallpapers AS w
             INNER JOIN image_resources AS original_resource
                 ON original_resource.wallpaper_id = w.id
                AND original_resource.resource_type = ?
                AND original_resource.image_status = 'ready'
-            LEFT JOIN image_resources AS download_resource
-                ON download_resource.wallpaper_id = w.id
-               AND download_resource.resource_type = ?
-               AND download_resource.image_status = 'ready'
             WHERE w.id = ?
               AND w.content_status = 'enabled'
               AND w.is_public = 1
@@ -55,13 +124,10 @@ class DownloadRepository:
             """,
             (
                 RESOURCE_TYPE_ORIGINAL,
-                PUBLIC_DETAIL_DOWNLOAD_RESOURCE_TYPE,
-                wallpaper_id,
-                current_time_utc,
-                current_time_utc,
+                *base_parameters,
             ),
         ).fetchone()
-        return cast(sqlite3.Row | None, row)
+        return cast(sqlite3.Row | None, legacy_row)
 
     def insert_download_event(
         self,
