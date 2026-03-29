@@ -426,6 +426,18 @@ class CollectionRepository:
         ).fetchone()
         return cast(sqlite3.Row | None, row)
 
+    def wallpaper_has_image_resources(self, *, wallpaper_id: int) -> bool:
+        row = self.connection.execute(
+            """
+            SELECT 1
+            FROM image_resources
+            WHERE wallpaper_id = ?
+            LIMIT 1;
+            """,
+            (wallpaper_id,),
+        ).fetchone()
+        return row is not None
+
     def create_wallpaper(self, item: WallpaperCreateInput) -> int:
         cursor = self.connection.execute(
             """

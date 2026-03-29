@@ -99,6 +99,7 @@ make verify-deploy
 - SQLite 版本化迁移基线与核心表结构
 - 空库初始化与重复执行迁移能力
 - Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动
+- 当同业务键壁纸已存在但尚未生成任何资源记录时，后续同键采集不会再被直接判定为重复，而会继续补齐资源，避免历史异常中断后留下“只有主体、没有图片资源”的半成品记录
 - 新采集内容默认会在资源全部就绪后自动切到 `enabled + is_public=true`；如需保留人工审核，可通过 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false` 关闭自动公开
 - `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 八个公开接口；其中公开详情现会返回默认下载地址和 `download_variants` 多分辨率下载列表
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录

@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## 2026-03-29T00:40:29Z
+
+### 变更内容
+
+- 更新 [app/services/source_collection.py](app/services/source_collection.py) 与 [app/repositories/collection_repository.py](app/repositories/collection_repository.py)，把同业务键去重逻辑收紧为“仅对已存在资源记录的壁纸直接判定为重复”；若历史异常中断后只留下壁纸主体、尚未写入任何 `image_resources`，则后续采集会继续补齐资源而不是直接跳过
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)，新增“已有零资源半成品记录时可修复式重试”的集成测试，确保修复不会破坏既有重复跳过行为
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录本次修复的原因、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 本地数据库在缺少 `V0007` 迁移时执行过一次 Bing 采集，导致壁纸主体已写入，但 `image_resources` 因表结构旧版本报错而未能创建
+- 现有去重逻辑只要命中同业务键就直接跳过，没有区分“完整已采集数据”和“只有主体、没有资源的半成品记录”
+- 因此本次采用最保守修复：不改变既有完整重复数据的跳过规则，只为“零资源半成品”补一个可恢复的重试入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T00:40:29Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖采集服务的业务键去重判定、采集仓储的资源存在性判断，以及对应的 Bing 采集集成测试和项目文档
+- 现在当历史异常中断留下零资源半成品时，再次执行同业务键采集会继续生成原图、缩略图、预览图和下载图，而不是直接记为重复
+- 本次不包含数据库结构变更、公开 API 字段调整、后台页面改版或更广义的失败重试策略重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_bing_collection_service.py`
+- 执行 `./.venv/bin/python -m ruff check app/services/source_collection.py app/repositories/collection_repository.py tests/integration/test_bing_collection_service.py`
+- 执行 `./.venv/bin/python -m mypy app/services/source_collection.py app/repositories/collection_repository.py tests/integration/test_bing_collection_service.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/services/source_collection.py](app/services/source_collection.py) 中“命中同业务键即直接跳过”的旧逻辑，并回退新增测试和文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，历史异常留下的零资源半成品记录会再次被当成重复数据直接跳过，仍需人工清理或手动修库后再采集
+
 ## 2026-03-28T15:43:24Z
 
 ### 变更内容

@@ -264,59 +264,77 @@ class SourceCollectionService:
             market_code=item.market_code,
         )
         if existing_wallpaper is not None:
+            existing_wallpaper_id = int(existing_wallpaper["id"])
+            if self.repository.wallpaper_has_image_resources(wallpaper_id=existing_wallpaper_id):
+                self.repository.create_task_item(
+                    TaskItemCreateInput(
+                        task_id=task_id,
+                        source_item_key=item.source_key,
+                        action_name="dedupe_check",
+                        result_status="duplicated",
+                        dedupe_hit_type="business_key",
+                        db_write_result="skipped_existing_wallpaper",
+                        file_write_result=None,
+                        failure_reason=None,
+                        occurred_at_utc=utc_now_isoformat(),
+                    )
+                )
+                return "duplicated"
+
             self.repository.create_task_item(
                 TaskItemCreateInput(
                     task_id=task_id,
                     source_item_key=item.source_key,
-                    action_name="dedupe_check",
-                    result_status="duplicated",
-                    dedupe_hit_type="business_key",
-                    db_write_result="skipped_existing_wallpaper",
+                    action_name="repair_incomplete_wallpaper",
+                    result_status="succeeded",
+                    dedupe_hit_type=None,
+                    db_write_result="resume_existing_wallpaper_without_resources",
                     file_write_result=None,
                     failure_reason=None,
                     occurred_at_utc=utc_now_isoformat(),
                 )
             )
-            return "duplicated"
+            wallpaper_id = existing_wallpaper_id
+            created_at_utc = utc_now_isoformat()
+        else:
+            existing_resource = self.repository.find_image_resource_by_source_url_hash(
+                item.source_url_hash
+            )
+            if existing_resource is not None:
+                self.repository.create_task_item(
+                    TaskItemCreateInput(
+                        task_id=task_id,
+                        source_item_key=item.source_key,
+                        action_name="dedupe_check",
+                        result_status="duplicated",
+                        dedupe_hit_type="source_url_hash",
+                        db_write_result="skipped_existing_resource",
+                        file_write_result=None,
+                        failure_reason=None,
+                        occurred_at_utc=utc_now_isoformat(),
+                    )
+                )
+                return "duplicated"
 
-        existing_resource = self.repository.find_image_resource_by_source_url_hash(
-            item.source_url_hash
-        )
-        if existing_resource is not None:
-            self.repository.create_task_item(
-                TaskItemCreateInput(
-                    task_id=task_id,
-                    source_item_key=item.source_key,
-                    action_name="dedupe_check",
-                    result_status="duplicated",
-                    dedupe_hit_type="source_url_hash",
-                    db_write_result="skipped_existing_resource",
-                    file_write_result=None,
-                    failure_reason=None,
-                    occurred_at_utc=utc_now_isoformat(),
+            created_at_utc = utc_now_isoformat()
+            wallpaper_id = self.repository.create_wallpaper(
+                WallpaperCreateInput(
+                    source_type=self.adapter.source_type,
+                    source_key=item.source_key,
+                    market_code=item.market_code,
+                    wallpaper_date=wallpaper_date,
+                    title=item.title,
+                    copyright_text=item.copyright_text,
+                    source_name=item.source_name,
+                    origin_page_url=item.origin_page_url,
+                    origin_image_url=item.origin_image_url,
+                    origin_width=item.origin_width,
+                    origin_height=item.origin_height,
+                    is_downloadable=item.is_downloadable,
+                    raw_extra_json=item.raw_extra_json,
+                    created_at_utc=created_at_utc,
                 )
             )
-            return "duplicated"
-
-        created_at_utc = utc_now_isoformat()
-        wallpaper_id = self.repository.create_wallpaper(
-            WallpaperCreateInput(
-                source_type=self.adapter.source_type,
-                source_key=item.source_key,
-                market_code=item.market_code,
-                wallpaper_date=wallpaper_date,
-                title=item.title,
-                copyright_text=item.copyright_text,
-                source_name=item.source_name,
-                origin_page_url=item.origin_page_url,
-                origin_image_url=item.origin_image_url,
-                origin_width=item.origin_width,
-                origin_height=item.origin_height,
-                is_downloadable=item.is_downloadable,
-                raw_extra_json=item.raw_extra_json,
-                created_at_utc=created_at_utc,
-            )
-        )
         relative_path = self.adapter.build_relative_path(item)
         filename = Path(relative_path).name
         file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"

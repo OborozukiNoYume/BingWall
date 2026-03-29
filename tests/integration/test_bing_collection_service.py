@@ -290,6 +290,102 @@ def test_bing_collection_service_skips_business_key_duplicates(tmp_path: Path) -
     assert latest_item["dedupe_hit_type"] == "business_key"
 
 
+def test_bing_collection_service_repairs_existing_wallpaper_without_resources(
+    tmp_path: Path,
+) -> None:
+    service, database_path, storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.Resume",
+                source_url="https://www.bing.com/th?id=OHR.Resume_1920x1080.jpg&pid=hp",
+            )
+        ],
+        downloads=[DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg")],
+    )
+
+    connection = sqlite3.connect(database_path)
+    try:
+        connection.execute(
+            """
+            INSERT INTO wallpapers (
+                source_type,
+                source_key,
+                market_code,
+                wallpaper_date,
+                title,
+                copyright_text,
+                source_name,
+                is_public,
+                is_downloadable,
+                origin_page_url,
+                origin_image_url,
+                origin_width,
+                origin_height,
+                resource_status,
+                raw_extra_json,
+                created_at_utc,
+                updated_at_utc
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?, ?, 'pending', ?, ?, ?);
+            """,
+            (
+                "bing",
+                "bing:en-US:2026-03-24:OHR.Resume",
+                "en-US",
+                "2026-03-24",
+                "Test title",
+                "Test copyright",
+                "Bing",
+                "https://www.bing.com/example",
+                "https://www.bing.com/th?id=OHR.Resume_1920x1080.jpg&pid=hp",
+                1920,
+                1080,
+                '{"source_key":"bing:en-US:2026-03-24:OHR.Resume"}',
+                "2026-03-24T00:00:00Z",
+                "2026-03-24T00:00:00Z",
+            ),
+        )
+        connection.commit()
+    finally:
+        connection.close()
+
+    try:
+        summary = service.collect(
+            market_code="en-US", count=1, trigger_type="manual", triggered_by=None
+        )
+    finally:
+        service.repository.close()
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper_count = connection.execute("SELECT COUNT(*) FROM wallpapers;").fetchone()[0]
+        wallpaper = connection.execute("SELECT * FROM wallpapers LIMIT 1;").fetchone()
+        resource_count = connection.execute("SELECT COUNT(*) FROM image_resources;").fetchone()[0]
+        latest_item = connection.execute(
+            "SELECT * FROM collection_task_items ORDER BY id ASC LIMIT 1;"
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert summary.task_status == "succeeded"
+    assert summary.success_count == 1
+    assert summary.duplicate_count == 0
+    assert wallpaper_count == 1
+    assert wallpaper is not None
+    assert wallpaper["resource_status"] == "ready"
+    assert wallpaper["content_status"] == "enabled"
+    assert resource_count == 4
+    assert latest_item is not None
+    assert latest_item["action_name"] == "repair_incomplete_wallpaper"
+    assert latest_item["db_write_result"] == "resume_existing_wallpaper_without_resources"
+    public_files = [path for path in storage.public_dir.rglob("*") if path.is_file()]
+    assert len(public_files) == 4
+
+
 def test_bing_collection_service_can_keep_new_wallpaper_in_draft_when_auto_publish_disabled(
     tmp_path: Path,
 ) -> None:
