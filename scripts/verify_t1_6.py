@@ -102,9 +102,7 @@ def main() -> int:
 
 def ensure_prerequisites() -> None:
     if shutil.which("uv") is None:
-        raise VerificationError(
-            "Required command is not available: uv"
-        )
+        raise VerificationError("Required command is not available: uv")
     if not (REPO_ROOT / ".venv").exists():
         raise VerificationError(
             f"Python virtual environment is missing: {REPO_ROOT / '.venv'}. Run `make setup` first."

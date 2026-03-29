@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-29T16:01:45Z
+
+### 变更内容
+
+- 更新 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py)，按 `ruff format` 期望收敛 `ensure_prerequisites` 中单处异常换行，消除全仓格式检查唯一失败项
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录本次格式修复、影响范围、验证结果与回滚说明
+
+### 变更原因
+
+- 上一轮全量测试中，`ruff check`、`mypy`、`pytest`、部署验收和恢复演练均已通过，但 `ruff format --check .` 仍因 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 的单处格式差异失败
+- 该问题不会改变业务行为，但会导致仓库无法达到“格式、静态检查、类型检查、功能测试与重型验收全部通过”的完整交付口径
+- 本次按最保守范围仅修复格式，不扩展到业务逻辑、依赖版本或部署行为调整
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T16:01:45Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 的代码格式，以及项目状态文档与变更记录
+- Python 运行逻辑、部署模板、`cron`、`systemd`、数据库、接口和测试语义均保持不变
+- 修复后，仓库重新具备 `ruff format --check` 全绿条件
+
+### 验证步骤
+
+- 执行 `uv run python -m ruff format --check .`
+- 执行 `uv run python -m ruff check .`
+- 执行 `uv run python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/install_cron.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `uv run python -m pytest`
+- 执行 `uv run python scripts/verify_t1_6.py`
+- 执行 `uv run python scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现 `ruff format --check .` 失败项，影响交付前的完整校验闭环
+
 ## 2026-03-29T15:46:35Z
 
 ### 变更内容
