@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-29T07:58:59Z
+
+### 变更内容
+
+- 更新 [web/public/assets/site.js](web/public/assets/site.js) 与 [web/public/assets/site.css](web/public/assets/site.css)，在公开列表页新增“按日期查找壁纸”区域，加入日期选择器和提交按钮；提交后前端会单独调用 `/api/public/wallpapers/by-date/{wallpaper_date}`，展示该日期对应的一张公开壁纸，同时保留现有“按市场查看最新壁纸”区和下方分页列表不变
+- 更新 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py)，补充前端静态资源断言，确认公开脚本已引用 `/api/public/wallpapers/by-date/` 与 `date_lookup` 状态字段，样式文件已包含日期查找区类名
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [CHANGELOG.md](CHANGELOG.md)，同步记录前端日期查找入口的行为说明、影响范围、验证步骤、回滚口径和时间戳
+
+### 变更原因
+
+- 用户希望前端页面增加“按日期筛选 / 查找壁纸”能力，并明确要求复用已经存在的 `/api/public/wallpapers/by-date/{date}` 接口
+- 现有 `/wallpapers` 页面已经同时承担分页列表、关键词、标签、地区和分辨率组合筛选；如果把“按日期精确查一张”直接混入列表筛选，会改变当前分页查询语义，增加回归风险
+- 因此本次采用最保守方案：保留原有列表查询链路不变，只额外增加一个独立日期查找区，单独消费 `by-date` 单条接口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T07:58:59Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖公开前端静态脚本、公开前端样式、公开前端集成测试，以及项目总说明和状态文档
+- 访问 `/wallpapers` 时，页面顶部现在除市场下拉外，还会显示一个日期选择器；选择日期并提交后，会读取该日期对应的一张公开壁纸并显示预览、元信息和跳转入口
+- 所选日期会保存在当前页面 URL 查询串中，刷新页面后仍可继续查看该日期结果
+- 下方原有的关键词、地区、标签、分辨率和分页列表仍保持原语义，继续调用 `/api/public/wallpapers`，不受日期单条查询区影响
+- 本次不包含后端 API 变更、数据库结构调整、后台页面改版、依赖升级或公开列表接口契约修改
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_public_frontend.py tests/integration/test_public_api.py`
+- 执行 `make verify`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [web/public/assets/site.js](web/public/assets/site.js) 中新增的日期查找区与 `/api/public/wallpapers/by-date/` 调用，恢复 [web/public/assets/site.css](web/public/assets/site.css) 的新增样式，并回退 [tests/integration/test_public_frontend.py](tests/integration/test_public_frontend.py) 与相关文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，公开前端会恢复为仅支持市场单条查看、列表筛选和详情页查看，不再在 `/wallpapers` 页面顶部直接提供按日期精确查找公开壁纸的入口
+
 ## 2026-03-29T07:41:15Z
 
 ### 变更内容

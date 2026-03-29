@@ -210,7 +210,9 @@ select {
 }
 
 .market-spotlight-panel,
+.date-lookup-panel,
 .market-spotlight-form,
+.date-lookup-form,
 .market-spotlight-result,
 .market-spotlight-card,
 .market-spotlight-body {
@@ -222,7 +224,13 @@ select {
   margin-bottom: 24px;
 }
 
-.market-spotlight-form {
+.date-lookup-panel {
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.market-spotlight-form,
+.date-lookup-form {
   max-width: 360px;
 }
 

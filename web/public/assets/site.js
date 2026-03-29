@@ -8,6 +8,7 @@ const MARKET_SPOTLIGHT_OPTIONS = [
   { code: "ja-JP", label: "日本語（日本）" },
 ];
 const DEFAULT_MARKET_SPOTLIGHT_CODE = MARKET_SPOTLIGHT_OPTIONS[0].code;
+const LOOKUP_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 document.addEventListener("DOMContentLoaded", async () => {
   await loadSiteInfo();
@@ -195,9 +196,11 @@ function renderListView({ filters, listPayload, state }) {
   const totalPages = Number(pagination.total_pages || 0);
   const selectedTagKeys = parseTagKeys(state.tag_keys);
   const selectedMarketSpotlightCode = normalizeMarketSpotlightCode(state.market_spotlight_code);
+  const selectedLookupDate = normalizeLookupDate(state.date_lookup);
   let currentState = {
     ...state,
     market_spotlight_code: selectedMarketSpotlightCode,
+    date_lookup: selectedLookupDate,
   };
 
   appRoot.innerHTML = `
@@ -219,6 +222,24 @@ function renderListView({ filters, listPayload, state }) {
         </div>
       </form>
       <div class="market-spotlight-result" id="market-spotlight-result" aria-live="polite"></div>
+    </section>
+    <section class="date-lookup-panel" aria-labelledby="date-lookup-heading">
+      <div class="section-head">
+        <div>
+          <h2 id="date-lookup-heading">按日期查找壁纸</h2>
+          <p class="meta-note">选择一个 <code>YYYY-MM-DD</code> 日期，单独调用公开单条接口查找当天对应的公开壁纸，不影响下方分页列表。</p>
+        </div>
+      </div>
+      <form class="date-lookup-form" id="date-lookup-form">
+        <div class="field">
+          <label for="date-lookup-input">日期</label>
+          <input id="date-lookup-input" name="date_lookup" type="date" value="${escapeHtml(selectedLookupDate)}" />
+        </div>
+        <div class="button-row">
+          <button class="button" type="submit">查找壁纸</button>
+        </div>
+      </form>
+      <div class="date-lookup-result" id="date-lookup-result" aria-live="polite"></div>
     </section>
     <div class="section-head">
       <div>
@@ -288,6 +309,8 @@ function renderListView({ filters, listPayload, state }) {
   const filterForm = document.querySelector("#wallpaper-filter-form");
   const marketSpotlightForm = document.querySelector("#market-spotlight-form");
   const marketSpotlightResult = document.querySelector("#market-spotlight-result");
+  const dateLookupForm = document.querySelector("#date-lookup-form");
+  const dateLookupResult = document.querySelector("#date-lookup-result");
   const resultsNode = document.querySelector("#wallpaper-list-results");
   const paginationNode = document.querySelector("#wallpaper-pagination");
 
@@ -310,6 +333,23 @@ function renderListView({ filters, listPayload, state }) {
         ...currentState,
       });
       await renderMarketSpotlight(marketSpotlightResult, nextMarketSpotlightCode);
+    });
+  }
+
+  if (dateLookupForm instanceof HTMLFormElement && dateLookupResult instanceof HTMLElement) {
+    void renderDateLookup(dateLookupResult, selectedLookupDate);
+    dateLookupForm.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const formData = new FormData(dateLookupForm);
+      const nextLookupDate = normalizeLookupDate(stringOrNull(formData.get("date_lookup")));
+      currentState = {
+        ...currentState,
+        date_lookup: nextLookupDate,
+      };
+      replaceListState({
+        ...currentState,
+      });
+      await renderDateLookup(dateLookupResult, nextLookupDate);
     });
   }
 
@@ -339,6 +379,7 @@ function renderListView({ filters, listPayload, state }) {
       resolution_min_height: stringOrNull(formData.get("resolution_min_height")),
       page_size: stringOrNull(formData.get("page_size")) || "20",
       market_spotlight_code: currentState.market_spotlight_code,
+      date_lookup: currentState.date_lookup,
       page: "1",
       sort: "date_desc",
     };
@@ -358,6 +399,7 @@ function renderListView({ filters, listPayload, state }) {
         sort: "date_desc",
         tag_keys: "",
         market_spotlight_code: currentState.market_spotlight_code,
+        date_lookup: currentState.date_lookup,
       });
     });
   }
@@ -404,6 +446,48 @@ async function renderMarketSpotlight(container, marketCode) {
 }
 
 function renderMarketSpotlightMarkup(detail) {
+  return renderFeatureWallpaperMarkup(detail, "市场最新公开壁纸");
+}
+
+async function renderDateLookup(container, lookupDate) {
+  if (!lookupDate) {
+    container.innerHTML = renderStatusMarkup({
+      title: "请选择日期",
+      copy: "选择一个日期后，页面会按该日期精确查找一张公开壁纸。",
+    });
+    return;
+  }
+
+  container.innerHTML = renderStatusMarkup({
+    title: "正在读取日期结果",
+    copy: `正在加载 ${lookupDate} 的公开壁纸...`,
+  });
+
+  try {
+    const detail = await fetchEnvelope(`/api/public/wallpapers/by-date/${encodeURIComponent(lookupDate)}`);
+    container.innerHTML = renderDateLookupMarkup(detail);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      container.innerHTML = renderStatusMarkup({
+        title: "当前日期暂无公开壁纸",
+        copy: `${lookupDate} 暂时没有可展示内容，可以换一个日期后重试。`,
+      });
+      return;
+    }
+
+    console.error(error);
+    container.innerHTML = renderStatusMarkup({
+      title: "日期结果读取失败",
+      copy: "公开接口暂时不可用，请稍后重试。",
+    });
+  }
+}
+
+function renderDateLookupMarkup(detail) {
+  return renderFeatureWallpaperMarkup(detail, "精确日期结果");
+}
+
+function renderFeatureWallpaperMarkup(detail, eyebrow) {
   const downloadMarkup =
     detail.is_downloadable && detail.download_url
       ? `<a class="button-secondary" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer">下载当前默认分辨率</a>`
@@ -415,7 +499,7 @@ function renderMarketSpotlightMarkup(detail) {
         <img src="${escapeHtml(detail.preview_url)}" alt="${escapeHtml(detail.title)}" loading="lazy" />
       </a>
       <div class="market-spotlight-body">
-        <p class="eyebrow">市场最新公开壁纸</p>
+        <p class="eyebrow">${escapeHtml(eyebrow)}</p>
         <h3><a href="/wallpapers/${escapeHtml(detail.id)}">${escapeHtml(detail.title)}</a></h3>
         <p class="detail-copy">${escapeHtml(detail.description || detail.subtitle || "当前没有补充说明。")}</p>
         <div class="wallpaper-meta">
@@ -540,6 +624,7 @@ function readListState() {
     resolution_min_width: params.get("resolution_min_width") || "",
     resolution_min_height: params.get("resolution_min_height") || "",
     market_spotlight_code: normalizeMarketSpotlightCode(params.get("market_spotlight_code")),
+    date_lookup: normalizeLookupDate(params.get("date_lookup")),
     page: params.get("page") || "1",
     page_size: params.get("page_size") || "20",
     sort: "date_desc",
@@ -571,6 +656,14 @@ function setFieldValue(form, name, value) {
 function normalizeMarketSpotlightCode(value) {
   const matchedOption = MARKET_SPOTLIGHT_OPTIONS.find((option) => option.code === value);
   return matchedOption ? matchedOption.code : DEFAULT_MARKET_SPOTLIGHT_CODE;
+}
+
+function normalizeLookupDate(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+  const trimmedValue = value.trim();
+  return LOOKUP_DATE_PATTERN.test(trimmedValue) ? trimmedValue : "";
 }
 
 async function fetchEnvelope(url) {
