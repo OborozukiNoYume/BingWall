@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## 2026-03-29T16:10:07Z
+
+### 变更内容
+
+- 删除 `docs/setup-troubleshooting.md`，不再单独保留环境搭建排障文档
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录本次文档收口、影响范围、验证方式与回滚说明
+- 调整历史变更记录中对 `docs/setup-troubleshooting.md` 的文件引用写法，保留历史事实，但不再保留指向已删除文件的失效链接
+
+### 变更原因
+
+- 你明确要求删除 `docs/setup-troubleshooting.md`，并同步处理与其相关的项目记录
+- 如果只删除文件而不修正文档状态和历史记录，仓库会留下多处失效链接，影响后续阅读和交接
+- 本次按最保守范围只做文档收口与记录修订，不改业务代码、不改依赖、不改运行入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T16:10:07Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 `docs/setup-troubleshooting.md` 删除，以及 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的文档修订
+- 当前 `uv sync`、`uv run`、部署模板、`cron`、`systemd` 和业务代码行为均保持不变
+- 删除后，当前环境说明需要以 [README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 和 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 为准
+
+### 验证步骤
+
+- 执行 `rg -n "setup-troubleshooting\\.md|环境搭建问题排查记录" README.md PROJECT_STATE.md CHANGELOG.md docs scripts tests deploy .`
+- 人工复核 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 中当前状态描述，确认已不再把 `docs/setup-troubleshooting.md` 作为现存文档引用
+- 人工复核 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 中历史条目，确认不再存在指向已删除文件的 Markdown 链接
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 `docs/setup-troubleshooting.md`、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现独立环境排障文档及其对应历史链接
+
 ## 2026-03-29T16:01:45Z
 
 ### 变更内容
@@ -45,7 +83,7 @@
 ### 变更内容
 
 - 更新 [.gitignore](/home/ops/Projects/BingWall/.gitignore)，删除 `pyenv`、旧虚拟环境目录和与当前仓库无关的 `pipenv`、`poetry`、`pdm`、`pixi` 模板段，保留当前 `uv` 工作流所需的忽略规则
-- 更新 [docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md)，把“旧锁文件思路”条目改写为迁移后错误示例说明，明确当前仓库已不再保留 `requirements.lock.txt`
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），把“旧锁文件思路”条目改写为迁移后错误示例说明，明确当前仓库已不再保留 `requirements.lock.txt`
 - 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录本次 `uv` 工作流遗留项清理、影响范围、验证方式和回滚说明
 
 ### 变更原因
@@ -70,11 +108,11 @@
 ### 验证步骤
 
 - 执行 `rg -n "^# pyenv$|^\\.venv-py312-broken/$|^# pipenv$|^# poetry$|^# pdm$|^# pixi$|^\\.pdm-python$|^\\.pdm-build/$|^\\.pixi$" .gitignore`
-- 人工复核 [docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md) 中“问题 2”条目，确认已明确说明当前仓库不再保留 `requirements.lock.txt`
+- 人工复核 `docs/setup-troubleshooting.md`（该文档现已删除）中“问题 2”条目，确认已明确说明当前仓库不再保留 `requirements.lock.txt`
 
 ### 回滚说明
 
-- 如需回滚本次变更，可恢复 [.gitignore](/home/ops/Projects/BingWall/.gitignore)、[docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 如需回滚本次变更，可恢复 [.gitignore](/home/ops/Projects/BingWall/.gitignore)、`docs/setup-troubleshooting.md`（该文档现已删除）、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
 - 回滚后，仓库会重新出现与当前 `uv` 工作流不一致的旧注释和旧示例表述，增加后续维护时的理解成本
 
 ## 2026-03-29T15:22:18Z
@@ -164,7 +202,7 @@
 - 更新 [Makefile](/home/ops/Projects/BingWall/Makefile)，把 `make setup` 改为 `uv sync --frozen` 工作流
 - 新增 [uv.lock](/home/ops/Projects/BingWall/uv.lock)，作为当前项目唯一的 Python 依赖锁文件
 - 删除 [requirements.lock.txt](/home/ops/Projects/BingWall/requirements.lock.txt) 与 [scripts/dev/bootstrap.sh](/home/ops/Projects/BingWall/scripts/dev/bootstrap.sh)，清理旧的 `pip` 锁文件和冗余开发引导脚本
-- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，把当前使用说明统一改成 `uv sync` / `uv.lock` 口径
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，把当前使用说明统一改成 `uv sync` / `uv.lock` 口径
 
 ### 变更原因
 
@@ -204,7 +242,7 @@
 
 ### 变更内容
 
-- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md)，把当前使用说明类文档从 `pyenv + venv/pip` 口径统一调整为 `uv + .venv`
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），把当前使用说明类文档从 `pyenv + venv/pip` 口径统一调整为 `uv + .venv`
 - 更新开发、本地排障和单机部署步骤中的 Python 环境准备、依赖安装、运行与迁移命令，统一改为 `uv python install`、`uv venv`、`uv pip install` 与 `uv run`
 - 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档口径切换的原因、影响范围、验证方式与回滚说明
 
@@ -233,7 +271,7 @@
 
 ### 回滚说明
 
-- 如需回滚本次变更，可恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 如需回滚本次变更，可恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
 - 回滚后，仓库当前使用说明会重新回到 `pyenv/venv/pip` 与 `uv` 混用状态，后续环境准备和排障步骤的统一性会变差
 
 ## 2026-03-29T14:02:40Z
@@ -279,7 +317,7 @@
 
 - 更新 [.python-version](.python-version) 与 [pyproject.toml](pyproject.toml)，把 Python 运行时约束从精确补丁版本 `3.14.2` 调整为固定 `3.14` 版本线；其中 `.python-version` 改为 `3.14`，`requires-python` 改为 `>=3.14,<3.15`
 - 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步把当前运行时基线说明改为 `Python 3.14`，并明确允许使用 `3.14.x` 补丁版本
-- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，将排障文档中的 Python 版本要求同步调整为 `3.14` 版本线口径
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），将排障文档中的 Python 版本要求同步调整为 `3.14` 版本线口径
 
 ### 变更原因
 
@@ -434,7 +472,7 @@
 
 - 更新 [app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/api/public/routes.py](app/api/public/routes.py)，新增 `/api/public/wallpapers/by-market/{market_code}` 与 `/api/public/wallpapers/by-date/{wallpaper_date}` 两个公开单条查询接口，分别支持按地区获取最新公开壁纸、按日期精确获取公开壁纸
 - 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐新接口的可见性过滤、默认市场优先、404 返回以及 `download_variants` 全部分辨率下载链接回归测试
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新接口用途、返回结构、验证示例、影响范围和回滚口径
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步记录新接口用途、返回结构、验证示例、影响范围和回滚口径
 
 ### 变更原因
 
@@ -518,7 +556,7 @@
 
 - 更新 [pyproject.toml](pyproject.toml)，将直接依赖 `fastapi` 从 `0.116.1` 升级到 `0.118.3`，保持其他直接依赖版本不变
 - 更新 [requirements.lock.txt](requirements.lock.txt)，用现有 `pip` 工具链重建锁文件，使依赖声明与虚拟环境实际安装结果保持一致
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/README.md](docs/README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新的 FastAPI 基线、兼容性依据、安装排障方式、验证步骤与回滚口径
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/README.md](docs/README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步记录新的 FastAPI 基线、兼容性依据、安装排障方式、验证步骤与回滚口径
 
 ### 变更原因
 
@@ -982,7 +1020,7 @@
 
 - 更新 [app/repositories/sqlite.py](app/repositories/sqlite.py)，把 SQLite 连接创建统一调整为 `check_same_thread=False`，兼容 FastAPI 同步依赖与同步路由在同一请求内跨工作线程执行的情况
 - 新增 [tests/unit/test_sqlite.py](tests/unit/test_sqlite.py)，补齐跨线程查询回归测试和外键约束开启断言
-- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[CHANGELOG.md](CHANGELOG.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步本次公开接口 `500` 的根因、影响范围、验证方式与回滚说明
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[CHANGELOG.md](CHANGELOG.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步本次公开接口 `500` 的根因、影响范围、验证方式与回滚说明
 
 ### 变更原因
 
@@ -1022,7 +1060,7 @@
 - 更新 [app/core/config.py](app/core/config.py)、[app/services/source_collection.py](app/services/source_collection.py)、[app/services/bing_collection.py](app/services/bing_collection.py) 与 [app/repositories/collection_repository.py](app/repositories/collection_repository.py)，新增 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED` 配置，并让新采集内容在资源全部就绪后默认自动切到 `enabled + is_public=true`
 - 更新 [app/collectors/bing.py](app/collectors/bing.py)、[app/collectors/nasa_apod.py](app/collectors/nasa_apod.py) 与 [app/collectors/manual_tasks.py](app/collectors/manual_tasks.py)，让 Bing、NASA APOD 和手动任务消费三条采集入口都使用同一自动公开策略
 - 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_multi_source_collection.py](tests/integration/test_multi_source_collection.py)、[tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py) 与 [tests/unit/test_config.py](tests/unit/test_config.py)，补齐默认自动公开、关闭自动公开后保持 `draft` 和配置加载验证
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/system-design.md](docs/system-design.md)、[docs/data-model.md](docs/data-model.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)、[.env.example](.env.example) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，同步默认自动公开口径、关闭方式和排障说明
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/system-design.md](docs/system-design.md)、[docs/data-model.md](docs/data-model.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）、[.env.example](.env.example) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，同步默认自动公开口径、关闭方式和排障说明
 
 ### 变更原因
 
@@ -1062,7 +1100,7 @@
 
 - 新增 [app/repositories/migrations/versions/V0006__admin_user_status_constraint.sql](app/repositories/migrations/versions/V0006__admin_user_status_constraint.sql)，在迁移阶段先清洗 `admin_users.status` 的 legacy 数据，再通过数据库触发器拦截新的非法状态写入
 - 更新 [tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)，补齐第 `6` 个迁移版本、触发器存在性断言，以及 legacy `active` / 非法状态清洗和迁移后非法写入拦截测试
-- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[docs/data-model.md](docs/data-model.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步管理员状态枚举、legacy 值迁移口径和最新排障建议
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[docs/data-model.md](docs/data-model.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步管理员状态枚举、legacy 值迁移口径和最新排障建议
 
 ### 变更原因
 
@@ -1099,7 +1137,7 @@
 
 ### 变更内容
 
-- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，删除“默认账号信息”表，避免再暗示仓库存在固定的 `admin/admin123` 默认后台账号
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），删除“默认账号信息”表，避免再暗示仓库存在固定的 `admin/admin123` 默认后台账号
 - 同步把后台登录示例改成基于 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 的占位写法，并要求调用方填写自己初始化时设置的管理员密码
 
 ### 变更原因
@@ -1121,18 +1159,18 @@
 
 ### 验证步骤
 
-- 人工核对 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 中“问题 8 / 9”“验证运行”与“注意事项”三处描述保持一致，不再出现 `admin123` 或“默认账号信息”表
+- 人工核对 `docs/setup-troubleshooting.md`（该文档现已删除）中“问题 8 / 9”“验证运行”与“注意事项”三处描述保持一致，不再出现 `admin123` 或“默认账号信息”表
 
 ### 回滚说明
 
-- 如需回滚本次变更，可恢复 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
+- 如需回滚本次变更，可恢复 `docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
 - 本次仅为文档修正，回滚不涉及代码或数据回滚
 
 ## 2026-03-27T13:31:19Z
 
 ### 变更内容
 
-- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，把“日期范围筛选 API”从待开发占位描述改为已实现说明，补齐闭区间语义、统一 `422` 参数错误行为，以及“当前未扩展公开前端日期选择器”的范围说明
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），把“日期范围筛选 API”从待开发占位描述改为已实现说明，补齐闭区间语义、统一 `422` 参数错误行为，以及“当前未扩展公开前端日期选择器”的范围说明
 
 ### 变更原因
 
@@ -1153,11 +1191,11 @@
 
 ### 验证步骤
 
-- 人工核对 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 中“日期范围筛选 API”条目与 [README.md](README.md)、[docs/api-conventions.md](docs/api-conventions.md) 的公开列表参数说明一致
+- 人工核对 `docs/setup-troubleshooting.md`（该文档现已删除）中“日期范围筛选 API”条目与 [README.md](README.md)、[docs/api-conventions.md](docs/api-conventions.md) 的公开列表参数说明一致
 
 ### 回滚说明
 
-- 如需回滚本次变更，可恢复 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
+- 如需回滚本次变更，可恢复 `docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
 - 本次仅为文档修正，回滚不涉及代码或数据回滚
 
 ## 2026-03-27T13:21:12Z
@@ -1206,7 +1244,7 @@
 
 - 更新 [app/api/public/routes.py](app/api/public/routes.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/repositories/public_repository.py](app/repositories/public_repository.py)，新增 `GET /api/public/wallpapers/today` 和 `GET /api/public/wallpapers/random` 两个公开端点，并复用现有公开详情的字段结构、资源 URL 生成逻辑和统一 404 错误响应
 - 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐今日壁纸默认市场优先、默认市场缺失回退、公开可见性过滤、随机抽取仅限公开可见内容、OSS 资源地址返回和空结果 404 等集成测试
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步新增公开接口、UTC 日期语义、随机池范围、最小验证命令和排障说明
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步新增公开接口、UTC 日期语义、随机池范围、最小验证命令和排障说明
 
 ### 变更原因
 
@@ -1246,7 +1284,7 @@
 - 新增 [app/services/admin_bootstrap.py](app/services/admin_bootstrap.py)，实现首个管理员账号幂等初始化：仅当 `admin_users` 为空且提供了初始化凭据时，自动创建状态为 `enabled` 的 `super_admin`
 - 更新 [app/core/config.py](app/core/config.py) 与 [app/repositories/migrations/__main__.py](app/repositories/migrations/__main__.py)，新增 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME`、`BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 配置校验，并把管理员初始化接入数据库迁移命令
 - 新增 [tests/integration/test_admin_bootstrap.py](tests/integration/test_admin_bootstrap.py)，并更新 [tests/unit/test_config.py](tests/unit/test_config.py) 与 [tests/conftest.py](tests/conftest.py)，覆盖首次创建、重复执行不重复创建、已有管理员不覆盖，以及配置成对出现和密码长度校验
-- 更新 [.env.example](.env.example)、[deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)、[README.md](README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md)，同步默认管理员初始化方式、使用步骤和排障说明
+- 更新 [.env.example](.env.example)、[deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)、[README.md](README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）与 [PROJECT_STATE.md](PROJECT_STATE.md)，同步默认管理员初始化方式、使用步骤和排障说明
 
 ### 变更原因
 
@@ -1284,8 +1322,8 @@
 
 ### 变更内容
 
-- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，修正文档中对 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 的说明，明确“未设置”与“设置为空字符串”在当前配置模型中的行为差异
-- 同步调整 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 的完整搭建步骤与注意事项，改为区分“仅本地文件存储”和“启用 OSS / CDN 公网访问”两种配置方式
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），修正文档中对 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 的说明，明确“未设置”与“设置为空字符串”在当前配置模型中的行为差异
+- 同步调整 `docs/setup-troubleshooting.md`（该文档现已删除）的完整搭建步骤与注意事项，改为区分“仅本地文件存储”和“启用 OSS / CDN 公网访问”两种配置方式
 - 更新 [PROJECT_STATE.md](PROJECT_STATE.md)，记录该排障结论已沉淀进项目文档，并刷新文档元信息时间
 
 ### 变更原因
@@ -1315,7 +1353,7 @@
 
 ### 回滚说明
 
-- 如需回滚本次变更，可回退 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)、[CHANGELOG.md](CHANGELOG.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md) 的文档修订
+- 如需回滚本次变更，可回退 `docs/setup-troubleshooting.md`（该文档现已删除）、[CHANGELOG.md](CHANGELOG.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md) 的文档修订
 - 回滚后文档将恢复到“默认建议填写 `http://localhost` 占位值”的旧表述，部署人员可能继续混淆“未设置”和“空字符串”的差别
 
 ## 2026-03-26T15:13:37Z
