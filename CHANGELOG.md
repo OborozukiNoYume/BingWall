@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-03-29T15:46:35Z
+
+### 变更内容
+
+- 更新 [.gitignore](/home/ops/Projects/BingWall/.gitignore)，删除 `pyenv`、旧虚拟环境目录和与当前仓库无关的 `pipenv`、`poetry`、`pdm`、`pixi` 模板段，保留当前 `uv` 工作流所需的忽略规则
+- 更新 [docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md)，把“旧锁文件思路”条目改写为迁移后错误示例说明，明确当前仓库已不再保留 `requirements.lock.txt`
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录本次 `uv` 工作流遗留项清理、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 当前项目的运行、部署和依赖同步入口已经完成 `uv` 收口，但仓库内仍残留少量 `pyenv` 时代注释、旧虚拟环境痕迹和容易误导读者的排障表述
+- 如果继续保留这些遗留内容，新接手的人容易误以为仓库还处于“`uv` 已接入但旧锁文件方案仍保留”的过渡状态
+- 这次按最保守范围只清理说明性残留与仓库卫生项，不改业务逻辑、不改依赖版本，也不改变现有脚本执行语义
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:46:35Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖仓库忽略规则、排障说明和项目状态文档
+- 当前 `uv sync`、`uv run`、`.python-version`、`uv.lock` 的主工作流保持不变
+- 本次不会影响现有开发、测试、部署、`cron` 或 `systemd` 的执行结果
+
+### 验证步骤
+
+- 执行 `rg -n "^# pyenv$|^\\.venv-py312-broken/$|^# pipenv$|^# poetry$|^# pdm$|^# pixi$|^\\.pdm-python$|^\\.pdm-build/$|^\\.pixi$" .gitignore`
+- 人工复核 [docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md) 中“问题 2”条目，确认已明确说明当前仓库不再保留 `requirements.lock.txt`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [.gitignore](/home/ops/Projects/BingWall/.gitignore)、[docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现与当前 `uv` 工作流不一致的旧注释和旧示例表述，增加后续维护时的理解成本
+
 ## 2026-03-29T15:22:18Z
 
 ### 变更内容

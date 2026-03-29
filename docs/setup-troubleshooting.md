@@ -36,7 +36,7 @@ uv sync --python 3.14 --frozen
 
 ### 现象
 ```bash
-项目里仍保留 requirements.lock.txt
+本地笔记、旧脚本或命令历史里还在按 requirements.lock.txt 思路操作
 ```
 
 或者继续执行：
@@ -46,7 +46,7 @@ uv pip install ...
 ```
 
 ### 原因
-这说明项目还停留在“`uv` 调用 `pip` 风格锁文件”的半迁移状态，不是真正的 `uv sync` 工作流。当前仓库已经改为以 `pyproject.toml + uv.lock` 作为唯一 Python 依赖来源。
+这通常说明你的操作习惯还停留在迁移前的旧方案，而不是当前仓库真的还保留旧锁文件。当前仓库已经完成迁移，不再保留 `requirements.lock.txt`，并且以 `pyproject.toml + uv.lock` 作为唯一 Python 依赖来源。
 
 ### 解决方案
 统一使用：
