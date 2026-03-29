@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## 2026-03-29T03:33:52Z
+
+### 变更内容
+
+- 更新 [pyproject.toml](pyproject.toml)，将直接依赖 `fastapi` 从 `0.116.1` 升级到 `0.118.3`，保持其他直接依赖版本不变
+- 更新 [requirements.lock.txt](requirements.lock.txt)，用现有 `pip` 工具链重建锁文件，使依赖声明与虚拟环境实际安装结果保持一致
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/README.md](docs/README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新的 FastAPI 基线、兼容性依据、安装排障方式、验证步骤与回滚口径
+
+### 变更原因
+
+- 当前仓库运行时已经固定为 `Python 3.14.2`，但直接依赖仍停留在 `fastapi==0.116.1`，与官方后续补齐的 Python `3.14` 支持口径不一致
+- 项目锁文件当前已固定 `starlette==0.47.3`，因此本次优先选择能继续兼容该版本范围、同时满足 Python `3.14` 支持的最小 FastAPI 版本，避免直接追到最新版带来额外行为变更风险
+
+### 依赖变更
+
+- 直接依赖：`fastapi` 从 `0.116.1` 升级到 `0.118.3`
+- 间接依赖：保持 `starlette==0.47.3` 不变，仍满足 FastAPI `0.118.3` 的依赖范围
+- 变更时间：`2026-03-29T03:33:52Z`
+- 依赖类型：直接依赖升级，无新增第三方依赖
+
+### 影响范围
+
+- 影响范围覆盖 Python 包依赖声明、锁文件、运行与部署说明、项目状态记录和环境搭建排障文档
+- 本次不包含业务接口改版、数据库迁移、技术栈替换、其他依赖连带升级或前后端功能扩展
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pip install -e ".[dev]"`
+- 执行 `./.venv/bin/python -m pip freeze --all --exclude-editable > requirements.lock.txt`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可将 `fastapi` 恢复到 `0.116.1`，重新安装依赖并重建 `requirements.lock.txt`，再回退本次新增的文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，项目将重新回到“Python `3.14.2` 运行时 + FastAPI `0.116.1`”的旧依赖组合，不再保持与官方 Python `3.14` 支持声明一致
+
 ## 2026-03-29T03:19:48Z
 
 ### 变更内容

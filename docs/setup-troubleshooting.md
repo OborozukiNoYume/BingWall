@@ -1,25 +1,29 @@
 # 环境搭建问题排查记录
 
-> 记录时间：2026-03-27
+> 记录时间：2026-03-29
 > 环境：Python 3.14.2, Ubuntu Linux
 
 ## 问题 1：pip 安装指定版本时找不到包
 
 ### 现象
 ```bash
-pip install fastapi==0.116.1
-# ERROR: No matching distribution found for fastapi==0.116.1
+pip install fastapi==0.118.3
+# ERROR: No matching distribution found for fastapi==0.118.3
 ```
 
 ### 原因
-网络超时导致 pip 无法正确查询 PyPI 索引，返回错误的"找不到包"信息。
+常见原因不是版本真的不存在，而是镜像站同步滞后、网络超时，或者 pip 没有拿到完整索引结果，最终返回了误导性的“找不到包”。
 
 ### 解决方案
-1. 先不指定版本安装，让 pip 自动选择兼容版本：
+1. 优先使用仓库自带的精确依赖安装入口，避免手动去掉版本锁定：
    ```bash
-   .venv/bin/pip install fastapi
+   make setup
    ```
-2. 或重试多次，等待网络恢复
+2. 如果需要单独排查，可显式指定官方索引重试精确版本安装：
+   ```bash
+   .venv/bin/pip install --index-url https://pypi.org/simple fastapi==0.118.3
+   ```
+3. 如仍失败，优先检查网络、代理或镜像同步状态，不要改成无版本约束安装
 
 ---
 
