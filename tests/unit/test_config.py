@@ -27,6 +27,8 @@ def set_valid_env() -> None:
     os.environ["BINGWALL_BACKUP_DIR"] = "./var/backups"
     os.environ["BINGWALL_COLLECT_BING_ENABLED"] = "true"
     os.environ["BINGWALL_COLLECT_BING_DEFAULT_MARKET"] = "en-US"
+    os.environ["BINGWALL_COLLECT_BING_MARKETS"] = "en-US,zh-CN,ja-JP"
+    os.environ["BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS"] = "5"
     os.environ["BINGWALL_COLLECT_BING_TIMEOUT_SECONDS"] = "10"
     os.environ["BINGWALL_COLLECT_BING_MAX_DOWNLOAD_RETRIES"] = "3"
     os.environ["BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED"] = "true"
@@ -63,6 +65,8 @@ def test_settings_load_valid_configuration() -> None:
     assert settings.app_host == "127.0.0.1"
     assert settings.app_port == 8000
     assert settings.collect_bing_default_market == "en-US"
+    assert settings.collect_bing_markets == ("en-US", "zh-CN", "ja-JP")
+    assert settings.collect_bing_scheduled_backtrack_days == 5
     assert settings.collect_bing_max_download_retries == 3
     assert settings.collect_auto_publish_enabled is True
     assert str(settings.storage_oss_public_base_url) == "https://cdn.example.com/bingwall"
@@ -88,6 +92,16 @@ def test_settings_reject_empty_oss_public_base_url() -> None:
     clear_bingwall_env()
     set_valid_env()
     os.environ["BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL"] = ""
+    reset_settings_cache()
+
+    with pytest.raises(ValidationError):
+        load_settings()
+
+
+def test_settings_reject_blank_bing_markets() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ["BINGWALL_COLLECT_BING_MARKETS"] = " , "
     reset_settings_cache()
 
     with pytest.raises(ValidationError):

@@ -1,9 +1,9 @@
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import AnyHttpUrl, Field, SecretStr, field_validator, model_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 AppEnvironment = Literal["development", "test", "production"]
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -33,6 +33,8 @@ class Settings(BaseSettings):
     backup_dir: Path
     collect_bing_enabled: bool = True
     collect_bing_default_market: str = Field(default="en-US", min_length=2)
+    collect_bing_markets: Annotated[tuple[str, ...], NoDecode] = ("en-US",)
+    collect_bing_scheduled_backtrack_days: int = Field(default=3)
     collect_bing_timeout_seconds: int = Field(default=10, gt=0, le=120)
     collect_bing_max_download_retries: int = Field(default=3, ge=1, le=10)
     collect_auto_publish_enabled: bool = True
@@ -50,6 +52,55 @@ class Settings(BaseSettings):
     def validate_session_secret(cls, value: SecretStr) -> SecretStr:
         if len(value.get_secret_value()) < 32:
             msg = "BINGWALL_SECURITY_SESSION_SECRET must be at least 32 characters long."
+            raise ValueError(msg)
+        return value
+
+    @field_validator("collect_bing_default_market")
+    @classmethod
+    def validate_collect_bing_default_market(cls, value: str) -> str:
+        normalized = value.strip()
+        if "-" not in normalized:
+            msg = "BINGWALL_COLLECT_BING_DEFAULT_MARKET must use the Bing market format."
+            raise ValueError(msg)
+        return normalized
+
+    @field_validator("collect_bing_markets", mode="before")
+    @classmethod
+    def parse_collect_bing_markets(cls, value: Any) -> tuple[str, ...]:
+        if value is None:
+            return ("en-US",)
+        if isinstance(value, str):
+            raw_items = value.split(",")
+        elif isinstance(value, (list, tuple, set)):
+            raw_items = [str(item) for item in value]
+        else:
+            msg = "BINGWALL_COLLECT_BING_MARKETS must be a comma-separated string."
+            raise ValueError(msg)
+
+        normalized_items: list[str] = []
+        seen: set[str] = set()
+        for raw_item in raw_items:
+            item = raw_item.strip()
+            if not item:
+                continue
+            if "-" not in item:
+                msg = "BINGWALL_COLLECT_BING_MARKETS must use Bing market codes."
+                raise ValueError(msg)
+            if item in seen:
+                continue
+            seen.add(item)
+            normalized_items.append(item)
+
+        if not normalized_items:
+            msg = "BINGWALL_COLLECT_BING_MARKETS must not be empty."
+            raise ValueError(msg)
+        return tuple(normalized_items)
+
+    @field_validator("collect_bing_scheduled_backtrack_days")
+    @classmethod
+    def validate_collect_bing_scheduled_backtrack_days(cls, value: int) -> int:
+        if value not in {3, 5, 7}:
+            msg = "BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS must be 3, 5, or 7."
             raise ValueError(msg)
         return value
 

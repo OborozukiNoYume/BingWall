@@ -1,5 +1,45 @@
 # CHANGELOG
 
+## 2026-03-29T03:19:48Z
+
+### 变更内容
+
+- 更新 [app/core/config.py](app/core/config.py)、[app/services/scheduled_collection.py](app/services/scheduled_collection.py) 与 [tests/unit/test_config.py](tests/unit/test_config.py)，新增 `BINGWALL_COLLECT_BING_MARKETS`、`BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 两个配置项及其校验，让 Bing 定时建任务可按市场列表逐个创建，并把回溯窗口写入任务快照
+- 更新 [app/collectors/bing.py](app/collectors/bing.py)、[app/domain/collection.py](app/domain/collection.py)、[app/repositories/collection_repository.py](app/repositories/collection_repository.py)、[app/services/source_collection.py](app/services/source_collection.py) 与 [app/repositories/migrations/versions/V0008__wallpapers_bing_portrait_image_url.sql](app/repositories/migrations/versions/V0008__wallpapers_bing_portrait_image_url.sql)，补齐 Bing 的 `subtitle`、`description`、`location_text`、`published_at_utc`、`portrait_image_url` 落库，并在重复续采时先校验现有本地资源是否缺失、尺寸不符或内容损坏，必要时自动清理并重建
+- 更新 [tests/integration/test_scheduled_collection.py](tests/integration/test_scheduled_collection.py)、[tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)、[tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py) 与 [tests/conftest.py](tests/conftest.py)，补齐多市场 cron 任务快照、回溯窗口、迁移字段、跨市场去重边界以及损坏资源自动修复的回归测试
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/data-model.md](docs/data-model.md)、[.env.example](.env.example) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，同步记录新增配置、任务行为、数据字段、验证方式和回滚说明
+
+### 变更原因
+
+- 之前的 Bing 定时建任务仍按“单市场、单日固定窗口”记录快照，已经不符合当前实现中“按市场列表逐个调度、窗口长度可配置”的行为
+- 之前的 Bing 落库字段还缺少若干已在采集链路中可提取的元数据，文档和数据库结构也没有同步记录竖版图地址
+- 现有重复续采只覆盖“零资源半成品补齐”，还没有覆盖“数据库显示 ready，但本地文件已损坏或不完整”的情况，因此需要在不扩大范围的前提下把修复口径补齐
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 新增数据库迁移：`V0008__wallpapers_bing_portrait_image_url.sql`
+- 变更时间：`2026-03-29T03:19:48Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Bing 配置加载、cron 定时任务快照、Bing 壁纸元数据落库、资源续采修复逻辑、数据库迁移结构、环境示例与运行文档
+- 现在 Bing cron 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场分别建任务，并把 `backtrack_days`、`date_from`、`date_to` 明确写入任务详情；同时，已存在但文件损坏的本地资源会在后续同键采集时自动重建
+- 本次不包含公开 API 新字段扩展、后台页面改版、技术栈调整、外部依赖升级或更广义的重试策略重写
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_config.py tests/integration/test_scheduled_collection.py tests/integration/test_bing_collection_service.py`
+- 执行 `./.venv/bin/python -m pytest tests/integration/test_sqlite_migrations.py tests/integration/test_admin_collection.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可回退 `V0008` 迁移、恢复 Bing 定时建任务的旧快照结构、删除新增配置项和元数据字段写入逻辑，并回退对应测试与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，Bing cron 会恢复为单市场固定窗口口径，后台任务详情将不再记录 `backtrack_days`，且已存在但文件损坏的本地资源不会在重复采集时自动重建
+
 ## 2026-03-29T01:44:31Z
 
 ### 变更内容

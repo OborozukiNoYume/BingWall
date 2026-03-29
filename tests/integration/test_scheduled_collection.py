@@ -19,7 +19,11 @@ def test_create_scheduled_collection_tasks_creates_fixed_date_tasks_for_enabled_
     tmp_path: Path,
 ) -> None:
     database_path = prepare_database(tmp_path)
-    settings = build_scheduled_collection_settings(tmp_path)
+    settings = build_scheduled_collection_settings(
+        tmp_path,
+        bing_markets=("en-US", "zh-CN"),
+        bing_backtrack_days=5,
+    )
 
     repository = AdminCollectionRepository(str(database_path))
     try:
@@ -31,8 +35,8 @@ def test_create_scheduled_collection_tasks_creates_fixed_date_tasks_for_enabled_
     finally:
         repository.close()
 
-    assert [result.action for result in results] == ["created", "created"]
-    assert [result.source_type for result in results] == ["bing", "nasa_apod"]
+    assert [result.action for result in results] == ["created", "created", "created"]
+    assert [result.source_type for result in results] == ["bing", "bing", "nasa_apod"]
 
     connection = sqlite3.connect(database_path)
     connection.row_factory = sqlite3.Row
@@ -47,25 +51,27 @@ def test_create_scheduled_collection_tasks_creates_fixed_date_tasks_for_enabled_
                 task_status,
                 request_snapshot_json
             FROM collection_tasks
-            ORDER BY source_type ASC;
+            ORDER BY source_type ASC, request_snapshot_json ASC;
             """
         ).fetchall()
     finally:
         connection.close()
 
-    assert len(rows) == 2
+    assert len(rows) == 3
 
-    bing_snapshot = json.loads(rows[0]["request_snapshot_json"])
-    nasa_snapshot = json.loads(rows[1]["request_snapshot_json"])
+    bing_en_snapshot = json.loads(rows[0]["request_snapshot_json"])
+    bing_zh_snapshot = json.loads(rows[1]["request_snapshot_json"])
+    nasa_snapshot = json.loads(rows[2]["request_snapshot_json"])
 
     assert rows[0]["task_type"] == "scheduled_collect"
     assert rows[0]["source_type"] == "bing"
     assert rows[0]["trigger_type"] == "cron"
     assert rows[0]["triggered_by"] == "cron"
     assert rows[0]["task_status"] == "queued"
-    assert bing_snapshot == {
-        "count": 8,
-        "date_from": "2026-03-28",
+    assert bing_en_snapshot == {
+        "backtrack_days": 5,
+        "count": 5,
+        "date_from": "2026-03-24",
         "date_to": "2026-03-28",
         "force_refresh": False,
         "market_code": "en-US",
@@ -74,11 +80,28 @@ def test_create_scheduled_collection_tasks_creates_fixed_date_tasks_for_enabled_
     }
 
     assert rows[1]["task_type"] == "scheduled_collect"
-    assert rows[1]["source_type"] == "nasa_apod"
+    assert rows[1]["source_type"] == "bing"
     assert rows[1]["trigger_type"] == "cron"
     assert rows[1]["triggered_by"] == "cron"
     assert rows[1]["task_status"] == "queued"
+    assert bing_zh_snapshot == {
+        "backtrack_days": 5,
+        "count": 5,
+        "date_from": "2026-03-24",
+        "date_to": "2026-03-28",
+        "force_refresh": False,
+        "market_code": "zh-CN",
+        "source_type": "bing",
+        "trigger_type": "cron",
+    }
+
+    assert rows[2]["task_type"] == "scheduled_collect"
+    assert rows[2]["source_type"] == "nasa_apod"
+    assert rows[2]["trigger_type"] == "cron"
+    assert rows[2]["triggered_by"] == "cron"
+    assert rows[2]["task_status"] == "queued"
     assert nasa_snapshot == {
+        "backtrack_days": None,
         "count": 1,
         "date_from": "2026-03-28",
         "date_to": "2026-03-28",
@@ -98,9 +121,11 @@ def test_create_scheduled_collection_tasks_skips_existing_same_date_non_failed_t
         database_path=database_path,
         source_type="bing",
         market_code="en-US",
-        scheduled_date="2026-03-28",
+        date_from="2026-03-24",
+        date_to="2026-03-28",
         task_status="succeeded",
-        count=8,
+        count=5,
+        backtrack_days=5,
     )
 
     repository = AdminCollectionRepository(str(database_path))
@@ -139,9 +164,11 @@ def test_create_scheduled_collection_tasks_allows_recreate_after_failed_task(
         database_path=database_path,
         source_type="bing",
         market_code="en-US",
-        scheduled_date="2026-03-28",
+        date_from="2026-03-24",
+        date_to="2026-03-28",
         task_status="failed",
-        count=8,
+        count=5,
+        backtrack_days=5,
     )
 
     repository = AdminCollectionRepository(str(database_path))
@@ -184,6 +211,8 @@ def build_scheduled_collection_settings(
     *,
     bing_enabled: bool = True,
     nasa_enabled: bool = True,
+    bing_markets: tuple[str, ...] = ("en-US",),
+    bing_backtrack_days: int = 5,
 ) -> Settings:
     clear_bingwall_env()
     os.environ["BINGWALL_APP_ENV"] = "test"
@@ -196,6 +225,9 @@ def build_scheduled_collection_settings(
     os.environ["BINGWALL_STORAGE_FAILED_DIR"] = str(tmp_path / "images" / "failed")
     os.environ["BINGWALL_BACKUP_DIR"] = str(tmp_path / "backups")
     os.environ["BINGWALL_COLLECT_BING_ENABLED"] = str(bing_enabled).lower()
+    os.environ["BINGWALL_COLLECT_BING_DEFAULT_MARKET"] = "en-US"
+    os.environ["BINGWALL_COLLECT_BING_MARKETS"] = ",".join(bing_markets)
+    os.environ["BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS"] = str(bing_backtrack_days)
     os.environ["BINGWALL_COLLECT_NASA_APOD_ENABLED"] = str(nasa_enabled).lower()
     os.environ["BINGWALL_SECURITY_SESSION_SECRET"] = "0123456789abcdef0123456789abcdef"
     os.environ["BINGWALL_SECURITY_SESSION_TTL_HOURS"] = "12"
@@ -209,9 +241,11 @@ def seed_scheduled_task(
     database_path: Path,
     source_type: str,
     market_code: str,
-    scheduled_date: str,
+    date_from: str,
+    date_to: str,
     task_status: str,
     count: int,
+    backtrack_days: int | None,
 ) -> None:
     connection = sqlite3.connect(database_path)
     try:
@@ -244,8 +278,9 @@ def seed_scheduled_task(
                     {
                         "source_type": source_type,
                         "market_code": market_code,
-                        "date_from": scheduled_date,
-                        "date_to": scheduled_date,
+                        "date_from": date_from,
+                        "date_to": date_to,
+                        "backtrack_days": backtrack_days,
                         "force_refresh": False,
                         "count": count,
                         "trigger_type": "cron",

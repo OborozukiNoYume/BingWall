@@ -78,6 +78,11 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert wallpapers[0]["resource_status"] == "ready"
     assert wallpapers[0]["content_status"] == "enabled"
     assert wallpapers[0]["is_public"] == 1
+    assert wallpapers[0]["subtitle"] == "Test subtitle"
+    assert wallpapers[0]["description"] == "Test description"
+    assert wallpapers[0]["location_text"] == "Test location"
+    assert wallpapers[0]["published_at_utc"] == "2026-03-24T16:00:00Z"
+    assert wallpapers[0]["portrait_image_url"] == "https://www.bing.com/th?id=OHR.Success_720x1280.jpg&pid=hp"
     assert len(resources) == 4
     assert {str(resource["resource_type"]) for resource in resources} == {
         "original",
@@ -98,6 +103,9 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert any(path.is_file() for path in public_files)
     assert len([path for path in public_files if path.is_file()]) == 4
     assert all(path.suffix == ".jpg" for path in public_files if path.is_file())
+    assert '"portrait_image_url": "https://www.bing.com/th?id=OHR.Success_720x1280.jpg&pid=hp"' in str(
+        wallpapers[0]["raw_extra_json"]
+    )
 
 
 def test_bing_collection_service_persists_all_available_bing_download_resolutions(
@@ -381,7 +389,7 @@ def test_bing_collection_service_repairs_existing_wallpaper_without_resources(
     assert resource_count == 4
     assert latest_item is not None
     assert latest_item["action_name"] == "repair_incomplete_wallpaper"
-    assert latest_item["db_write_result"] == "resume_existing_wallpaper_without_resources"
+    assert latest_item["db_write_result"] == "resume_existing_wallpaper_resources"
     public_files = [path for path in storage.public_dir.rglob("*") if path.is_file()]
     assert len(public_files) == 4
 
@@ -562,6 +570,55 @@ def test_bing_collection_service_skips_source_url_hash_duplicates(tmp_path: Path
                 market_code="fr-FR",
                 wallpaper_date="2026-03-25",
                 source_key="bing:fr-FR:2026-03-25:OHR.SharedB",
+                source_url="https://www.bing.com/th?id=OHR.Shared_1920x1080.jpg&pid=hp",
+            ),
+        ],
+        downloads=[
+            DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
+            DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
+        ],
+    )
+
+    try:
+        summary = service.collect(
+            market_code="en-US", count=2, trigger_type="manual", triggered_by=None
+        )
+    finally:
+        service.repository.close()
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper_count = connection.execute("SELECT COUNT(*) FROM wallpapers;").fetchone()[0]
+        latest_item = connection.execute(
+            "SELECT * FROM collection_task_items ORDER BY id DESC LIMIT 1;"
+        ).fetchone()
+    finally:
+        connection.close()
+
+    assert summary.success_count == 2
+    assert summary.duplicate_count == 0
+    assert wallpaper_count == 2
+    assert latest_item["result_status"] == "succeeded"
+
+
+def test_bing_collection_service_skips_source_url_hash_duplicates_within_same_market(
+    tmp_path: Path,
+) -> None:
+    duplicated_url = "https://www.bing.com/th?id=OHR.Shared_1920x1080.jpg"
+    service, database_path, _storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.SharedA",
+                source_url=duplicated_url,
+            ),
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-25",
+                source_key="bing:en-US:2026-03-25:OHR.SharedB",
                 source_url=duplicated_url,
             ),
         ],
@@ -589,6 +646,57 @@ def test_bing_collection_service_skips_source_url_hash_duplicates(tmp_path: Path
     assert summary.duplicate_count == 1
     assert wallpaper_count == 1
     assert latest_item["dedupe_hit_type"] == "source_url_hash"
+
+
+def test_bing_collection_service_repairs_corrupted_ready_resource_files(tmp_path: Path) -> None:
+    service, database_path, storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.ResumeCorrupted",
+                source_url="https://www.bing.com/th?id=OHR.ResumeCorrupted_1920x1080.jpg&pid=hp",
+            )
+        ],
+        downloads=[
+            DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
+            DownloadedImage(content=build_test_jpeg_bytes(width=1920, height=1080), mime_type="image/jpeg"),
+        ],
+    )
+
+    try:
+        first_summary = service.collect(
+            market_code="en-US", count=1, trigger_type="manual", triggered_by=None
+        )
+        public_files = [path for path in storage.public_dir.rglob("*") if path.is_file()]
+        assert public_files
+        corrupted_path = public_files[0]
+        corrupted_path.write_bytes(b"x" * corrupted_path.stat().st_size)
+        second_summary = service.collect(
+            market_code="en-US", count=1, trigger_type="manual", triggered_by=None
+        )
+    finally:
+        service.repository.close()
+
+    connection = sqlite3.connect(database_path)
+    connection.row_factory = sqlite3.Row
+    try:
+        wallpaper_count = connection.execute("SELECT COUNT(*) FROM wallpapers;").fetchone()[0]
+        resource_count = connection.execute("SELECT COUNT(*) FROM image_resources;").fetchone()[0]
+        latest_items = connection.execute(
+            "SELECT action_name, failure_reason FROM collection_task_items ORDER BY id DESC LIMIT 2;"
+        ).fetchall()
+    finally:
+        connection.close()
+
+    assert first_summary.success_count == 1
+    assert second_summary.success_count == 1
+    assert second_summary.duplicate_count == 0
+    assert wallpaper_count == 1
+    assert resource_count == 4
+    assert any(str(item["action_name"]) == "repair_incomplete_wallpaper" for item in latest_items)
+    assert any("integrity validation" in str(item["failure_reason"]) for item in latest_items)
 
 
 def build_service(
@@ -623,6 +731,11 @@ def make_metadata(
     wallpaper_date: str,
     source_key: str,
     source_url: str,
+    subtitle: str | None = "Test subtitle",
+    description: str | None = "Test description",
+    location_text: str | None = "Test location",
+    published_at_utc: str | None = "2026-03-24T16:00:00Z",
+    portrait_image_url: str | None = None,
     download_variants: tuple[CollectedDownloadVariant, ...] = (),
 ) -> BingImageMetadata:
     from datetime import date
@@ -642,7 +755,19 @@ def make_metadata(
         source_name="Bing",
         origin_width=1920,
         origin_height=1080,
-        raw_extra_json=json.dumps({"source_key": source_key}, ensure_ascii=True),
+        raw_extra_json=json.dumps(
+            {
+                "source_key": source_key,
+                "portrait_image_url": portrait_image_url
+                or source_url.replace("_1920x1080", "_720x1280"),
+            },
+            ensure_ascii=True,
+        ),
+        subtitle=subtitle,
+        description=description,
+        location_text=location_text,
+        published_at_utc=published_at_utc,
+        portrait_image_url=portrait_image_url or source_url.replace("_1920x1080", "_720x1280"),
         download_variants=download_variants,
     )
 

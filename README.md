@@ -90,7 +90,7 @@ make verify-deploy
 - `make setup`、`make db-migrate`、`make verify`、`make run` 统一命令入口
 - `make collect-bing MARKET=en-US COUNT=1` Bing 手动采集入口
 - `make collect-nasa-apod MARKET=global` NASA APOD 手动采集入口
-- `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口，会按当天 UTC 日期为已启用来源生成 `queued` 的 `cron` 任务
+- `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口，会按当天 UTC 日期为已启用来源生成 `queued` 的 `cron` 任务；Bing 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场各建一条任务，并把窗口起点按 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 回溯
 - `make scheduled-collect` 本地联调便捷入口，会先创建当天固定日期采集任务，再立即消费最多 `5` 个任务
 - `make consume-collection-tasks` 手动采集任务消费入口，可供 cron 调用
 - `make inspect-resources` 资源巡检入口，可供 cron 调用
@@ -100,8 +100,9 @@ make verify-deploy
 - 最小 FastAPI 服务和 `/api/health/live`、`/api/health/ready`、`/api/health/deep` 健康检查
 - SQLite 版本化迁移基线与核心表结构
 - 空库初始化与重复执行迁移能力
-- Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动
+- Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动；当前已补齐 `subtitle`、`description`、`location_text`、`published_at_utc` 与 `portrait_image_url` 落库
 - 当同业务键壁纸已存在但尚未生成任何资源记录时，后续同键采集不会再被直接判定为重复，而会继续补齐资源，避免历史异常中断后留下“只有主体、没有图片资源”的半成品记录
+- 当同业务键壁纸的资源记录已存在但本地正式文件丢失、大小不一致或图片内容已损坏时，后续同键采集会先清理旧资源记录并重建文件，避免数据库显示 `ready` 但实际资源已坏
 - 新采集内容默认会在资源全部就绪后自动切到 `enabled + is_public=true`；如需保留人工审核，可通过 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false` 关闭自动公开
 - `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 八个公开接口；其中公开详情现会返回默认下载地址和 `download_variants` 多分辨率下载列表
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
@@ -137,7 +138,7 @@ make verify-deploy
 - `/api/admin/collection-tasks`、`/api/admin/collection-tasks/{task_id}`、`/api/admin/collection-tasks/{task_id}/consume`、`/api/admin/collection-tasks/{task_id}/retry`、`/api/admin/logs` 后台任务与结构化日志接口
 - 手动采集任务创建、任务列表、任务详情、`queued` 任务人工触发执行、失败任务重试、结构化日志查询和 `collection_task_items` 明细展示
 - `app.collectors.manual_tasks` 与 `make consume-collection-tasks` 队列消费入口，按 `queued -> running -> succeeded / partially_failed / failed` 更新任务状态
-- `scripts/create_scheduled_collection_tasks.py` 与 `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口，会为已启用来源写入 `trigger_type=cron`、`date_from=date_to=当天 UTC 日期` 的 `scheduled_collect` 任务；若同来源同日期已有 `queued` / `running` / `succeeded` / `partially_failed` 任务，则保守跳过，避免重复堆积
+- `scripts/create_scheduled_collection_tasks.py` 与 `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口；Bing 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场分别创建 `trigger_type=cron` 的 `scheduled_collect` 任务，并把 `date_from` 按 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 回溯到窗口起点；若同来源同市场同窗口已有 `queued` / `running` / `succeeded` / `partially_failed` 任务，则保守跳过，避免重复堆积
 - `/admin/tasks`、`/admin/tasks/{task_id}`、`/admin/logs` 后台页面，以及任务创建表单、手动触发按钮、统计摘要、错误摘要和逐条处理明细展示
 - 手动采集与后台观测的集成测试，覆盖任务创建、消费、日志查询、重试和前端页面壳
 
@@ -303,9 +304,9 @@ cat deploy/cron/bingwall-cron
 
 说明：
 
-- 新增的定时建任务脚本固定按 UTC 当天生成 `date_from=date_to=当天` 的任务快照，后台任务详情可直接看到具体日期。
+- 新增的定时建任务脚本固定按 UTC 当天生成任务快照；其中 Bing 会按照 `BINGWALL_COLLECT_BING_MARKETS` 逐个市场建任务，并把 `date_to` 固定为当天、`date_from` 按 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 回溯。
 - cron 消费固定日期任务时，若上游在当天 UTC 边界尚未提供该日期图片，系统会在最近 `8` 天窗口内自动回退到最近可用日期，并写入 `resolve_date_fallback` 任务日志；手动任务仍保持严格日期匹配，不会自动放宽。
-- Bing 定时任务会额外写入 `count=8`，先向上游拉取最近 `8` 天元数据，再优先匹配固定日期；若当天无图，则回退到窗口内最近可用日期。
+- Bing 定时任务会把 `count` 与 `backtrack_days` 一并写入任务快照，当前允许值为 `3`、`5`、`7`；任务消费时会先拉取该窗口内的元数据，再优先匹配固定日期，若当天无图，则回退到窗口内最近可用日期。
 - NASA APOD 定时任务仍写入 `count=1`，但消费阶段会把上游查询窗口扩展到最近 `8` 天，并在当天无图时回退到最近可用日期。
 
 下载统计最小验证示例：

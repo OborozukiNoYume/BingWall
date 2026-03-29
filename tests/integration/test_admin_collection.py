@@ -69,6 +69,7 @@ def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
         "market_code": "en-US",
         "date_from": "2026-03-23",
         "date_to": "2026-03-24",
+        "backtrack_days": None,
         "force_refresh": False,
         "count": None,
         "trigger_type": None,

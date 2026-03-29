@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-26T12:30:40Z
+- 更新时间：2026-03-29T03:19:48Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期实施前的数据实体、字段分组、状态模型、约束和索引说明
 
@@ -61,6 +61,7 @@
 | `origin_image_url` | string | 否 | 原始图片地址 |
 | `origin_width` | integer | 否 | 原始宽度 |
 | `origin_height` | integer | 否 | 原始高度 |
+| `portrait_image_url` | string | 否 | Bing 竖版下载图地址，便于后续客户端直接使用 |
 | `resource_status` | string | 是 | 当前可用资源状态快照 |
 | `raw_extra_json` | text | 否 | 来源扩展信息 |
 | `sort_weight` | integer | 是 | 排序权重，默认 `0` |
@@ -74,6 +75,7 @@
 - 非删除内容才能参与公开查询
 - 当 `content_status = enabled` 时，`resource_status` 必须为 `ready`
 - `resource_status` 由领域服务或巡检任务根据当前对外可用的资源记录同步刷新，不允许由公开接口直接写入
+- Bing 来源当前还会补充 `subtitle`、`description`、`location_text`、`published_at_utc` 与 `portrait_image_url`，用于公开检索、后台展示和移动端竖版图适配
 - 当前关键词搜索基于 `title`、`subtitle`、`copyright_text`、`description` 与已绑定标签实现，不单独新增搜索索引表
 
 ## 2. 图片资源 `image_resources`
@@ -145,6 +147,11 @@
 | `retry_of_task_id` | integer / uuid | 否 | 被重试任务 ID |
 | `created_at_utc` | datetime | 是 | 创建时间 |
 | `updated_at_utc` | datetime | 是 | 更新时间 |
+
+补充说明：
+
+- `scheduled_collect` 类型任务的 `request_snapshot_json` 当前至少会保存 `source_type`、`market_code`、`date_from`、`date_to`、`force_refresh`、`count`、`trigger_type`
+- Bing 的 `scheduled_collect` 任务还会额外保存 `backtrack_days`，用于区分不同回溯窗口，避免同市场同日任务重复创建
 
 ## 4. 采集明细 `collection_task_items`
 

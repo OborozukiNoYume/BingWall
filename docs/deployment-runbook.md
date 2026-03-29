@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-25T14:24:30Z
+- 更新时间：2026-03-29T03:19:48Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -86,7 +86,7 @@
 | 服务配置 | 监听地址、端口、基础 URL |
 | 数据库配置 | SQLite 文件路径 |
 | 存储配置 | 临时目录、正式目录、备份目录 |
-| 采集配置 | 来源开关、市场、超时、重试次数 |
+| 采集配置 | 来源开关、默认市场、市场列表、定时回溯天数、超时、重试次数 |
 | 安全配置 | 会话密钥、登录过期时间、密码策略 |
 | 日志配置 | 级别、目录、保留天数 |
 | 告警配置 | 邮件或 Webhook 地址 |
@@ -125,6 +125,13 @@
 - 配置错误应在启动阶段失败
 - 任何敏感值都不能写入仓库
 - 所有时间相关配置内部按 UTC 处理
+
+### Bing 采集配置补充
+
+- `BINGWALL_COLLECT_BING_DEFAULT_MARKET` 仍表示公开站点和手动采集默认使用的 Bing 市场代码，必须使用 `en-US` 这类带连字符的 Bing 市场格式
+- `BINGWALL_COLLECT_BING_MARKETS` 用于 cron 定时建任务；值为逗号分隔的市场列表，例如 `en-US,zh-CN,ja-JP`，系统会自动去重并忽略空白项
+- `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 用于 Bing 定时任务快照中的回溯窗口，当前只允许 `3`、`5`、`7`
+- 如果未单独配置 `BINGWALL_COLLECT_BING_MARKETS`，环境示例默认只创建 `en-US` 一个 Bing 定时任务
 
 ## 5. 服务拓扑
 
@@ -239,6 +246,8 @@
 - 临时目录、失败目录、数据库目录不对 Nginx 开放
 - 仅本地文件存储时，应保持 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 未设置，不要写成空字符串
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
+- 如需让 Bing 定时采集覆盖多个地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=en-US,zh-CN,ja-JP`
+- 如需调整 Bing 定时采集回溯窗口，可把 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 设为 `3`、`5` 或 `7`
 - 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
 - 如需保留“采集后先人工审核再发布”的旧策略，可在环境文件中把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`
 
@@ -254,15 +263,16 @@
 
 当前仓库已提供：
 
-- `scripts/create_scheduled_collection_tasks.py`：按当天 UTC 日期为每个已启用来源创建一条 `queued` 的 `scheduled_collect` 任务，任务快照固定写入 `date_from=date_to=当天`
+- `scripts/create_scheduled_collection_tasks.py`：按当天 UTC 日期为每个已启用来源创建 `queued` 的 `scheduled_collect` 任务；其中 Bing 会按市场列表分别建任务，并把 `date_from`、`date_to`、`backtrack_days` 一并写入任务快照
 - `deploy/cron/bingwall-cron`：目标机 `cron` 配置示例，包含“每日创建固定日期采集任务”和“每分钟消费采集队列”两条示例
 
 行为说明：
 
 - cron 消费固定日期任务时，若上游在当天 UTC 边界尚未提供对应日期图片，系统会在最近 `8` 天窗口内自动回退到最近可用日期，并写入 `resolve_date_fallback` 任务日志；手动任务仍保持严格日期匹配
-- Bing 定时任务会写入 `count=8`，先读取最近 `8` 天元数据，再优先匹配固定日期；若当天无图，则回退到窗口内最近可用日期
+- Bing 定时任务会按 `BINGWALL_COLLECT_BING_MARKETS` 逐个市场建任务，并把 `count` 与 `backtrack_days` 同步写入任务快照；当前回溯天数只允许 `3`、`5`、`7`
+- Bing 定时任务会先读取回溯窗口内的元数据，再优先匹配固定日期；若当天无图，则回退到窗口内最近可用日期
 - NASA APOD 定时任务写入 `count=1`，但消费阶段会把上游查询窗口扩展到最近 `8` 天，并在当天无图时回退到最近可用日期
-- 若同来源同日期已存在 `queued`、`running`、`succeeded` 或 `partially_failed` 的 `cron` 任务，新脚本会跳过创建，避免重复堆积；若历史任务为 `failed`，则允许重建
+- 若同来源同市场同 `date_from/date_to/backtrack_days` 组合已存在 `queued`、`running`、`succeeded` 或 `partially_failed` 的 `cron` 任务，新脚本会跳过创建，避免重复堆积；若历史任务为 `failed`，则允许重建
 
 建议部署步骤：
 
@@ -270,7 +280,7 @@
 2. 根据真实路径调整 `/opt/bingwall/app`、`.venv/bin/python` 和 `/var/log/bingwall`
 3. 执行 `crontab -l`、`crontab <file>` 或系统级安装命令完成加载
 4. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
-5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron` 且日期固定
+5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
 
 当前目标机仍需补齐：
 

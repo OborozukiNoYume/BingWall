@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import argparse
-from datetime import datetime
 from datetime import date
+from datetime import datetime
 import hashlib
 import json
 import logging
@@ -106,6 +106,18 @@ class BingClient:
             primary_variant.source_url if primary_variant is not None else origin_image_url
         )
         raw_payload = dict(payload)
+        raw_payload["requested_market_code"] = market_code
+        raw_payload["wallpaper_date"] = wallpaper_date.isoformat()
+        raw_payload["published_at_utc"] = parse_bing_fullstartdate(
+            normalize_optional_text(payload.get("fullstartdate"))
+        )
+        raw_payload["hd_image_url"] = primary_variant.source_url if primary_variant else origin_image_url
+        raw_payload["portrait_image_url"] = find_portrait_image_url(
+            download_variants=download_variants,
+            urlbase=normalize_optional_text(payload.get("urlbase")),
+            image_url=origin_image_url,
+            is_downloadable=bool(payload.get("wp")),
+        )
         raw_payload["download_variants"] = [
             {
                 "variant_key": variant.variant_key,
@@ -130,6 +142,18 @@ class BingClient:
             origin_width=width,
             origin_height=height,
             raw_extra_json=raw_extra_json,
+            subtitle=extract_bing_subtitle(payload),
+            description=extract_bing_description(payload),
+            location_text=extract_bing_location_text(payload),
+            published_at_utc=parse_bing_fullstartdate(
+                normalize_optional_text(payload.get("fullstartdate"))
+            ),
+            portrait_image_url=find_portrait_image_url(
+                download_variants=download_variants,
+                urlbase=normalize_optional_text(payload.get("urlbase")),
+                image_url=origin_image_url,
+                is_downloadable=bool(payload.get("wp")),
+            ),
             download_variants=download_variants,
         )
 
@@ -198,6 +222,12 @@ def parse_bing_date(value: str) -> date:
     return datetime.strptime(value, "%Y%m%d").date()
 
 
+def parse_bing_fullstartdate(value: str | None) -> str | None:
+    if not value:
+        return None
+    return datetime.strptime(value, "%Y%m%d%H%M").isoformat() + "Z"
+
+
 def extract_source_id(value: str) -> str:
     query_value = value
     if value.startswith("/"):
@@ -235,6 +265,45 @@ def normalize_optional_text(value: Any) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def extract_bing_subtitle(payload: dict[str, Any]) -> str | None:
+    return first_non_empty_text(
+        payload.get("caption"),
+        payload.get("bsTitle"),
+        payload.get("headline"),
+    )
+
+
+def extract_bing_description(payload: dict[str, Any]) -> str | None:
+    return first_non_empty_text(
+        payload.get("description"),
+        payload.get("desc"),
+        payload.get("caption"),
+        payload.get("copyrightonly"),
+    )
+
+
+def extract_bing_location_text(payload: dict[str, Any]) -> str | None:
+    candidates = (
+        normalize_optional_text(payload.get("copyrightonly")),
+        normalize_optional_text(payload.get("copyright")),
+    )
+    for candidate in candidates:
+        if not candidate:
+            continue
+        location_text = candidate.split("(", 1)[0].strip().rstrip(",")
+        if location_text:
+            return location_text
+    return None
+
+
+def first_non_empty_text(*values: Any) -> str | None:
+    for value in values:
+        text = normalize_optional_text(value)
+        if text:
+            return text
+    return None
 
 
 def build_bing_relative_path(item: BingImageMetadata) -> str:
@@ -302,6 +371,33 @@ def build_download_variants(
             )
         )
     return tuple(variants)
+
+
+def find_portrait_image_url(
+    *,
+    download_variants: tuple[CollectedDownloadVariant, ...],
+    urlbase: str | None,
+    image_url: str,
+    is_downloadable: bool,
+) -> str | None:
+    for variant in download_variants:
+        if variant.width is not None and variant.height is not None and variant.height > variant.width:
+            return variant.source_url
+    if not is_downloadable or not urlbase:
+        return None
+    file_ext = extract_file_ext_from_bing_image_url(image_url)
+    parsed_image_url = urlparse(image_url)
+    passthrough_query = [
+        (key, value)
+        for key, value in parse_qsl(parsed_image_url.query, keep_blank_values=True)
+        if key != "id"
+    ]
+    return build_variant_image_url(
+        urlbase=urlbase,
+        variant_key="720x1280",
+        file_ext=file_ext,
+        passthrough_query=passthrough_query,
+    )
 
 
 def build_variant_image_url(

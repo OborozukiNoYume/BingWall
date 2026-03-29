@@ -297,6 +297,12 @@ class SourceCollectionService:
 
     def _collect_single_item(self, *, task_id: int, item: CollectedImageMetadata) -> str:
         wallpaper_date = item.wallpaper_date.isoformat()
+        created_at_utc = utc_now_isoformat()
+        wallpaper_input = self._build_wallpaper_create_input(
+            item=item,
+            wallpaper_date=wallpaper_date,
+            created_at_utc=created_at_utc,
+        )
         existing_wallpaper = self.repository.find_wallpaper_by_business_key(
             source_type=self.adapter.source_type,
             wallpaper_date=wallpaper_date,
@@ -304,7 +310,15 @@ class SourceCollectionService:
         )
         if existing_wallpaper is not None:
             existing_wallpaper_id = int(existing_wallpaper["id"])
-            if self.repository.wallpaper_has_image_resources(wallpaper_id=existing_wallpaper_id):
+            self.repository.update_wallpaper_metadata(
+                wallpaper_id=existing_wallpaper_id,
+                item=wallpaper_input,
+                updated_at_utc=created_at_utc,
+            )
+            needs_resume, resume_reason = self._wallpaper_needs_resume(
+                wallpaper_id=existing_wallpaper_id
+            )
+            if not needs_resume:
                 self.repository.create_task_item(
                     TaskItemCreateInput(
                         task_id=task_id,
@@ -320,6 +334,10 @@ class SourceCollectionService:
                 )
                 return "duplicated"
 
+            self._prepare_wallpaper_resume(
+                wallpaper_id=existing_wallpaper_id,
+                resume_reason=resume_reason,
+            )
             self.repository.create_task_item(
                 TaskItemCreateInput(
                     task_id=task_id,
@@ -327,17 +345,18 @@ class SourceCollectionService:
                     action_name="repair_incomplete_wallpaper",
                     result_status="succeeded",
                     dedupe_hit_type=None,
-                    db_write_result="resume_existing_wallpaper_without_resources",
+                    db_write_result="resume_existing_wallpaper_resources",
                     file_write_result=None,
-                    failure_reason=None,
+                    failure_reason=resume_reason,
                     occurred_at_utc=utc_now_isoformat(),
                 )
             )
             wallpaper_id = existing_wallpaper_id
-            created_at_utc = utc_now_isoformat()
         else:
-            existing_resource = self.repository.find_image_resource_by_source_url_hash(
-                item.source_url_hash
+            existing_resource = self.repository.find_image_resource_by_source_url_hash_in_scope(
+                source_url_hash=item.source_url_hash,
+                source_type=self.adapter.source_type,
+                market_code=item.market_code,
             )
             if existing_resource is not None:
                 self.repository.create_task_item(
@@ -355,25 +374,7 @@ class SourceCollectionService:
                 )
                 return "duplicated"
 
-            created_at_utc = utc_now_isoformat()
-            wallpaper_id = self.repository.create_wallpaper(
-                WallpaperCreateInput(
-                    source_type=self.adapter.source_type,
-                    source_key=item.source_key,
-                    market_code=item.market_code,
-                    wallpaper_date=wallpaper_date,
-                    title=item.title,
-                    copyright_text=item.copyright_text,
-                    source_name=item.source_name,
-                    origin_page_url=item.origin_page_url,
-                    origin_image_url=item.origin_image_url,
-                    origin_width=item.origin_width,
-                    origin_height=item.origin_height,
-                    is_downloadable=item.is_downloadable,
-                    raw_extra_json=item.raw_extra_json,
-                    created_at_utc=created_at_utc,
-                )
-            )
+            wallpaper_id = self.repository.create_wallpaper(wallpaper_input)
         relative_path = self.adapter.build_relative_path(item)
         filename = Path(relative_path).name
         file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"
@@ -413,6 +414,81 @@ class SourceCollectionService:
             )
         )
         return "succeeded"
+
+    def _build_wallpaper_create_input(
+        self,
+        *,
+        item: CollectedImageMetadata,
+        wallpaper_date: str,
+        created_at_utc: str,
+    ) -> WallpaperCreateInput:
+        return WallpaperCreateInput(
+            source_type=self.adapter.source_type,
+            source_key=item.source_key,
+            market_code=item.market_code,
+            wallpaper_date=wallpaper_date,
+            title=item.title,
+            subtitle=item.subtitle,
+            description=item.description,
+            copyright_text=item.copyright_text,
+            source_name=item.source_name,
+            published_at_utc=item.published_at_utc,
+            location_text=item.location_text,
+            origin_page_url=item.origin_page_url,
+            origin_image_url=item.origin_image_url,
+            origin_width=item.origin_width,
+            origin_height=item.origin_height,
+            is_downloadable=item.is_downloadable,
+            portrait_image_url=item.portrait_image_url,
+            raw_extra_json=item.raw_extra_json,
+            created_at_utc=created_at_utc,
+        )
+
+    def _wallpaper_needs_resume(self, *, wallpaper_id: int) -> tuple[bool, str | None]:
+        resource_rows = self.repository.list_image_resources_for_wallpaper(wallpaper_id=wallpaper_id)
+        if not resource_rows:
+            return True, "wallpaper exists without any image resources"
+
+        for row in resource_rows:
+            if str(row["image_status"]) != "ready":
+                return True, f"resource {row['id']} is not ready"
+            if str(row["storage_backend"]) != "local":
+                continue
+            relative_path = str(row["relative_path"])
+            file_path = self.storage.public_dir / relative_path
+            if not file_path.is_file():
+                return True, f"resource file is missing: {relative_path}"
+            if row["file_size_bytes"] is not None and file_path.stat().st_size != int(
+                row["file_size_bytes"]
+            ):
+                return True, f"resource file size does not match: {relative_path}"
+            try:
+                load_image_bytes(file_path.read_bytes(), fallback_mime_type=None)
+            except Exception as exc:
+                return True, f"resource file failed integrity validation: {relative_path}: {exc}"
+        return False, None
+
+    def _prepare_wallpaper_resume(self, *, wallpaper_id: int, resume_reason: str | None) -> None:
+        resource_rows = self.repository.list_image_resources_for_wallpaper(wallpaper_id=wallpaper_id)
+        for row in resource_rows:
+            if str(row["storage_backend"]) != "local":
+                continue
+            relative_path = str(row["relative_path"])
+            cleanup_path(self.storage.public_dir / relative_path)
+            cleanup_path(self.storage.failed_dir / relative_path)
+            cleanup_path(self.storage.tmp_dir / relative_path)
+        self.repository.delete_image_resources_for_wallpaper(wallpaper_id=wallpaper_id)
+        self.repository.reset_wallpaper_for_resource_rebuild(
+            wallpaper_id=wallpaper_id,
+            updated_at_utc=utc_now_isoformat(),
+        )
+        if resume_reason:
+            logger.warning(
+                "Resume collection for %s wallpaper_id=%s because %s",
+                self.adapter.source_type,
+                wallpaper_id,
+                resume_reason,
+            )
 
     def _download_and_store_resource(
         self,
