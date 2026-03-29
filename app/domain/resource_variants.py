@@ -33,22 +33,22 @@ def derive_resource_status(
     is_downloadable: bool,
 ) -> ResourceStatus:
     ready_types = {
-        resource_type
-        for resource_type, image_status in resources
-        if image_status == "ready"
+        resource_type for resource_type, image_status in resources if image_status == "ready"
     }
     failed_types = {
-        resource_type
-        for resource_type, image_status in resources
-        if image_status == "failed"
+        resource_type for resource_type, image_status in resources if image_status == "failed"
     }
-    has_download_rows = any(resource_type == RESOURCE_TYPE_DOWNLOAD for resource_type, _ in resources)
+    has_download_rows = any(
+        resource_type == RESOURCE_TYPE_DOWNLOAD for resource_type, _ in resources
+    )
     has_ready_download = RESOURCE_TYPE_DOWNLOAD in ready_types or (
         is_downloadable and not has_download_rows and RESOURCE_TYPE_ORIGINAL in ready_types
     )
     has_failed_download = has_download_rows and RESOURCE_TYPE_DOWNLOAD in failed_types
 
-    if REQUIRED_READY_RESOURCE_TYPES and not set(REQUIRED_READY_RESOURCE_TYPES).issubset(ready_types):
+    if REQUIRED_READY_RESOURCE_TYPES and not set(REQUIRED_READY_RESOURCE_TYPES).issubset(
+        ready_types
+    ):
         if set(REQUIRED_READY_RESOURCE_TYPES).intersection(failed_types):
             return "failed"
         if is_downloadable and has_failed_download:

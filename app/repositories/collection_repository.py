@@ -691,6 +691,30 @@ class CollectionRepository:
         )
         self.connection.commit()
 
+    def update_image_resource_relative_path(
+        self,
+        *,
+        resource_id: int,
+        relative_path: str,
+        filename: str,
+        file_ext: str,
+        mime_type: str,
+        updated_at_utc: str,
+    ) -> None:
+        self.connection.execute(
+            """
+            UPDATE image_resources
+            SET relative_path = ?,
+                filename = ?,
+                file_ext = ?,
+                mime_type = ?,
+                updated_at_utc = ?
+            WHERE id = ?;
+            """,
+            (relative_path, filename, file_ext, mime_type, updated_at_utc, resource_id),
+        )
+        self.connection.commit()
+
     def mark_image_resource_ready(
         self,
         *,
@@ -806,8 +830,7 @@ class CollectionRepository:
         ).fetchall()
         resource_status = derive_resource_status(
             resources=[
-                (str(row["resource_type"]), str(row["image_status"]))
-                for row in resource_rows
+                (str(row["resource_type"]), str(row["image_status"])) for row in resource_rows
             ],
             is_downloadable=bool(wallpaper_row["is_downloadable"]),
         )

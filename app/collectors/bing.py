@@ -111,7 +111,9 @@ class BingClient:
         raw_payload["published_at_utc"] = parse_bing_fullstartdate(
             normalize_optional_text(payload.get("fullstartdate"))
         )
-        raw_payload["hd_image_url"] = primary_variant.source_url if primary_variant else origin_image_url
+        raw_payload["hd_image_url"] = (
+            primary_variant.source_url if primary_variant else origin_image_url
+        )
         raw_payload["portrait_image_url"] = find_portrait_image_url(
             download_variants=download_variants,
             urlbase=normalize_optional_text(payload.get("urlbase")),
@@ -381,7 +383,11 @@ def find_portrait_image_url(
     is_downloadable: bool,
 ) -> str | None:
     for variant in download_variants:
-        if variant.width is not None and variant.height is not None and variant.height > variant.width:
+        if (
+            variant.width is not None
+            and variant.height is not None
+            and variant.height > variant.width
+        ):
             return variant.source_url
     if not is_downloadable or not urlbase:
         return None

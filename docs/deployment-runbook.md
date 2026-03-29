@@ -2,13 +2,13 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T03:33:52Z
+- 更新时间：2026-03-29T04:08:24Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
 ## 当前状态说明
 
-当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查与资源巡检闭环、阶段二 `T2.5` 的备份恢复脚本与恢复演练入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
+当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查、资源巡检与本地资源归档清理闭环、阶段二 `T2.5` 的备份恢复脚本与恢复演练入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
 
 ## 1. 部署目标
 
@@ -169,6 +169,7 @@
 - 手动采集任务消费
 - 失败重试
 - 资源巡检
+- 资源归档清理
 - 备份任务
 
 ## 6. 启动与运行要求
@@ -188,6 +189,7 @@
 - 本地联调便捷命令：`make scheduled-collect`
 - 手动采集任务消费命令：`make consume-collection-tasks`
 - 资源巡检命令：`make inspect-resources`
+- 资源归档命令：`make archive-wallpapers`
 - 备份命令：`make backup`
 - 恢复命令：`make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1`
 - 本地开发验证命令：`make verify`
@@ -265,7 +267,7 @@
 当前仓库已提供：
 
 - `scripts/create_scheduled_collection_tasks.py`：按当天 UTC 日期为每个已启用来源创建 `queued` 的 `scheduled_collect` 任务；其中 Bing 会按市场列表分别建任务，并把 `date_from`、`date_to`、`backtrack_days` 一并写入任务快照
-- `deploy/cron/bingwall-cron`：目标机 `cron` 配置示例，包含“每日创建固定日期采集任务”和“每分钟消费采集队列”两条示例
+- `deploy/cron/bingwall-cron`：目标机 `cron` 配置示例，当前包含“每日创建固定日期采集任务”和“每分钟消费采集队列”两条示例；资源巡检、归档和备份表达式仍需按目标机策略补充
 
 行为说明：
 
@@ -297,6 +299,7 @@
 - `GET /api/health/ready`：确认配置、数据库和关键目录可用；失败时返回 `503`
 - `GET /api/health/deep`：返回最近一次采集任务摘要、磁盘使用率和资源目录摘要；严重异常时返回 `503`
 - `make inspect-resources`：巡检数据库就绪资源与正式资源目录的一致性，发现资源缺失时自动刷新资源与内容状态
+- `make archive-wallpapers`：把本地 ready 资源迁移到统一结构化路径，清理临时目录遗留文件、空文件和重复孤儿文件，并把损坏资源隔离到失败目录；若发现损坏资源或目标路径存在内容冲突，命令会返回非零退出码
 
 ## 7. 日志要求
 
@@ -386,7 +389,8 @@
 4. 恢复完成后启动或重启应用与代理服务
 5. 执行 `curl http://127.0.0.1/api/health/deep`
 6. 执行 `make inspect-resources`
-7. 验证 `curl http://127.0.0.1/`、`curl http://127.0.0.1/api/public/site-info` 和后台登录/后台列表接口
+7. 执行 `make archive-wallpapers`
+8. 验证 `curl http://127.0.0.1/`、`curl http://127.0.0.1/api/public/site-info` 和后台登录/后台列表接口
 
 ## 10. 上线前检查清单
 
@@ -411,7 +415,8 @@
 8. 执行 `curl http://127.0.0.1/`
 9. 如已有正式资源，执行 `curl -I http://127.0.0.1/images/<正式资源相对路径>`
 10. 执行 `make inspect-resources`
-11. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
+11. 执行 `make archive-wallpapers`
+12. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
 
 ### 完整上线检查（阶段二目标）
 

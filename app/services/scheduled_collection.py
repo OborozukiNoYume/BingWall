@@ -141,7 +141,9 @@ def build_scheduled_task_snapshot(
     }
 
 
-def scheduled_task_count_for_source(*, settings: Settings, source_type: CollectionSourceType) -> int:
+def scheduled_task_count_for_source(
+    *, settings: Settings, source_type: CollectionSourceType
+) -> int:
     if source_type == "bing":
         return settings.collect_bing_scheduled_backtrack_days
     return 1

@@ -82,13 +82,22 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert wallpapers[0]["description"] == "Test description"
     assert wallpapers[0]["location_text"] == "Test location"
     assert wallpapers[0]["published_at_utc"] == "2026-03-24T16:00:00Z"
-    assert wallpapers[0]["portrait_image_url"] == "https://www.bing.com/th?id=OHR.Success_720x1280.jpg&pid=hp"
+    assert (
+        wallpapers[0]["portrait_image_url"]
+        == "https://www.bing.com/th?id=OHR.Success_720x1280.jpg&pid=hp"
+    )
     assert len(resources) == 4
     assert {str(resource["resource_type"]) for resource in resources} == {
         "original",
         "thumbnail",
         "preview",
         "download",
+    }
+    assert {str(resource["relative_path"]) for resource in resources} == {
+        "bing/2026/03/24_en-US_1920x1080.jpg",
+        "bing/2026/03/24_en-US_thumbnail_480x270.jpg",
+        "bing/2026/03/24_en-US_preview_1600x900.jpg",
+        "bing/2026/03/24_en-US_download_1920x1080.jpg",
     }
     assert all(str(resource["image_status"]) == "ready" for resource in resources)
     original_resource = next(
@@ -103,8 +112,9 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
     assert any(path.is_file() for path in public_files)
     assert len([path for path in public_files if path.is_file()]) == 4
     assert all(path.suffix == ".jpg" for path in public_files if path.is_file())
-    assert '"portrait_image_url": "https://www.bing.com/th?id=OHR.Success_720x1280.jpg&pid=hp"' in str(
-        wallpapers[0]["raw_extra_json"]
+    assert (
+        '"portrait_image_url": "https://www.bing.com/th?id=OHR.Success_720x1280.jpg&pid=hp"'
+        in str(wallpapers[0]["raw_extra_json"])
     )
 
 
@@ -145,9 +155,13 @@ def test_bing_collection_service_persists_all_available_bing_download_resolution
             )
         ],
         downloads=[
-            DownloadedImage(content=build_test_jpeg_bytes(width=3840, height=2160), mime_type="image/jpeg"),
+            DownloadedImage(
+                content=build_test_jpeg_bytes(width=3840, height=2160), mime_type="image/jpeg"
+            ),
             DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
-            DownloadedImage(content=build_test_jpeg_bytes(width=480, height=800), mime_type="image/jpeg"),
+            DownloadedImage(
+                content=build_test_jpeg_bytes(width=480, height=800), mime_type="image/jpeg"
+            ),
         ],
     )
 
@@ -172,6 +186,14 @@ def test_bing_collection_service_persists_all_available_bing_download_resolution
             ORDER BY width DESC, height DESC, id ASC;
             """
         ).fetchall()
+        stored_download_paths = connection.execute(
+            """
+            SELECT relative_path
+            FROM image_resources
+            WHERE resource_type = 'download'
+            ORDER BY width DESC, height DESC, id ASC;
+            """
+        ).fetchall()
     finally:
         connection.close()
 
@@ -188,6 +210,11 @@ def test_bing_collection_service_persists_all_available_bing_download_resolution
         ("UHD", 3840, 2160, uhd_url),
         ("1920x1080", 1920, 1080, hd_url),
         ("480x800", 480, 800, mobile_url),
+    ]
+    assert [str(row["relative_path"]) for row in stored_download_paths] == [
+        "bing/2026/03/24_en-US_download_3840x2160.jpg",
+        "bing/2026/03/24_en-US_download_1920x1080.jpg",
+        "bing/2026/03/24_en-US_download_480x800.jpg",
     ]
 
 
@@ -661,7 +688,9 @@ def test_bing_collection_service_repairs_corrupted_ready_resource_files(tmp_path
         ],
         downloads=[
             DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg"),
-            DownloadedImage(content=build_test_jpeg_bytes(width=1920, height=1080), mime_type="image/jpeg"),
+            DownloadedImage(
+                content=build_test_jpeg_bytes(width=1920, height=1080), mime_type="image/jpeg"
+            ),
         ],
     )
 

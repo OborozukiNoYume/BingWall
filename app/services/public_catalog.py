@@ -193,7 +193,9 @@ class PublicCatalogService:
             ),
             download_variants=download_variants if bool(row["is_downloadable"]) else [],
             is_downloadable=bool(row["is_downloadable"]),
-            width=default_download.width if default_download is not None else _optional_int(row["width"]),
+            width=default_download.width
+            if default_download is not None
+            else _optional_int(row["width"]),
             height=default_download.height
             if default_download is not None
             else _optional_int(row["height"]),

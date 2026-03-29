@@ -150,7 +150,9 @@ def get_collection_repository(
 def get_admin_collection_execution_service(
     settings: Annotated[Settings, Depends(get_settings)],
     repository: Annotated[CollectionRepository, Depends(get_collection_repository)],
-    audit_repository: Annotated[AdminCollectionRepository, Depends(get_admin_collection_repository)],
+    audit_repository: Annotated[
+        AdminCollectionRepository, Depends(get_admin_collection_repository)
+    ],
 ) -> AdminCollectionExecutionService:
     storage = FileStorage(
         tmp_dir=settings.storage_tmp_dir,

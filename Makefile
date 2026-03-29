@@ -2,7 +2,7 @@ PYTHON_BIN ?= python3
 VENV ?= .venv
 VENV_PYTHON := $(VENV)/bin/python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources backup restore verify-backup-restore run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources archive-wallpapers backup restore verify-backup-restore run clean
 
 MARKET ?= en-US
 COUNT ?= 1
@@ -21,7 +21,7 @@ lint:
 	$(VENV_PYTHON) -m ruff check .
 
 typecheck:
-	$(VENV_PYTHON) -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py
+	$(VENV_PYTHON) -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py
 
 test:
 	$(VENV_PYTHON) -m pytest
@@ -52,6 +52,9 @@ consume-collection-tasks:
 
 inspect-resources:
 	$(VENV_PYTHON) scripts/run_resource_inspection.py
+
+archive-wallpapers:
+	$(VENV_PYTHON) scripts/run_wallpaper_archive.py
 
 backup:
 	$(VENV_PYTHON) scripts/run_backup.py

@@ -86,6 +86,19 @@ def generate_variant_image(
     )
 
 
+def calculate_variant_dimensions(
+    *,
+    width: int,
+    height: int,
+    resource_type: ResourceType,
+) -> tuple[int, int]:
+    max_width, max_height = _variant_max_size(resource_type)
+    scale = min(max_width / width, max_height / height, 1.0)
+    scaled_width = max(1, int(width * scale))
+    scaled_height = max(1, int(height * scale))
+    return scaled_width, scaled_height
+
+
 def _variant_max_size(resource_type: ResourceType) -> tuple[int, int]:
     if resource_type == RESOURCE_TYPE_THUMBNAIL:
         return THUMBNAIL_MAX_SIZE

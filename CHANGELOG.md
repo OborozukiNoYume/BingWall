@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## 2026-03-29T04:33:18Z
+
+### 变更内容
+
+- 更新 [app/services/source_collection.py](app/services/source_collection.py)、[app/services/image_variants.py](app/services/image_variants.py)、[app/services/resource_paths.py](app/services/resource_paths.py)、[app/repositories/collection_repository.py](app/repositories/collection_repository.py) 与 [app/repositories/health_repository.py](app/repositories/health_repository.py)，把本地资源相对路径统一收敛为 `source/year/month/day_market_type_resolution.ext` 结构化格式，并补齐原图、缩略图、预览图和下载图的统一路径生成、尺寸计算与路径更新能力
+- 新增 [app/services/resource_archive.py](app/services/resource_archive.py)、[scripts/run_wallpaper_archive.py](scripts/run_wallpaper_archive.py) 与 [Makefile](Makefile) 中的 `make archive-wallpapers`，提供历史 ready 资源归档、临时目录清理、空文件删除、重复孤儿文件删除、孤儿文件隔离与损坏资源降级入口
+- 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_resource_archive.py](tests/integration/test_resource_archive.py)、[tests/unit/test_resource_locator.py](tests/unit/test_resource_locator.py) 与 [tests/unit/test_resource_paths.py](tests/unit/test_resource_paths.py)，补齐结构化路径落库断言、历史资源迁移、孤儿文件清理、损坏资源隔离和路径构造回归测试
+- 更新 [app/api/admin/routes.py](app/api/admin/routes.py)、[app/collectors/bing.py](app/collectors/bing.py)、[app/domain/resource_variants.py](app/domain/resource_variants.py)、[app/services/public_catalog.py](app/services/public_catalog.py)、[app/services/scheduled_collection.py](app/services/scheduled_collection.py) 与 [scripts/verify_t1_6.py](scripts/verify_t1_6.py)，清理仓库内原有的格式化阻塞，并为部署验收脚本补齐精确返回类型，确保全仓格式与类型校验可通过
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步记录新的归档命令、行为说明、验证步骤和回滚口径
+
+### 变更原因
+
+- 现有采集链路的资源文件名仍混用旧占位和历史路径风格，导致后续巡检、归档和人工排障时，难以从路径直接判断来源、日期、资源类型和分辨率
+- 历史正式资源目录中还可能残留临时文件、空文件、重复孤儿文件，或者数据库仍显示 `ready` 但本地图片已损坏的脏状态，需要一个保守、可重复执行的清理入口
+- 仓库内还存在少量与本次交付无关的历史格式化/类型标注遗留问题，会阻塞全仓质量门禁，因此一并做最小修正以恢复可提交状态
+- 因此本次采用最保守修复：不改数据库结构、不改公开接口契约，只统一本地资源路径规则并新增归档清理脚本与回归测试
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无新增数据库迁移、锁文件或运行时版本变更
+- 变更时间：`2026-03-29T04:33:18Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地资源相对路径生成规则、采集后资源落盘位置、历史资源归档清理脚本、对应单元/集成测试，以及运行文档
+- 额外影响到 6 个历史文件的代码格式，以及 `scripts/verify_t1_6.py` 的静态类型声明；这些改动不改变运行时业务行为，只用于恢复全仓校验可用性
+- 现在本地资源会统一命名为 `source/year/month/day_market_type_resolution.ext` 形式；对原图会省略 `resource_type` 段，其他派生版本会显式带上 `thumbnail`、`preview`、`download`
+- `make archive-wallpapers` 会清理临时目录遗留文件、空文件和重复孤儿文件，把无法关联的有效孤儿文件移动到失败目录，并在发现损坏 ready 资源时同步将数据库资源状态与壁纸公开状态降级
+- 本次不包含数据库迁移、公开 API 字段调整、后台页面改版、对象存储写入链路重写或更广义的健康检查改版
+
+### 验证步骤
+
+- 执行 `./.venv/bin/python -m pytest tests/unit/test_resource_paths.py tests/unit/test_resource_locator.py tests/integration/test_bing_collection_service.py tests/integration/test_resource_archive.py`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t1_6.py scripts/verify_t2_5.py`
+- 执行 `./.venv/bin/python -m ruff check app tests scripts`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [app/services/resource_archive.py](app/services/resource_archive.py)、[app/services/resource_paths.py](app/services/resource_paths.py) 与 [scripts/run_wallpaper_archive.py](scripts/run_wallpaper_archive.py)，恢复 [app/services/source_collection.py](app/services/source_collection.py) 中旧的相对路径生成方式，并回退对应测试与文档记录，或执行 `git revert` 回退本次提交
+- 回滚后，新采集资源会重新使用旧路径风格，历史 ready 资源不会自动归档到统一结构化路径，临时/空/重复孤儿文件和损坏 ready 资源也不会通过独立命令集中处理
+
 ## 2026-03-29T03:33:52Z
 
 ### 变更内容

@@ -84,6 +84,68 @@ class HealthRepository:
         ).fetchall()
         return list(rows)
 
+    def list_ready_local_resources_with_hashes(self) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            """
+            SELECT
+                id AS resource_id,
+                relative_path,
+                content_hash
+            FROM image_resources
+            WHERE storage_backend = 'local'
+              AND image_status = 'ready'
+            ORDER BY id ASC;
+            """
+        ).fetchall()
+        return list(rows)
+
+    def list_local_resources_for_archive(self) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            """
+            SELECT
+                r.id AS resource_id,
+                r.wallpaper_id,
+                r.resource_type,
+                r.variant_key,
+                r.relative_path,
+                r.file_ext,
+                r.file_size_bytes,
+                r.width,
+                r.height,
+                r.image_status,
+                w.source_type,
+                w.market_code,
+                w.wallpaper_date
+            FROM image_resources AS r
+            INNER JOIN wallpapers AS w ON w.id = r.wallpaper_id
+            WHERE r.storage_backend = 'local'
+            ORDER BY r.id ASC;
+            """
+        ).fetchall()
+        return list(rows)
+
+    def update_image_resource_relative_path(
+        self,
+        *,
+        resource_id: int,
+        relative_path: str,
+        filename: str,
+        file_ext: str,
+        updated_at_utc: str,
+    ) -> None:
+        self.connection.execute(
+            """
+            UPDATE image_resources
+            SET relative_path = ?,
+                filename = ?,
+                file_ext = ?,
+                updated_at_utc = ?
+            WHERE id = ?;
+            """,
+            (relative_path, filename, file_ext, updated_at_utc, resource_id),
+        )
+        self.connection.commit()
+
     def mark_resource_missing_and_sync(
         self,
         *,
@@ -132,8 +194,7 @@ class HealthRepository:
 
             resource_status = derive_resource_status(
                 resources=[
-                    (str(row["resource_type"]), str(row["image_status"]))
-                    for row in resource_rows
+                    (str(row["resource_type"]), str(row["image_status"])) for row in resource_rows
                 ],
                 is_downloadable=bool(wallpaper_row["is_downloadable"]),
             )
@@ -179,3 +240,18 @@ class HealthRepository:
                 ),
             )
         return disabled_wallpaper, action
+
+    def mark_resource_failed_and_sync(
+        self,
+        *,
+        resource_id: int,
+        wallpaper_id: int,
+        failure_reason: str,
+        processed_at_utc: str,
+    ) -> tuple[bool, str]:
+        return self.mark_resource_missing_and_sync(
+            resource_id=resource_id,
+            wallpaper_id=wallpaper_id,
+            failure_reason=failure_reason,
+            processed_at_utc=processed_at_utc,
+        )

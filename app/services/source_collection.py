@@ -9,7 +9,6 @@ import hashlib
 import json
 import logging
 from pathlib import Path
-import re
 from typing import Protocol
 from typing import cast
 from urllib.parse import parse_qs
@@ -31,12 +30,12 @@ from app.repositories.collection_repository import TaskItemCreateInput
 from app.repositories.collection_repository import WallpaperCreateInput
 from app.repositories.file_storage import FileStorage
 from app.services.image_variants import LoadedImage
+from app.services.image_variants import calculate_variant_dimensions
 from app.services.image_variants import generate_variant_image
 from app.services.image_variants import load_image_bytes
+from app.services.resource_paths import build_resource_relative_path
 
 logger = logging.getLogger(__name__)
-
-SAFE_PATH_PATTERN = re.compile(r"[^A-Za-z0-9._-]+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -445,7 +444,9 @@ class SourceCollectionService:
         )
 
     def _wallpaper_needs_resume(self, *, wallpaper_id: int) -> tuple[bool, str | None]:
-        resource_rows = self.repository.list_image_resources_for_wallpaper(wallpaper_id=wallpaper_id)
+        resource_rows = self.repository.list_image_resources_for_wallpaper(
+            wallpaper_id=wallpaper_id
+        )
         if not resource_rows:
             return True, "wallpaper exists without any image resources"
 
@@ -469,7 +470,9 @@ class SourceCollectionService:
         return False, None
 
     def _prepare_wallpaper_resume(self, *, wallpaper_id: int, resume_reason: str | None) -> None:
-        resource_rows = self.repository.list_image_resources_for_wallpaper(wallpaper_id=wallpaper_id)
+        resource_rows = self.repository.list_image_resources_for_wallpaper(
+            wallpaper_id=wallpaper_id
+        )
         for row in resource_rows:
             if str(row["storage_backend"]) != "local":
                 continue
@@ -500,9 +503,11 @@ class SourceCollectionService:
         relative_path: str,
     ) -> None:
         try:
-            downloaded, loaded_image, actual_source_url, downloaded_variants = self._download_original_image(
-                item=item,
-                relative_path=relative_path,
+            downloaded, loaded_image, actual_source_url, downloaded_variants = (
+                self._download_original_image(
+                    item=item,
+                    relative_path=relative_path,
+                )
             )
         except Exception as exc:
             processed_at_utc = utc_now_isoformat()
@@ -517,11 +522,21 @@ class SourceCollectionService:
             )
             raise
         content_hash = hashlib.sha256(downloaded.content).hexdigest()
+        original_file_ext = extract_file_ext_from_source_url(actual_source_url)
         original_mime_type = guess_mime_type(
-            file_ext=extract_file_ext_from_source_url(actual_source_url),
+            file_ext=original_file_ext,
             fallback=loaded_image.mime_type,
         )
         processed_at_utc = utc_now_isoformat()
+        canonical_original_relative_path = build_resource_relative_path(
+            source_type=self.adapter.source_type,
+            wallpaper_date=item.wallpaper_date,
+            market_code=item.market_code,
+            resource_type=RESOURCE_TYPE_ORIGINAL,
+            file_ext=original_file_ext,
+            width=loaded_image.width,
+            height=loaded_image.height,
+        )
         self.repository.update_wallpaper_origin_metadata(
             wallpaper_id=wallpaper_id,
             origin_image_url=actual_source_url,
@@ -535,6 +550,17 @@ class SourceCollectionService:
             source_url_hash=hashlib.sha256(actual_source_url.encode("utf-8")).hexdigest(),
             updated_at_utc=processed_at_utc,
         )
+        if canonical_original_relative_path != relative_path:
+            self.repository.update_image_resource_relative_path(
+                resource_id=original_resource_id,
+                relative_path=canonical_original_relative_path,
+                filename=Path(canonical_original_relative_path).name,
+                file_ext=original_file_ext,
+                mime_type=original_mime_type,
+                updated_at_utc=processed_at_utc,
+            )
+            relative_path = canonical_original_relative_path
+
         original_tmp_path = self.storage.tmp_path_for(relative_path)
         cleanup_path(original_tmp_path)
         try:
@@ -570,7 +596,7 @@ class SourceCollectionService:
 
         variant_resources = self._create_non_download_variant_resource_records(
             wallpaper_id=wallpaper_id,
-            original_relative_path=relative_path,
+            item=item,
             loaded_image=loaded_image,
         )
         download_resources = self._create_download_resource_records(
@@ -668,14 +694,20 @@ class SourceCollectionService:
         downloaded_variants: list[DownloadedVariantRecord] = []
         for variant in item.download_variants:
             try:
+                variant_file_ext = extract_file_ext_from_source_url(variant.source_url)
+                failure_relative_path = build_resource_relative_path(
+                    source_type=self.adapter.source_type,
+                    wallpaper_date=item.wallpaper_date,
+                    market_code=item.market_code,
+                    resource_type=RESOURCE_TYPE_DOWNLOAD,
+                    file_ext=variant_file_ext,
+                    width=variant.width,
+                    height=variant.height,
+                    variant_key=variant.variant_key,
+                )
                 downloaded, loaded_image = self._download_single_image(
                     image_url=variant.source_url,
-                    failure_relative_path=build_variant_relative_path(
-                        original_relative_path=original_relative_path,
-                        resource_type=RESOURCE_TYPE_DOWNLOAD,
-                        file_ext=extract_file_ext_from_source_url(variant.source_url),
-                        variant_key=variant.variant_key,
-                    ),
+                    failure_relative_path=failure_relative_path,
                     source_key=item.source_key,
                 )
             except Exception as exc:
@@ -749,17 +781,26 @@ class SourceCollectionService:
         self,
         *,
         wallpaper_id: int,
-        original_relative_path: str,
+        item: CollectedImageMetadata,
         loaded_image: LoadedImage,
     ) -> list[VariantResourceRecord]:
         created_at_utc = utc_now_isoformat()
         thumbnail_preview_ext = default_variant_file_ext(loaded_image=loaded_image)
         resources: list[VariantResourceRecord] = []
         for resource_type in (RESOURCE_TYPE_THUMBNAIL, RESOURCE_TYPE_PREVIEW):
-            relative_path = build_variant_relative_path(
-                original_relative_path=original_relative_path,
+            variant_width, variant_height = calculate_variant_dimensions(
+                width=loaded_image.width,
+                height=loaded_image.height,
+                resource_type=resource_type,
+            )
+            relative_path = build_resource_relative_path(
+                source_type=self.adapter.source_type,
+                wallpaper_date=item.wallpaper_date,
+                market_code=item.market_code,
                 resource_type=resource_type,
                 file_ext=thumbnail_preview_ext,
+                width=variant_width,
+                height=variant_height,
             )
             file_ext = thumbnail_preview_ext
             mime_type = guess_mime_type(file_ext=file_ext, fallback=None)
@@ -803,10 +844,14 @@ class SourceCollectionService:
         if downloaded_variants:
             for variant in downloaded_variants:
                 file_ext = extract_file_ext_from_source_url(variant.source_url)
-                relative_path = build_variant_relative_path(
-                    original_relative_path=original_relative_path,
+                relative_path = build_resource_relative_path(
+                    source_type=self.adapter.source_type,
+                    wallpaper_date=item.wallpaper_date,
+                    market_code=item.market_code,
                     resource_type=RESOURCE_TYPE_DOWNLOAD,
                     file_ext=file_ext,
+                    width=variant.loaded_image.width,
+                    height=variant.loaded_image.height,
                     variant_key=variant.variant_key,
                 )
                 resource_id = self.repository.create_image_resource(
@@ -822,7 +867,9 @@ class SourceCollectionService:
                             fallback=variant.loaded_image.mime_type,
                         ),
                         source_url=variant.source_url,
-                        source_url_hash=hashlib.sha256(variant.source_url.encode("utf-8")).hexdigest(),
+                        source_url_hash=hashlib.sha256(
+                            variant.source_url.encode("utf-8")
+                        ).hexdigest(),
                         created_at_utc=created_at_utc,
                         variant_key=variant.variant_key,
                     )
@@ -837,10 +884,14 @@ class SourceCollectionService:
                 )
             return resources
 
-        relative_path = build_variant_relative_path(
-            original_relative_path=original_relative_path,
+        relative_path = build_resource_relative_path(
+            source_type=self.adapter.source_type,
+            wallpaper_date=item.wallpaper_date,
+            market_code=item.market_code,
             resource_type=RESOURCE_TYPE_DOWNLOAD,
             file_ext=Path(original_relative_path).suffix.lstrip(".").lower() or "jpg",
+            width=original_loaded_image.width,
+            height=original_loaded_image.height,
         )
         file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"
         resource_id = self.repository.create_image_resource(
@@ -851,7 +902,9 @@ class SourceCollectionService:
                 relative_path=relative_path,
                 filename=Path(relative_path).name,
                 file_ext=file_ext,
-                mime_type=guess_mime_type(file_ext=file_ext, fallback=original_loaded_image.mime_type),
+                mime_type=guess_mime_type(
+                    file_ext=file_ext, fallback=original_loaded_image.mime_type
+                ),
                 source_url=None,
                 source_url_hash=None,
                 created_at_utc=created_at_utc,
@@ -1009,11 +1062,15 @@ def build_source_relative_path(
     source_key: str,
     origin_image_url: str,
 ) -> str:
-    safe_source_key = SAFE_PATH_PATTERN.sub("-", source_key.replace(":", "-")).strip("-")
     file_ext = extract_file_ext_from_source_url(origin_image_url)
-    return (
-        f"{source_type}/{wallpaper_date.year:04d}/{wallpaper_date.month:02d}/"
-        f"{market_code}/{safe_source_key}.{file_ext}"
+    return build_resource_relative_path(
+        source_type=source_type,
+        wallpaper_date=wallpaper_date,
+        market_code=market_code,
+        resource_type=RESOURCE_TYPE_ORIGINAL,
+        file_ext=file_ext,
+        width=None,
+        height=None,
     )
 
 
@@ -1042,21 +1099,6 @@ def extract_file_ext_from_source_url(source_url: str) -> str:
         if suffix:
             return suffix
     return "jpg"
-
-
-def build_variant_relative_path(
-    *,
-    original_relative_path: str,
-    resource_type: ResourceType,
-    file_ext: str,
-    variant_key: str = "",
-) -> str:
-    path = Path(original_relative_path)
-    variant_suffix = ""
-    if variant_key:
-        safe_variant_key = SAFE_PATH_PATTERN.sub("-", variant_key).strip("-").lower()
-        variant_suffix = f"-{safe_variant_key}"
-    return str(path.with_name(f"{path.stem}--{resource_type}{variant_suffix}.{file_ext}"))
 
 
 def default_variant_file_ext(*, loaded_image: LoadedImage) -> str:
