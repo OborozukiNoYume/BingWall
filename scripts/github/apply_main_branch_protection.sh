@@ -9,7 +9,24 @@ fi
 
 OWNER="${GITHUB_OWNER:-OborozukiNoYume}"
 REPO="${GITHUB_REPO:-BingWall}"
+WORKFLOW_PERMISSIONS_API_URL="https://api.github.com/repos/${OWNER}/${REPO}/actions/permissions/workflow"
 API_URL="https://api.github.com/repos/${OWNER}/${REPO}/branches/main/protection"
+
+curl \
+  --fail \
+  --silent \
+  --show-error \
+  -X PUT \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+  -H "X-GitHub-Api-Version: 2022-11-28" \
+  "${WORKFLOW_PERMISSIONS_API_URL}" \
+  -d @- <<'EOF'
+{
+  "default_workflow_permissions": "write",
+  "can_approve_pull_request_reviews": true
+}
+EOF
 
 curl \
   --fail \
@@ -45,4 +62,4 @@ curl \
 }
 EOF
 
-echo "main branch protection applied for ${OWNER}/${REPO}"
+echo "Actions permissions and main branch protection applied for ${OWNER}/${REPO}"
