@@ -112,7 +112,9 @@ def build_context(args: argparse.Namespace) -> RenderContext:
         validate_cli_path("output_path", args.output)
 
     app_dir = resolve_path(args.app_dir)
-    venv_python = resolve_path(args.venv_python) if args.venv_python else app_dir / ".venv/bin/python"
+    venv_python = (
+        resolve_path(args.venv_python) if args.venv_python else app_dir / ".venv/bin/python"
+    )
     log_dir = resolve_path(args.log_dir)
     env_file = resolve_path(args.env_file)
     output_path = resolve_path(args.output) if args.output else None

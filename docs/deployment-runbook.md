@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T07:12:10Z
+- 更新时间：2026-03-29T14:08:33Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -28,7 +28,7 @@
 | 组件 | 当前记录 | 说明 |
 |---|---|---|
 | Ubuntu | `24.04 LTS` 目标平台 | 部署环境需在实施时记录精确发行版本 |
-| Python | `3.14.2` | 当前开发基线，后续需写入运行时和依赖管理文件 |
+| Python | `3.14` | 当前开发基线，固定 `3.14` 版本线，允许 `3.14.x` 补丁版本 |
 | Node.js | `24.13.0` | 当前前端与构建运行时基线，后续如引入 Node.js 构建链路需补充版本锁定文件 |
 | SQLite | 待实施环境安装后记录精确版本 | 一期数据库 |
 | Nginx | 待实施环境安装后记录精确版本 | 反向代理与静态资源服务 |
@@ -37,9 +37,9 @@
 
 说明：
 
-- 当前仓库已生成 `.python-version`、`.nvmrc` 和 `requirements.lock.txt`
+- 当前仓库已生成 `.python-version`、`.nvmrc` 与 `pyproject.toml`，并统一以 `uv` 创建和维护 `.venv`
 - 当前仓库已生成 `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example`
-- 当前已确认 `Python 3.14.2` 为一期开发基线，阶段一初始化代码时必须围绕该版本生成运行时与依赖锁定文件
+- 当前已确认 `Python 3.14` 为一期开发基线，阶段一初始化代码时必须围绕该版本线生成运行时与依赖锁定文件
 - 当前后端依赖基线已固定为 `FastAPI 0.118.3`，该版本官方支持 `Python 3.14`，并兼容当前锁定的 `Starlette 0.47.3`
 - 当前已确认 `Node.js 24.13.0` 为前端与构建运行时基线；若后续引入 Node.js 构建链路，必须补充对应版本锁定文件
 - SQLite、Nginx、cron 的精确版本必须在目标部署环境创建时记录到部署清单
@@ -180,7 +180,7 @@
 
 当前已提供：
 
-- 依赖安装命令：`make setup`
+- 开发环境依赖安装方式：`uv python install 3.14`、`uv venv --python 3.14 .venv`、`uv pip install --python .venv/bin/python -e ".[dev]"`
 - 数据库初始化命令：`make db-migrate`
 - 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 自动公开开关：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`，默认 `true`；开启时，新采集内容会在资源全部就绪后自动公开
@@ -229,7 +229,7 @@
 ### 生产环境最小启动步骤
 
 1. 把仓库代码部署到 `/opt/bingwall/app`
-2. 使用 `python3.14` 在 `/opt/bingwall/app/.venv` 创建虚拟环境并安装 `pip install -e .`
+2. 使用 `uv python install 3.14`、`uv venv --python 3.14 /opt/bingwall/app/.venv` 和 `uv pip install --python /opt/bingwall/app/.venv/bin/python -e .` 准备生产虚拟环境
 3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `.venv/bin/python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`

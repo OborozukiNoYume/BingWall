@@ -1,5 +1,114 @@
 # CHANGELOG
 
+## 2026-03-29T14:08:33Z
+
+### 变更内容
+
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md)，把当前使用说明类文档从 `pyenv + venv/pip` 口径统一调整为 `uv + .venv`
+- 更新开发、本地排障和单机部署步骤中的 Python 环境准备、依赖安装、运行与迁移命令，统一改为 `uv python install`、`uv venv`、`uv pip install` 与 `uv run`
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档口径切换的原因、影响范围、验证方式与回滚说明
+
+### 变更原因
+
+- 项目当前已从 `pyenv` 管理切换到 `uv` 管理，但仓库中的部分说明文档仍保留旧的 `python -m venv`、`pip install` 和 `make setup` 操作口径，容易让后续开发、排障和部署步骤出现混用
+- 本次按最保守范围只调整“当前使用说明类文档”，把实际推荐流程统一为 `uv + .venv`，不改动业务代码、依赖版本、服务配置模板或历史变更记录中的原始事实描述
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T14:08:33Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖项目总说明、项目状态文档、部署运行说明和环境排障说明
+- 当前文档推荐的开发流程已统一为：先用 `uv` 准备 `Python 3.14` 和 `.venv`，再使用 `uv pip install` 安装依赖，使用 `uv run` 执行本地迁移、启动和排障命令
+- 生产部署文档仍保留 `.venv/bin/python` 作为 `systemd` / `cron` 的执行目标，但其创建和依赖安装步骤已改为通过 `uv` 完成
+- 本次不包含 `Makefile`、`scripts/dev/bootstrap.sh`、`systemd` 服务文件、`cron` 模板或锁文件策略调整
+
+### 验证步骤
+
+- 执行 `rg -n "make setup|python -m venv|\\.venv/bin/pip|pip install -e|python3\\.14 -m venv" README.md PROJECT_STATE.md docs/deployment-runbook.md docs/setup-troubleshooting.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库当前使用说明会重新回到 `pyenv/venv/pip` 与 `uv` 混用状态，后续环境准备和排障步骤的统一性会变差
+
+## 2026-03-29T14:02:40Z
+
+### 变更内容
+
+- 更新 [scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py) 与 [tests/integration/test_install_cron.py](/home/ops/Projects/BingWall/tests/integration/test_install_cron.py)，按 `ruff format` 结果收敛代码格式，消除全仓格式检查失败项
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次在 `uv` 环境下执行的整仓校验结果、影响范围、验证步骤、回滚说明与时间戳
+
+### 变更原因
+
+- 由于项目从 `pyenv` 切换到 `uv` 管理，需要在新的 `Python 3.14` 运行时环境下重新执行一次全仓代码检测，确认格式、静态检查、类型检查和测试都能通过
+- 实测 `uv` 环境下 `ruff check`、`mypy` 与 `pytest` 已全部通过，但 `ruff format --check` 仍因上述两个文件的格式偏差失败，因此做最小范围格式修正，不扩大到业务逻辑、依赖或部署流程变更
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T14:02:40Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 `cron` 安装脚本及其集成测试的代码格式，以及项目状态文档中的校验记录
+- 本次不修改业务逻辑、接口契约、数据库结构、部署脚本行为或 `uv` 依赖解析结果
+- 修正后，项目在 `uv` 管理的 `Python 3.14.3` 环境下可通过 `ruff format --check`、`ruff check`、`mypy` 和全量 `pytest`
+
+### 验证步骤
+
+- 执行 `uv run python --version`
+- 执行 `uv run python -m ruff format --check .`
+- 执行 `uv run python -m ruff check .`
+- 执行 `uv run python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/install_cron.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `uv run python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py) 与 [tests/integration/test_install_cron.py](/home/ops/Projects/BingWall/tests/integration/test_install_cron.py) 的格式化改动，并回退 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 中本次记录
+- 回滚后，`uv` 环境下的功能行为不会变化，但全仓 `ruff format --check` 会重新失败
+## 2026-03-29T13:18:43Z
+
+### 变更内容
+
+- 更新 [.python-version](.python-version) 与 [pyproject.toml](pyproject.toml)，把 Python 运行时约束从精确补丁版本 `3.14.2` 调整为固定 `3.14` 版本线；其中 `.python-version` 改为 `3.14`，`requires-python` 改为 `>=3.14,<3.15`
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步把当前运行时基线说明改为 `Python 3.14`，并明确允许使用 `3.14.x` 补丁版本
+- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，将排障文档中的 Python 版本要求同步调整为 `3.14` 版本线口径
+
+### 变更原因
+
+- 当前仓库原先把 Python 运行时精确锁到 `3.14.2`，但你要求仅固定 `3.14` 这一条版本线，不再要求所有环境必须落到同一个补丁号
+- 对这个项目来说，保留 `3.14` 大版本约束可以继续控制主兼容范围，同时减少因为补丁版本差异导致的环境准备摩擦
+- 本次只调整运行时约束和文档说明，不扩大到依赖升级、业务逻辑修改或技术栈调整
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T13:18:43Z`
+- 依赖类型：无直接或间接第三方包变更；仅调整 Python 运行时约束表达方式
+
+### 影响范围
+
+- 影响范围覆盖 Python 版本声明和项目文档说明
+- 之后使用 `uv` 或遵循 `.python-version` 准备环境时，可使用任意 `3.14.x` 补丁版本，不再要求必须是 `3.14.2`
+- 本次不包含 FastAPI、Starlette、Pillow、Node.js、数据库结构、接口契约或前后端业务行为变更
+
+### 验证步骤
+
+- 执行 `uv run python --version`
+
+### 回滚说明
+
+- 如需回滚本次变更，可将 [.python-version](.python-version) 恢复为 `3.14.2`，并将 [pyproject.toml](pyproject.toml) 中的 `requires-python` 恢复为 `==3.14.2`
+- 回滚后，项目环境准备会重新要求精确使用 `Python 3.14.2`
+
 ## 2026-03-29T07:58:59Z
 
 ### 变更内容

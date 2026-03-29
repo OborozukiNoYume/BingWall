@@ -19,9 +19,7 @@ def test_install_cron_script_renders_expected_template(tmp_path: Path) -> None:
     app_dir.mkdir(parents=True, exist_ok=True)
     venv_python.parent.mkdir(parents=True, exist_ok=True)
     venv_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    venv_python.chmod(
-        venv_python.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-    )
+    venv_python.chmod(venv_python.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     log_dir.mkdir(parents=True, exist_ok=True)
     env_file.write_text("BINGWALL_LOG_LEVEL=INFO\n", encoding="utf-8")
 
@@ -73,12 +71,10 @@ def test_install_cron_script_installs_with_fake_crontab(tmp_path: Path) -> None:
     app_dir.mkdir(parents=True, exist_ok=True)
     venv_python.parent.mkdir(parents=True, exist_ok=True)
     venv_python.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
-    venv_python.chmod(
-        venv_python.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-    )
+    venv_python.chmod(venv_python.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
     log_dir.mkdir(parents=True, exist_ok=True)
     env_file.write_text("BINGWALL_LOG_LEVEL=INFO\n", encoding="utf-8")
-    (state_dir / "installed.txt").write_text("MAILTO=\"\"\n0 1 * * * echo old\n", encoding="utf-8")
+    (state_dir / "installed.txt").write_text('MAILTO=""\n0 1 * * * echo old\n', encoding="utf-8")
 
     fake_crontab.write_text(
         """
@@ -107,9 +103,7 @@ sys.exit(2)
 """.lstrip(),
         encoding="utf-8",
     )
-    fake_crontab.chmod(
-        fake_crontab.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH
-    )
+    fake_crontab.chmod(fake_crontab.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
 
     result = subprocess.run(
         [
@@ -139,7 +133,10 @@ sys.exit(2)
 
     assert payload["installed"] is True
     assert payload["backup_path"] is not None
-    assert Path(payload["backup_path"]).read_text(encoding="utf-8") == "MAILTO=\"\"\n0 1 * * * echo old\n"
+    assert (
+        Path(payload["backup_path"]).read_text(encoding="utf-8")
+        == 'MAILTO=""\n0 1 * * * echo old\n'
+    )
     assert "scripts/create_scheduled_collection_tasks.py" in installed_cron
     assert "scripts/run_resource_inspection.py" in installed_cron
     assert "scripts/run_wallpaper_archive.py" in installed_cron

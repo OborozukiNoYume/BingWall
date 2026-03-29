@@ -1,37 +1,39 @@
 # 环境搭建问题排查记录
 
 > 记录时间：2026-03-29
-> 环境：Python 3.14.2, Ubuntu Linux
+> 环境：uv + Python 3.14, Ubuntu Linux
 
-## 问题 1：pip 安装指定版本时找不到包
+## 问题 1：uv 安装指定版本时找不到包
 
 ### 现象
 ```bash
-pip install fastapi==0.118.3
+uv pip install --python .venv/bin/python fastapi==0.118.3
 # ERROR: No matching distribution found for fastapi==0.118.3
 ```
 
 ### 原因
-常见原因不是版本真的不存在，而是镜像站同步滞后、网络超时，或者 pip 没有拿到完整索引结果，最终返回了误导性的“找不到包”。
+常见原因不是版本真的不存在，而是镜像站同步滞后、网络超时，或者 `uv` 在解析索引时没拿到完整结果，最终返回了误导性的“找不到包”。
 
 ### 解决方案
 1. 优先使用仓库自带的精确依赖安装入口，避免手动去掉版本锁定：
    ```bash
-   make setup
+   uv python install 3.14
+   uv venv --python 3.14 .venv
+   uv pip install --python .venv/bin/python -e ".[dev]"
    ```
 2. 如果需要单独排查，可显式指定官方索引重试精确版本安装：
    ```bash
-   .venv/bin/pip install --index-url https://pypi.org/simple fastapi==0.118.3
+   uv pip install --python .venv/bin/python --index-url https://pypi.org/simple fastapi==0.118.3
    ```
 3. 如仍失败，优先检查网络、代理或镜像同步状态，不要改成无版本约束安装
 
 ---
 
-## 问题 2：Pillow 指定版本安装失败
+## 问题 2：Pillow 安装失败
 
 ### 现象
 ```bash
-pip install Pillow==12.1.1
+uv pip install --python .venv/bin/python Pillow==12.1.1
 # ERROR: Could not find a version that satisfies the requirement Pillow==12.1.1
 ```
 
@@ -41,7 +43,7 @@ pip install Pillow==12.1.1
 ### 解决方案
 不指定版本直接安装：
 ```bash
-.venv/bin/pip install Pillow
+uv pip install --python .venv/bin/python Pillow
 # Successfully installed Pillow-12.1.1
 ```
 
@@ -107,7 +109,7 @@ sqlite3.OperationalError: no such table: wallpapers
 mkdir -p var/data var/images/tmp var/images/public var/images/failed var/backups
 
 # 运行迁移
-.venv/bin/python -m app.repositories.migrations
+uv run python -m app.repositories.migrations
 ```
 
 ---
@@ -132,7 +134,7 @@ lsof -i :30003
 kill -9 <PID>
 
 # 然后重新启动应用
-.venv/bin/python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 30003
+uv run python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 30003
 ```
 
 ---
@@ -190,10 +192,10 @@ curl "http://127.0.0.1:30003/api/public/wallpaper-filters"
 运行采集任务：
 ```bash
 # 采集 Bing 壁纸（默认 en-US 市场，1 张）
-.venv/bin/python -m app.collectors.bing --market en-US --count 8
+uv run python -m app.collectors.bing --market en-US --count 8
 
 # 采集 NASA APOD
-.venv/bin/python -m app.collectors.nasa_apod --market global
+uv run python -m app.collectors.nasa_apod --market global
 ```
 
 ---
@@ -212,7 +214,7 @@ curl "http://127.0.0.1:30003/api/public/wallpaper-filters"
 ### 解决方案
 先确认当前配置与数据库状态：
 ```bash
-.venv/bin/python -c "
+uv run python -c "
 import sqlite3
 conn = sqlite3.connect('var/data/bingwall.sqlite3')
 rows = conn.execute('SELECT id, content_status, is_public, resource_status FROM wallpapers ORDER BY id DESC LIMIT 5').fetchall()
@@ -230,7 +232,7 @@ BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=true
 如果你是有意关闭了自动公开，也可以再手动发布指定内容：
 
 ```bash
-.venv/bin/python -c "
+uv run python -c "
 import sqlite3
 conn = sqlite3.connect('var/data/bingwall.sqlite3')
 conn.execute('UPDATE wallpapers SET is_public=1, content_status=\"enabled\" WHERE id=?', (1,))
@@ -261,7 +263,7 @@ printf '\nBINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME=admin\n' >> .env
 printf 'BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD=replace-with-a-strong-password\n' >> .env
 
 mkdir -p var/data var/images/tmp var/images/public var/images/failed var/backups
-.venv/bin/python -m app.repositories.migrations
+uv run python -m app.repositories.migrations
 ```
 
 > 说明：初始化命令只会在 `admin_users` 为空时创建一个状态为 `enabled` 的 `super_admin`。如果数据库里已经有管理员，再次执行不会覆盖原账号。
@@ -280,10 +282,10 @@ mkdir -p var/data var/images/tmp var/images/public var/images/failed var/backups
 ```bash
 # 推荐先执行最新迁移；当前迁移会把 legacy 的 active 归一化为 enabled，
 # 把其他未知非法值保守降级为 disabled，并阻止未来再写入非法状态
-.venv/bin/python -m app.repositories.migrations
+uv run python -m app.repositories.migrations
 
 # 如果仍需手工修复，再按需更新为 enabled 或 disabled
-.venv/bin/python -c "
+uv run python -c "
 import sqlite3
 conn = sqlite3.connect('var/data/bingwall.sqlite3')
 conn.execute('UPDATE admin_users SET status=\"enabled\" WHERE username=\"admin\"')
@@ -307,20 +309,15 @@ git checkout dev
 git pull origin dev
 ```
 
-### 2. 创建虚拟环境
+### 2. 创建 uv 虚拟环境
 ```bash
-python3 -m venv .venv
+uv python install 3.14
+uv venv --python 3.14 .venv
 ```
 
-### 3. 安装依赖（网络不稳定时分步安装）
+### 3. 安装依赖
 ```bash
-# 核心依赖
-.venv/bin/pip install fastapi
-.venv/bin/pip install Pillow
-.venv/bin/pip install pydantic-settings==2.11.0 uvicorn==0.35.0
-
-# 开发依赖
-.venv/bin/pip install httpx==0.28.1 mypy==1.18.2 pytest==8.4.2 ruff==0.13.3
+uv pip install --python .venv/bin/python -e ".[dev]"
 ```
 
 ### 4. 配置环境变量
@@ -341,7 +338,7 @@ printf 'BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD=replace-with-a-strong-passwor
 ### 5. 初始化数据库
 ```bash
 mkdir -p var/data var/images/tmp var/images/public var/images/failed var/backups
-.venv/bin/python -m app.repositories.migrations
+uv run python -m app.repositories.migrations
 ```
 
 > 如果 `admin_users` 为空，且上一步已经配置了 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`，这里会自动创建一个启用中的管理员账号。
@@ -349,20 +346,20 @@ mkdir -p var/data var/images/tmp var/images/public var/images/failed var/backups
 ### 6. 启动应用
 ```bash
 # 默认端口 8000
-.venv/bin/python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000
+uv run python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 8000
 
 # 自定义端口（如 30003）
-.venv/bin/python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 30003
+uv run python -m uvicorn app.main:create_app --factory --host 0.0.0.0 --port 30003
 ```
 
 ### 7. 采集壁纸
 ```bash
-.venv/bin/python -m app.collectors.bing --market en-US --count 8
+uv run python -m app.collectors.bing --market en-US --count 8
 ```
 
 ### 8. 发布壁纸（测试用）
 ```bash
-.venv/bin/python -c "
+uv run python -c "
 import sqlite3
 conn = sqlite3.connect('var/data/bingwall.sqlite3')
 conn.execute('UPDATE wallpapers SET is_public=1, content_status=\"enabled\"')
@@ -387,7 +384,7 @@ curl -X POST http://127.0.0.1:30003/api/admin/auth/login \
 ## 注意事项
 
 1. **网络问题**：PyPI 访问可能较慢或超时，建议使用国内镜像或耐心重试
-2. **Python 版本**：项目要求 Python 3.14.2，确保版本匹配
+2. **Python 版本**：项目要求 Python 3.14 版本线，`3.14.x` 补丁版本均可
 3. **端口占用**：启动前确认目标端口未被占用，可用 `fuser -k <端口>/tcp` 清理
 4. **目录权限**：确保 `./var/` 目录有写入权限（数据库和图片存储需要）
 5. **壁纸状态**：采集的壁纸默认为草稿状态，需手动发布才能在公开 API 显示
