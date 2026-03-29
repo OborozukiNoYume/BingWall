@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T07:12:10Z
+- 更新时间：2026-03-29T15:07:34Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -28,7 +28,7 @@
 | 组件 | 当前记录 | 说明 |
 |---|---|---|
 | Ubuntu | `24.04 LTS` 目标平台 | 部署环境需在实施时记录精确发行版本 |
-| Python | `3.14.2` | 当前开发基线，后续需写入运行时和依赖管理文件 |
+| Python | `3.14` | 当前开发基线，固定 `3.14` 版本线，允许 `3.14.x` 补丁版本 |
 | Node.js | `24.13.0` | 当前前端与构建运行时基线，后续如引入 Node.js 构建链路需补充版本锁定文件 |
 | SQLite | 待实施环境安装后记录精确版本 | 一期数据库 |
 | Nginx | 待实施环境安装后记录精确版本 | 反向代理与静态资源服务 |
@@ -37,9 +37,9 @@
 
 说明：
 
-- 当前仓库已生成 `.python-version`、`.nvmrc` 和 `requirements.lock.txt`
+- 当前仓库已生成 `.python-version`、`.nvmrc`、`pyproject.toml` 与 `uv.lock`，并统一以 `uv sync` 创建和维护 `.venv`
 - 当前仓库已生成 `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example`
-- 当前已确认 `Python 3.14.2` 为一期开发基线，阶段一初始化代码时必须围绕该版本生成运行时与依赖锁定文件
+- 当前已确认 `Python 3.14` 为一期开发基线，阶段一初始化代码时必须围绕该版本线生成运行时与依赖锁定文件
 - 当前后端依赖基线已固定为 `FastAPI 0.118.3`，该版本官方支持 `Python 3.14`，并兼容当前锁定的 `Starlette 0.47.3`
 - 当前已确认 `Node.js 24.13.0` 为前端与构建运行时基线；若后续引入 Node.js 构建链路，必须补充对应版本锁定文件
 - SQLite、Nginx、cron 的精确版本必须在目标部署环境创建时记录到部署清单
@@ -180,7 +180,7 @@
 
 当前已提供：
 
-- 依赖安装命令：`make setup`
+- 开发环境依赖安装方式：`uv python install 3.14`、`uv sync --python 3.14 --frozen`，或直接执行内部等价的 `make setup`
 - 数据库初始化命令：`make db-migrate`
 - 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 自动公开开关：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`，默认 `true`；开启时，新采集内容会在资源全部就绪后自动公开
@@ -229,9 +229,9 @@
 ### 生产环境最小启动步骤
 
 1. 把仓库代码部署到 `/opt/bingwall/app`
-2. 使用 `python3.14` 在 `/opt/bingwall/app/.venv` 创建虚拟环境并安装 `pip install -e .`
+2. 使用 `uv python install 3.14` 与 `uv sync --python 3.14 --frozen --no-dev` 准备生产虚拟环境
 3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
-4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `.venv/bin/python -m app.repositories.migrations`
+4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `uv run --no-sync python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
 6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`、`nginx -t`、`systemctl reload nginx`
 7. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
@@ -242,6 +242,7 @@
 
 - 通过 `/etc/bingwall/bingwall.env` 注入受控环境变量
 - 使用 `bingwall` 账号运行应用
+- 通过 `/usr/bin/env uv run --no-sync python ...` 统一走 `uv` 运行入口，并固定 `PATH=/usr/local/bin:/usr/bin:/bin`
 - 通过 `SupplementaryGroups=www-data` 配合正式资源目录权限，保证应用写入、Nginx 读取
 - 采用 `Restart=on-failure`，在进程异常退出后自动重启
 
@@ -280,11 +281,11 @@
 - Bing 定时任务会先读取回溯窗口内的元数据，再优先匹配固定日期；若当天无图，则回退到窗口内最近可用日期
 - NASA APOD 定时任务写入 `count=1`，但消费阶段会把上游查询窗口扩展到最近 `8` 天，并在当天无图时回退到最近可用日期
 - 若同来源同市场同 `date_from/date_to/backtrack_days` 组合已存在 `queued`、`running`、`succeeded` 或 `partially_failed` 的 `cron` 任务，新脚本会跳过创建，避免重复堆积；若历史任务为 `failed`，则允许重建
-- 模板中的每条命令都会先加载 `/etc/bingwall/bingwall.env`，确保 `cron` 与 `systemd` 使用同一套生产环境变量，而不是退回仓库根目录 `.env`
+- 模板中的每条命令都会先加载 `/etc/bingwall/bingwall.env`，再通过安装时解析出的绝对 `uv` 路径执行 `uv run --no-sync python ...`，确保 `cron` 与 `systemd` 使用同一套生产环境变量，而不是退回仓库根目录 `.env`
 
 建议部署步骤：
 
-1. 确认 `/opt/bingwall/app`、`/opt/bingwall/app/.venv/bin/python`、`/var/log/bingwall` 与 `/etc/bingwall/bingwall.env` 已存在且权限正确
+1. 确认 `/opt/bingwall/app`、`uv` 可执行文件、`/opt/bingwall/app/.venv`、`/var/log/bingwall` 与 `/etc/bingwall/bingwall.env` 已存在且权限正确
 2. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
 3. 观察安装输出中的 `backup_path`，记录当前用户旧 `crontab` 备份位置，便于回滚
 4. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
@@ -390,7 +391,7 @@
 
 1. 执行 `make backup`，确认最新快照目录已生成 `manifest.json`
 2. 如需先做隔离演练，执行 `make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1`
-3. 如需原位恢复，执行 `./.venv/bin/python scripts/run_restore.py --snapshot /var/backups/bingwall/<snapshot> --database-path /var/lib/bingwall/data/bingwall.sqlite3 --public-dir /var/lib/bingwall/images/public --config-dir /etc/bingwall --log-dir /var/log/bingwall --backup-dir /var/backups/bingwall --nginx-config-path /etc/nginx/sites-available/bingwall.conf --systemd-service-path /etc/systemd/system/bingwall-api.service --tmpfiles-config-path /etc/tmpfiles.d/bingwall.conf --force`
+3. 如需原位恢复，执行 `uv run --no-sync python scripts/run_restore.py --snapshot /var/backups/bingwall/<snapshot> --database-path /var/lib/bingwall/data/bingwall.sqlite3 --public-dir /var/lib/bingwall/images/public --config-dir /etc/bingwall --log-dir /var/log/bingwall --backup-dir /var/backups/bingwall --nginx-config-path /etc/nginx/sites-available/bingwall.conf --systemd-service-path /etc/systemd/system/bingwall-api.service --tmpfiles-config-path /etc/tmpfiles.d/bingwall.conf --force`
 4. 恢复完成后启动或重启应用与代理服务
 5. 执行 `curl http://127.0.0.1/api/health/deep`
 6. 执行 `make inspect-resources`

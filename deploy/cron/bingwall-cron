@@ -2,7 +2,7 @@
 #
 # 渲染占位：
 # - __BINGWALL_APP_DIR__
-# - __BINGWALL_VENV_PYTHON__
+# - __BINGWALL_UV_BIN__
 # - __BINGWALL_LOG_DIR__
 # - __BINGWALL_ENV_FILE__
 #
@@ -18,8 +18,8 @@
 CRON_TZ=UTC
 MAILTO=""
 
-15 3 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/create_scheduled_collection_tasks.py >> __BINGWALL_LOG_DIR__/create-scheduled-collection-tasks.log 2>&1
-* * * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ -m app.collectors.manual_tasks --max-tasks 5 >> __BINGWALL_LOG_DIR__/consume-collection-tasks.log 2>&1
-45 3 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/run_resource_inspection.py >> __BINGWALL_LOG_DIR__/inspect-resources.log 2>&1
-15 4 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/run_wallpaper_archive.py >> __BINGWALL_LOG_DIR__/archive-wallpapers.log 2>&1
-45 4 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_VENV_PYTHON__ scripts/run_backup.py >> __BINGWALL_LOG_DIR__/backup.log 2>&1
+15 3 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_UV_BIN__ run --no-sync python scripts/create_scheduled_collection_tasks.py >> __BINGWALL_LOG_DIR__/create-scheduled-collection-tasks.log 2>&1
+* * * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_UV_BIN__ run --no-sync python -m app.collectors.manual_tasks --max-tasks 5 >> __BINGWALL_LOG_DIR__/consume-collection-tasks.log 2>&1
+45 3 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_UV_BIN__ run --no-sync python scripts/run_resource_inspection.py >> __BINGWALL_LOG_DIR__/inspect-resources.log 2>&1
+15 4 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_UV_BIN__ run --no-sync python scripts/run_wallpaper_archive.py >> __BINGWALL_LOG_DIR__/archive-wallpapers.log 2>&1
+45 4 * * * cd __BINGWALL_APP_DIR__ && set -a && . __BINGWALL_ENV_FILE__ && set +a && __BINGWALL_UV_BIN__ run --no-sync python scripts/run_backup.py >> __BINGWALL_LOG_DIR__/backup.log 2>&1

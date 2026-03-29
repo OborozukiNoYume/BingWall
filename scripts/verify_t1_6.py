@@ -19,7 +19,6 @@ from typing import TypedDict
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-VENV_PYTHON = REPO_ROOT / ".venv" / "bin" / "python"
 NGINX_IMAGE = "nginx:1.27-alpine"
 APP_PORT = 8000
 DEFAULT_NGINX_PORT = 18080
@@ -102,9 +101,11 @@ def main() -> int:
 
 
 def ensure_prerequisites() -> None:
-    if not VENV_PYTHON.exists():
+    if shutil.which("uv") is None:
+        raise VerificationError("Required command is not available: uv")
+    if not (REPO_ROOT / ".venv").exists():
         raise VerificationError(
-            f"Python virtual environment is missing: {VENV_PYTHON}. Run `make setup` first."
+            f"Python virtual environment is missing: {REPO_ROOT / '.venv'}. Run `make setup` first."
         )
 
     for command in ("docker", "systemd-analyze", "systemd-run", "systemctl", "journalctl"):
@@ -323,6 +324,9 @@ def seed_sample_wallpaper(paths: VerificationPaths) -> int:
 
 def start_uvicorn_under_systemd(*, paths: VerificationPaths, unit_name: str) -> None:
     env_vars = build_runtime_env(paths)
+    uv_executable = shutil.which("uv")
+    if uv_executable is None:
+        raise VerificationError("Required command is not available: uv")
     command = [
         "systemd-run",
         "--user",
@@ -337,7 +341,12 @@ def start_uvicorn_under_systemd(*, paths: VerificationPaths, unit_name: str) -> 
     for key, value in env_vars.items():
         command.append(f"--setenv={key}={value}")
     command.extend([
-        str(VENV_PYTHON),
+        uv_executable,
+        "run",
+        "--directory",
+        str(REPO_ROOT),
+        "--no-sync",
+        "python",
         "-m",
         "uvicorn",
         "app.main:create_app",

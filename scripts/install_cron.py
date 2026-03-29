@@ -19,7 +19,7 @@ DEFAULT_APP_DIR = Path("/opt/bingwall/app")
 DEFAULT_LOG_DIR = Path("/var/log/bingwall")
 DEFAULT_ENV_FILE = Path("/etc/bingwall/bingwall.env")
 PLACEHOLDER_APP_DIR = "__BINGWALL_APP_DIR__"
-PLACEHOLDER_VENV_PYTHON = "__BINGWALL_VENV_PYTHON__"
+PLACEHOLDER_UV_BIN = "__BINGWALL_UV_BIN__"
 PLACEHOLDER_LOG_DIR = "__BINGWALL_LOG_DIR__"
 PLACEHOLDER_ENV_FILE = "__BINGWALL_ENV_FILE__"
 
@@ -32,7 +32,7 @@ class CronInstallError(RuntimeError):
 class RenderContext:
     template_path: Path
     app_dir: Path
-    venv_python: Path
+    uv_bin: Path
     log_dir: Path
     env_file: Path
     output_path: Path | None
@@ -46,7 +46,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE_PATH)
     parser.add_argument("--app-dir", type=Path, default=DEFAULT_APP_DIR)
-    parser.add_argument("--venv-python", type=Path)
+    parser.add_argument(
+        "--uv-bin",
+        default="uv",
+        help="The uv executable or absolute path used in the rendered cron entries.",
+    )
     parser.add_argument("--log-dir", type=Path, default=DEFAULT_LOG_DIR)
     parser.add_argument("--env-file", type=Path, default=DEFAULT_ENV_FILE)
     parser.add_argument("--output", type=Path)
@@ -89,7 +93,7 @@ def main() -> int:
                     "log_dir": str(context.log_dir),
                     "output_path": None if written_path is None else str(written_path),
                     "template_path": str(context.template_path),
-                    "venv_python": str(context.venv_python),
+                    "uv_bin": str(context.uv_bin),
                 },
                 ensure_ascii=False,
                 sort_keys=True,
@@ -104,15 +108,13 @@ def main() -> int:
 def build_context(args: argparse.Namespace) -> RenderContext:
     validate_cli_path("template", args.template)
     validate_cli_path("app_dir", args.app_dir)
-    if args.venv_python:
-        validate_cli_path("venv_python", args.venv_python)
     validate_cli_path("log_dir", args.log_dir)
     validate_cli_path("env_file", args.env_file)
     if args.output:
         validate_cli_path("output_path", args.output)
 
     app_dir = resolve_path(args.app_dir)
-    venv_python = resolve_path(args.venv_python) if args.venv_python else app_dir / ".venv/bin/python"
+    uv_bin = resolve_executable(args.uv_bin)
     log_dir = resolve_path(args.log_dir)
     env_file = resolve_path(args.env_file)
     output_path = resolve_path(args.output) if args.output else None
@@ -120,7 +122,7 @@ def build_context(args: argparse.Namespace) -> RenderContext:
 
     validate_template_path(template_path)
     validate_safe_path("app_dir", app_dir)
-    validate_safe_path("venv_python", venv_python)
+    validate_safe_path("uv_bin", uv_bin)
     validate_safe_path("log_dir", log_dir)
     validate_safe_path("env_file", env_file)
     if output_path is not None:
@@ -130,12 +132,12 @@ def build_context(args: argparse.Namespace) -> RenderContext:
         validate_runtime_path("app_dir", app_dir, path_type="dir")
         validate_runtime_path("log_dir", log_dir, path_type="dir")
         validate_runtime_path("env_file", env_file, path_type="file")
-        validate_runtime_path("venv_python", venv_python, path_type="file", executable=True)
+        validate_runtime_path("uv_bin", uv_bin, path_type="file", executable=True)
 
     return RenderContext(
         template_path=template_path,
         app_dir=app_dir,
-        venv_python=venv_python,
+        uv_bin=uv_bin,
         log_dir=log_dir,
         env_file=env_file,
         output_path=output_path,
@@ -186,7 +188,7 @@ def validate_runtime_path(
 def render_cron_template(context: RenderContext) -> str:
     rendered = context.template_path.read_text(encoding="utf-8")
     rendered = rendered.replace(PLACEHOLDER_APP_DIR, str(context.app_dir))
-    rendered = rendered.replace(PLACEHOLDER_VENV_PYTHON, str(context.venv_python))
+    rendered = rendered.replace(PLACEHOLDER_UV_BIN, str(context.uv_bin))
     rendered = rendered.replace(PLACEHOLDER_LOG_DIR, str(context.log_dir))
     rendered = rendered.replace(PLACEHOLDER_ENV_FILE, str(context.env_file))
 
@@ -194,7 +196,7 @@ def render_cron_template(context: RenderContext) -> str:
         placeholder in rendered
         for placeholder in (
             PLACEHOLDER_APP_DIR,
-            PLACEHOLDER_VENV_PYTHON,
+            PLACEHOLDER_UV_BIN,
             PLACEHOLDER_LOG_DIR,
             PLACEHOLDER_ENV_FILE,
         )

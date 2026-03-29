@@ -1,5 +1,352 @@
 # CHANGELOG
 
+## 2026-03-29T16:10:07Z
+
+### 变更内容
+
+- 删除 `docs/setup-troubleshooting.md`，不再单独保留环境搭建排障文档
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录本次文档收口、影响范围、验证方式与回滚说明
+- 调整历史变更记录中对 `docs/setup-troubleshooting.md` 的文件引用写法，保留历史事实，但不再保留指向已删除文件的失效链接
+
+### 变更原因
+
+- 你明确要求删除 `docs/setup-troubleshooting.md`，并同步处理与其相关的项目记录
+- 如果只删除文件而不修正文档状态和历史记录，仓库会留下多处失效链接，影响后续阅读和交接
+- 本次按最保守范围只做文档收口与记录修订，不改业务代码、不改依赖、不改运行入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T16:10:07Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 `docs/setup-troubleshooting.md` 删除，以及 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的文档修订
+- 当前 `uv sync`、`uv run`、部署模板、`cron`、`systemd` 和业务代码行为均保持不变
+- 删除后，当前环境说明需要以 [README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 和 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 为准
+
+### 验证步骤
+
+- 执行 `rg -n "setup-troubleshooting\\.md|环境搭建问题排查记录" README.md PROJECT_STATE.md CHANGELOG.md docs scripts tests deploy .`
+- 人工复核 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 中当前状态描述，确认已不再把 `docs/setup-troubleshooting.md` 作为现存文档引用
+- 人工复核 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 中历史条目，确认不再存在指向已删除文件的 Markdown 链接
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 `docs/setup-troubleshooting.md`、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现独立环境排障文档及其对应历史链接
+
+## 2026-03-29T16:01:45Z
+
+### 变更内容
+
+- 更新 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py)，按 `ruff format` 期望收敛 `ensure_prerequisites` 中单处异常换行，消除全仓格式检查唯一失败项
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录本次格式修复、影响范围、验证结果与回滚说明
+
+### 变更原因
+
+- 上一轮全量测试中，`ruff check`、`mypy`、`pytest`、部署验收和恢复演练均已通过，但 `ruff format --check .` 仍因 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 的单处格式差异失败
+- 该问题不会改变业务行为，但会导致仓库无法达到“格式、静态检查、类型检查、功能测试与重型验收全部通过”的完整交付口径
+- 本次按最保守范围仅修复格式，不扩展到业务逻辑、依赖版本或部署行为调整
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T16:01:45Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 的代码格式，以及项目状态文档与变更记录
+- Python 运行逻辑、部署模板、`cron`、`systemd`、数据库、接口和测试语义均保持不变
+- 修复后，仓库重新具备 `ruff format --check` 全绿条件
+
+### 验证步骤
+
+- 执行 `uv run python -m ruff format --check .`
+- 执行 `uv run python -m ruff check .`
+- 执行 `uv run python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/install_cron.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `uv run python -m pytest`
+- 执行 `uv run python scripts/verify_t1_6.py`
+- 执行 `uv run python scripts/verify_t2_5.py`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现 `ruff format --check .` 失败项，影响交付前的完整校验闭环
+
+## 2026-03-29T15:46:35Z
+
+### 变更内容
+
+- 更新 [.gitignore](/home/ops/Projects/BingWall/.gitignore)，删除 `pyenv`、旧虚拟环境目录和与当前仓库无关的 `pipenv`、`poetry`、`pdm`、`pixi` 模板段，保留当前 `uv` 工作流所需的忽略规则
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），把“旧锁文件思路”条目改写为迁移后错误示例说明，明确当前仓库已不再保留 `requirements.lock.txt`
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录本次 `uv` 工作流遗留项清理、影响范围、验证方式和回滚说明
+
+### 变更原因
+
+- 当前项目的运行、部署和依赖同步入口已经完成 `uv` 收口，但仓库内仍残留少量 `pyenv` 时代注释、旧虚拟环境痕迹和容易误导读者的排障表述
+- 如果继续保留这些遗留内容，新接手的人容易误以为仓库还处于“`uv` 已接入但旧锁文件方案仍保留”的过渡状态
+- 这次按最保守范围只清理说明性残留与仓库卫生项，不改业务逻辑、不改依赖版本，也不改变现有脚本执行语义
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:46:35Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖仓库忽略规则、排障说明和项目状态文档
+- 当前 `uv sync`、`uv run`、`.python-version`、`uv.lock` 的主工作流保持不变
+- 本次不会影响现有开发、测试、部署、`cron` 或 `systemd` 的执行结果
+
+### 验证步骤
+
+- 执行 `rg -n "^# pyenv$|^\\.venv-py312-broken/$|^# pipenv$|^# poetry$|^# pdm$|^# pixi$|^\\.pdm-python$|^\\.pdm-build/$|^\\.pixi$" .gitignore`
+- 人工复核 `docs/setup-troubleshooting.md`（该文档现已删除）中“问题 2”条目，确认已明确说明当前仓库不再保留 `requirements.lock.txt`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [.gitignore](/home/ops/Projects/BingWall/.gitignore)、`docs/setup-troubleshooting.md`（该文档现已删除）、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现与当前 `uv` 工作流不一致的旧注释和旧示例表述，增加后续维护时的理解成本
+
+## 2026-03-29T15:22:18Z
+
+### 变更内容
+
+- 更新 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[deploy/cron/bingwall-cron](/home/ops/Projects/BingWall/deploy/cron/bingwall-cron)、[scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py)、[scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py)、[Makefile](/home/ops/Projects/BingWall/Makefile) 与对应测试，把生产部署、计划任务安装、部署验收和 `make install-cron` 入口统一收敛为 `uv` 运行口径
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录“整个项目执行入口切到 `uv`”后的当前状态、验证方式、影响范围和回滚说明
+
+### 变更原因
+
+- 你明确要求“整个项目都转变为 `uv`”，这不只是依赖安装要使用 `uv sync`，还包括开发、部署、计划任务和验收脚本的运行入口也要统一到 `uv`
+- 如果继续保留 `systemd`、`cron`、安装脚本或恢复命令里的 `.venv/bin/python`，项目仍会停留在“依赖管理是 `uv`，执行入口还是旧 `venv`”的混合状态
+- 因此这次继续按最小闭环收口：不改业务逻辑和依赖版本，只把剩余执行入口全部切到 `uv`
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:22:18Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地开发入口、生产 `systemd` 模板、`cron` 模板、`cron` 安装脚本、部署验收脚本、相关测试和说明文档
+- 现在开发与部署侧 Python 命令都统一通过 `uv` 执行；运行阶段统一采用 `uv run --no-sync python ...`
+- `cron` 模板不再渲染 `.venv/bin/python`，而是在安装时解析 `uv` 的绝对路径并写入计划任务，降低 `cron` 默认 `PATH` 过短导致找不到 `uv` 的风险
+
+### 验证步骤
+
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `uv run python -m pytest tests/integration/test_install_cron.py tests/unit/test_deploy_templates.py`
+- 执行 `bash -n scripts/dev/run-api.sh`
+- 执行 `uv run python scripts/install_cron.py --help`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [Makefile](/home/ops/Projects/BingWall/Makefile)、[deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[deploy/cron/bingwall-cron](/home/ops/Projects/BingWall/deploy/cron/bingwall-cron)、[scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py)、[scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 和相关文档测试文件中的本次修改
+- 回滚后，项目会重新回到“`uv` 负责依赖同步，但生产和计划任务入口仍直接调用 `.venv/bin/python`”的混合状态
+
+## 2026-03-29T15:15:38Z
+
+### 变更内容
+
+- 更新 [Makefile](/home/ops/Projects/BingWall/Makefile)，把本地开发态和校验类 `make` 目标从直接调用 `.venv/bin/python` 收敛为统一通过 `uv run python` 执行
+- 更新 [scripts/dev/run-api.sh](/home/ops/Projects/BingWall/scripts/dev/run-api.sh)，把本地开发启动脚本改为直接调用 `uv run python -m uvicorn`
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，补充说明“开发入口改为 `uv run`、生产模板仍保留 `.venv/bin/python`”的边界
+
+### 变更原因
+
+- 目前项目的依赖来源已经完成 `pyproject.toml + uv.lock` 收口，但本地开发入口层仍保留大量直接写死 `.venv/bin/python` 的调用，容易继续沿用旧的 `venv` 心智
+- 对开发态来说，统一使用 `uv run python` 更符合 `uv` 原生工作流，也能避免把本地命令执行绑定到固定的 `.venv` 路径
+- 这次按最保守范围只调整本地开发和校验入口，不改业务逻辑、不改依赖版本，也不把生产 `systemd` / `cron` 模板强行切成依赖 `uv` 命令的运行方式
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:15:38Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地开发入口、仓库内校验入口和相关说明文档
+- 现在执行 `make lint`、`make typecheck`、`make test`、`make run`、`make db-migrate` 等命令时，会统一走 `uv run python`
+- 生产环境的 `deploy/systemd/bingwall-api.service`、`deploy/cron/bingwall-cron` 与 `scripts/install_cron.py` 仍保持 `.venv/bin/python` 口径，继续使用已同步好的虚拟环境作为稳定运行时
+
+### 验证步骤
+
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `make test`
+- 执行 `uv run python -m pytest tests/integration/test_install_cron.py tests/unit/test_deploy_templates.py`
+- 执行 `bash -n scripts/dev/run-api.sh`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [Makefile](/home/ops/Projects/BingWall/Makefile)、[scripts/dev/run-api.sh](/home/ops/Projects/BingWall/scripts/dev/run-api.sh)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，项目会继续保持“依赖安装使用 `uv`，但本地执行入口仍直接写死 `.venv/bin/python`”的混合状态
+
+## 2026-03-29T15:07:34Z
+
+### 变更内容
+
+- 更新 [pyproject.toml](/home/ops/Projects/BingWall/pyproject.toml)，把开发依赖从 `optional-dependencies` 迁移为 `dependency-groups`，使项目能够直接使用 `uv sync`
+- 更新 [Makefile](/home/ops/Projects/BingWall/Makefile)，把 `make setup` 改为 `uv sync --frozen` 工作流
+- 新增 [uv.lock](/home/ops/Projects/BingWall/uv.lock)，作为当前项目唯一的 Python 依赖锁文件
+- 删除 [requirements.lock.txt](/home/ops/Projects/BingWall/requirements.lock.txt) 与 [scripts/dev/bootstrap.sh](/home/ops/Projects/BingWall/scripts/dev/bootstrap.sh)，清理旧的 `pip` 锁文件和冗余开发引导脚本
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，把当前使用说明统一改成 `uv sync` / `uv.lock` 口径
+
+### 变更原因
+
+- 你明确要求项目真正转成 `uv` 原生工作流，能够直接使用 `uv sync`，并删除旧文件
+- 继续保留 `requirements.lock.txt` 只会让项目停留在“`uv` 调 `pip` 锁文件”的过渡状态，不符合这次要求
+- 因此本次采用最保守的最终收口方案：保留当前依赖版本不变，改为提交 `uv.lock`，并删除旧的 `requirements.lock.txt` 与冗余脚本
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:07:34Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Python 依赖定义、环境准备入口、依赖锁文件和相关使用说明文档
+- 现在开发环境可直接执行 `uv sync --python 3.14 --frozen`，生产部署可执行 `uv sync --python 3.14 --frozen --no-dev`
+- Python 依赖锁定文件现已统一为 `uv.lock`；旧的 `requirements.lock.txt` 不再保留
+- 本次不包含 `systemd` 服务文件、`cron` 模板或任何业务代码路径调整
+
+### 验证步骤
+
+- 执行 `UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv lock`
+- 执行 `UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple make setup`
+- 执行 `./.venv/bin/python -m ruff format --check .`
+- 执行 `./.venv/bin/python -m ruff check .`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/install_cron.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [requirements.lock.txt](/home/ops/Projects/BingWall/requirements.lock.txt) 与 [scripts/dev/bootstrap.sh](/home/ops/Projects/BingWall/scripts/dev/bootstrap.sh)，回退 [pyproject.toml](/home/ops/Projects/BingWall/pyproject.toml)、[Makefile](/home/ops/Projects/BingWall/Makefile) 和相关文档文件中的本次修改，并删除 [uv.lock](/home/ops/Projects/BingWall/uv.lock)
+- 回滚后，项目会重新回到“`uv` 与旧 `pip` 锁文件并存”的过渡状态，不能再以 `uv sync` 作为唯一标准环境准备方式
+
+## 2026-03-29T14:08:33Z
+
+### 变更内容
+
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），把当前使用说明类文档从 `pyenv + venv/pip` 口径统一调整为 `uv + .venv`
+- 更新开发、本地排障和单机部署步骤中的 Python 环境准备、依赖安装、运行与迁移命令，统一改为 `uv python install`、`uv venv`、`uv pip install` 与 `uv run`
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档口径切换的原因、影响范围、验证方式与回滚说明
+
+### 变更原因
+
+- 项目当前已从 `pyenv` 管理切换到 `uv` 管理，但仓库中的部分说明文档仍保留旧的 `python -m venv`、`pip install` 和 `make setup` 操作口径，容易让后续开发、排障和部署步骤出现混用
+- 本次按最保守范围只调整“当前使用说明类文档”，把实际推荐流程统一为 `uv + .venv`，不改动业务代码、依赖版本、服务配置模板或历史变更记录中的原始事实描述
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T14:08:33Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖项目总说明、项目状态文档、部署运行说明和环境排障说明
+- 当前文档推荐的开发流程已统一为：先用 `uv` 准备 `Python 3.14` 和 `.venv`，再使用 `uv pip install` 安装依赖，使用 `uv run` 执行本地迁移、启动和排障命令
+- 生产部署文档仍保留 `.venv/bin/python` 作为 `systemd` / `cron` 的执行目标，但其创建和依赖安装步骤已改为通过 `uv` 完成
+- 本次不包含 `Makefile`、`scripts/dev/bootstrap.sh`、`systemd` 服务文件、`cron` 模板或锁文件策略调整
+
+### 验证步骤
+
+- 执行 `rg -n "make setup|python -m venv|\\.venv/bin/pip|pip install -e|python3\\.14 -m venv" README.md PROJECT_STATE.md docs/deployment-runbook.md docs/setup-troubleshooting.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库当前使用说明会重新回到 `pyenv/venv/pip` 与 `uv` 混用状态，后续环境准备和排障步骤的统一性会变差
+
+## 2026-03-29T14:02:40Z
+
+### 变更内容
+
+- 更新 [scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py) 与 [tests/integration/test_install_cron.py](/home/ops/Projects/BingWall/tests/integration/test_install_cron.py)，按 `ruff format` 结果收敛代码格式，消除全仓格式检查失败项
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次在 `uv` 环境下执行的整仓校验结果、影响范围、验证步骤、回滚说明与时间戳
+
+### 变更原因
+
+- 由于项目从 `pyenv` 切换到 `uv` 管理，需要在新的 `Python 3.14` 运行时环境下重新执行一次全仓代码检测，确认格式、静态检查、类型检查和测试都能通过
+- 实测 `uv` 环境下 `ruff check`、`mypy` 与 `pytest` 已全部通过，但 `ruff format --check` 仍因上述两个文件的格式偏差失败，因此做最小范围格式修正，不扩大到业务逻辑、依赖或部署流程变更
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T14:02:40Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 `cron` 安装脚本及其集成测试的代码格式，以及项目状态文档中的校验记录
+- 本次不修改业务逻辑、接口契约、数据库结构、部署脚本行为或 `uv` 依赖解析结果
+- 修正后，项目在 `uv` 管理的 `Python 3.14.3` 环境下可通过 `ruff format --check`、`ruff check`、`mypy` 和全量 `pytest`
+
+### 验证步骤
+
+- 执行 `uv run python --version`
+- 执行 `uv run python -m ruff format --check .`
+- 执行 `uv run python -m ruff check .`
+- 执行 `uv run python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/install_cron.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `uv run python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py) 与 [tests/integration/test_install_cron.py](/home/ops/Projects/BingWall/tests/integration/test_install_cron.py) 的格式化改动，并回退 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 中本次记录
+- 回滚后，`uv` 环境下的功能行为不会变化，但全仓 `ruff format --check` 会重新失败
+## 2026-03-29T13:18:43Z
+
+### 变更内容
+
+- 更新 [.python-version](.python-version) 与 [pyproject.toml](pyproject.toml)，把 Python 运行时约束从精确补丁版本 `3.14.2` 调整为固定 `3.14` 版本线；其中 `.python-version` 改为 `3.14`，`requires-python` 改为 `>=3.14,<3.15`
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md) 与 [docs/deployment-runbook.md](docs/deployment-runbook.md)，同步把当前运行时基线说明改为 `Python 3.14`，并明确允许使用 `3.14.x` 补丁版本
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），将排障文档中的 Python 版本要求同步调整为 `3.14` 版本线口径
+
+### 变更原因
+
+- 当前仓库原先把 Python 运行时精确锁到 `3.14.2`，但你要求仅固定 `3.14` 这一条版本线，不再要求所有环境必须落到同一个补丁号
+- 对这个项目来说，保留 `3.14` 大版本约束可以继续控制主兼容范围，同时减少因为补丁版本差异导致的环境准备摩擦
+- 本次只调整运行时约束和文档说明，不扩大到依赖升级、业务逻辑修改或技术栈调整
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T13:18:43Z`
+- 依赖类型：无直接或间接第三方包变更；仅调整 Python 运行时约束表达方式
+
+### 影响范围
+
+- 影响范围覆盖 Python 版本声明和项目文档说明
+- 之后使用 `uv` 或遵循 `.python-version` 准备环境时，可使用任意 `3.14.x` 补丁版本，不再要求必须是 `3.14.2`
+- 本次不包含 FastAPI、Starlette、Pillow、Node.js、数据库结构、接口契约或前后端业务行为变更
+
+### 验证步骤
+
+- 执行 `uv run python --version`
+
+### 回滚说明
+
+- 如需回滚本次变更，可将 [.python-version](.python-version) 恢复为 `3.14.2`，并将 [pyproject.toml](pyproject.toml) 中的 `requires-python` 恢复为 `==3.14.2`
+- 回滚后，项目环境准备会重新要求精确使用 `Python 3.14.2`
+
 ## 2026-03-29T07:58:59Z
 
 ### 变更内容
@@ -125,7 +472,7 @@
 
 - 更新 [app/repositories/public_repository.py](app/repositories/public_repository.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/api/public/routes.py](app/api/public/routes.py)，新增 `/api/public/wallpapers/by-market/{market_code}` 与 `/api/public/wallpapers/by-date/{wallpaper_date}` 两个公开单条查询接口，分别支持按地区获取最新公开壁纸、按日期精确获取公开壁纸
 - 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐新接口的可见性过滤、默认市场优先、404 返回以及 `download_variants` 全部分辨率下载链接回归测试
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新接口用途、返回结构、验证示例、影响范围和回滚口径
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步记录新接口用途、返回结构、验证示例、影响范围和回滚口径
 
 ### 变更原因
 
@@ -209,7 +556,7 @@
 
 - 更新 [pyproject.toml](pyproject.toml)，将直接依赖 `fastapi` 从 `0.116.1` 升级到 `0.118.3`，保持其他直接依赖版本不变
 - 更新 [requirements.lock.txt](requirements.lock.txt)，用现有 `pip` 工具链重建锁文件，使依赖声明与虚拟环境实际安装结果保持一致
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/README.md](docs/README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步记录新的 FastAPI 基线、兼容性依据、安装排障方式、验证步骤与回滚口径
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/README.md](docs/README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步记录新的 FastAPI 基线、兼容性依据、安装排障方式、验证步骤与回滚口径
 
 ### 变更原因
 
@@ -673,7 +1020,7 @@
 
 - 更新 [app/repositories/sqlite.py](app/repositories/sqlite.py)，把 SQLite 连接创建统一调整为 `check_same_thread=False`，兼容 FastAPI 同步依赖与同步路由在同一请求内跨工作线程执行的情况
 - 新增 [tests/unit/test_sqlite.py](tests/unit/test_sqlite.py)，补齐跨线程查询回归测试和外键约束开启断言
-- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[CHANGELOG.md](CHANGELOG.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步本次公开接口 `500` 的根因、影响范围、验证方式与回滚说明
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[CHANGELOG.md](CHANGELOG.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步本次公开接口 `500` 的根因、影响范围、验证方式与回滚说明
 
 ### 变更原因
 
@@ -713,7 +1060,7 @@
 - 更新 [app/core/config.py](app/core/config.py)、[app/services/source_collection.py](app/services/source_collection.py)、[app/services/bing_collection.py](app/services/bing_collection.py) 与 [app/repositories/collection_repository.py](app/repositories/collection_repository.py)，新增 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED` 配置，并让新采集内容在资源全部就绪后默认自动切到 `enabled + is_public=true`
 - 更新 [app/collectors/bing.py](app/collectors/bing.py)、[app/collectors/nasa_apod.py](app/collectors/nasa_apod.py) 与 [app/collectors/manual_tasks.py](app/collectors/manual_tasks.py)，让 Bing、NASA APOD 和手动任务消费三条采集入口都使用同一自动公开策略
 - 更新 [tests/integration/test_bing_collection_service.py](tests/integration/test_bing_collection_service.py)、[tests/integration/test_multi_source_collection.py](tests/integration/test_multi_source_collection.py)、[tests/integration/test_admin_collection.py](tests/integration/test_admin_collection.py) 与 [tests/unit/test_config.py](tests/unit/test_config.py)，补齐默认自动公开、关闭自动公开后保持 `draft` 和配置加载验证
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/system-design.md](docs/system-design.md)、[docs/data-model.md](docs/data-model.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)、[.env.example](.env.example) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，同步默认自动公开口径、关闭方式和排障说明
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/system-design.md](docs/system-design.md)、[docs/data-model.md](docs/data-model.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）、[.env.example](.env.example) 与 [deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)，同步默认自动公开口径、关闭方式和排障说明
 
 ### 变更原因
 
@@ -753,7 +1100,7 @@
 
 - 新增 [app/repositories/migrations/versions/V0006__admin_user_status_constraint.sql](app/repositories/migrations/versions/V0006__admin_user_status_constraint.sql)，在迁移阶段先清洗 `admin_users.status` 的 legacy 数据，再通过数据库触发器拦截新的非法状态写入
 - 更新 [tests/integration/test_sqlite_migrations.py](tests/integration/test_sqlite_migrations.py)，补齐第 `6` 个迁移版本、触发器存在性断言，以及 legacy `active` / 非法状态清洗和迁移后非法写入拦截测试
-- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[docs/data-model.md](docs/data-model.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步管理员状态枚举、legacy 值迁移口径和最新排障建议
+- 更新 [PROJECT_STATE.md](PROJECT_STATE.md)、[docs/data-model.md](docs/data-model.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步管理员状态枚举、legacy 值迁移口径和最新排障建议
 
 ### 变更原因
 
@@ -790,7 +1137,7 @@
 
 ### 变更内容
 
-- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，删除“默认账号信息”表，避免再暗示仓库存在固定的 `admin/admin123` 默认后台账号
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），删除“默认账号信息”表，避免再暗示仓库存在固定的 `admin/admin123` 默认后台账号
 - 同步把后台登录示例改成基于 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 的占位写法，并要求调用方填写自己初始化时设置的管理员密码
 
 ### 变更原因
@@ -812,18 +1159,18 @@
 
 ### 验证步骤
 
-- 人工核对 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 中“问题 8 / 9”“验证运行”与“注意事项”三处描述保持一致，不再出现 `admin123` 或“默认账号信息”表
+- 人工核对 `docs/setup-troubleshooting.md`（该文档现已删除）中“问题 8 / 9”“验证运行”与“注意事项”三处描述保持一致，不再出现 `admin123` 或“默认账号信息”表
 
 ### 回滚说明
 
-- 如需回滚本次变更，可恢复 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
+- 如需回滚本次变更，可恢复 `docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
 - 本次仅为文档修正，回滚不涉及代码或数据回滚
 
 ## 2026-03-27T13:31:19Z
 
 ### 变更内容
 
-- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，把“日期范围筛选 API”从待开发占位描述改为已实现说明，补齐闭区间语义、统一 `422` 参数错误行为，以及“当前未扩展公开前端日期选择器”的范围说明
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），把“日期范围筛选 API”从待开发占位描述改为已实现说明，补齐闭区间语义、统一 `422` 参数错误行为，以及“当前未扩展公开前端日期选择器”的范围说明
 
 ### 变更原因
 
@@ -844,11 +1191,11 @@
 
 ### 验证步骤
 
-- 人工核对 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 中“日期范围筛选 API”条目与 [README.md](README.md)、[docs/api-conventions.md](docs/api-conventions.md) 的公开列表参数说明一致
+- 人工核对 `docs/setup-troubleshooting.md`（该文档现已删除）中“日期范围筛选 API”条目与 [README.md](README.md)、[docs/api-conventions.md](docs/api-conventions.md) 的公开列表参数说明一致
 
 ### 回滚说明
 
-- 如需回滚本次变更，可恢复 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
+- 如需回滚本次变更，可恢复 `docs/setup-troubleshooting.md`（该文档现已删除）与 [CHANGELOG.md](CHANGELOG.md) 的本次文档修订，或执行 `git revert` 回退本次提交
 - 本次仅为文档修正，回滚不涉及代码或数据回滚
 
 ## 2026-03-27T13:21:12Z
@@ -897,7 +1244,7 @@
 
 - 更新 [app/api/public/routes.py](app/api/public/routes.py)、[app/services/public_catalog.py](app/services/public_catalog.py) 与 [app/repositories/public_repository.py](app/repositories/public_repository.py)，新增 `GET /api/public/wallpapers/today` 和 `GET /api/public/wallpapers/random` 两个公开端点，并复用现有公开详情的字段结构、资源 URL 生成逻辑和统一 404 错误响应
 - 更新 [tests/integration/test_public_api.py](tests/integration/test_public_api.py)，补齐今日壁纸默认市场优先、默认市场缺失回退、公开可见性过滤、随机抽取仅限公开可见内容、OSS 资源地址返回和空结果 404 等集成测试
-- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，同步新增公开接口、UTC 日期语义、随机池范围、最小验证命令和排障说明
+- 更新 [README.md](README.md)、[PROJECT_STATE.md](PROJECT_STATE.md)、[docs/api-conventions.md](docs/api-conventions.md) 与 `docs/setup-troubleshooting.md`（该文档现已删除），同步新增公开接口、UTC 日期语义、随机池范围、最小验证命令和排障说明
 
 ### 变更原因
 
@@ -937,7 +1284,7 @@
 - 新增 [app/services/admin_bootstrap.py](app/services/admin_bootstrap.py)，实现首个管理员账号幂等初始化：仅当 `admin_users` 为空且提供了初始化凭据时，自动创建状态为 `enabled` 的 `super_admin`
 - 更新 [app/core/config.py](app/core/config.py) 与 [app/repositories/migrations/__main__.py](app/repositories/migrations/__main__.py)，新增 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME`、`BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 配置校验，并把管理员初始化接入数据库迁移命令
 - 新增 [tests/integration/test_admin_bootstrap.py](tests/integration/test_admin_bootstrap.py)，并更新 [tests/unit/test_config.py](tests/unit/test_config.py) 与 [tests/conftest.py](tests/conftest.py)，覆盖首次创建、重复执行不重复创建、已有管理员不覆盖，以及配置成对出现和密码长度校验
-- 更新 [.env.example](.env.example)、[deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)、[README.md](README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md)，同步默认管理员初始化方式、使用步骤和排障说明
+- 更新 [.env.example](.env.example)、[deploy/systemd/bingwall.env.example](deploy/systemd/bingwall.env.example)、[README.md](README.md)、[docs/deployment-runbook.md](docs/deployment-runbook.md)、`docs/setup-troubleshooting.md`（该文档现已删除）与 [PROJECT_STATE.md](PROJECT_STATE.md)，同步默认管理员初始化方式、使用步骤和排障说明
 
 ### 变更原因
 
@@ -975,8 +1322,8 @@
 
 ### 变更内容
 
-- 更新 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)，修正文档中对 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 的说明，明确“未设置”与“设置为空字符串”在当前配置模型中的行为差异
-- 同步调整 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md) 的完整搭建步骤与注意事项，改为区分“仅本地文件存储”和“启用 OSS / CDN 公网访问”两种配置方式
+- 更新 `docs/setup-troubleshooting.md`（该文档现已删除），修正文档中对 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 的说明，明确“未设置”与“设置为空字符串”在当前配置模型中的行为差异
+- 同步调整 `docs/setup-troubleshooting.md`（该文档现已删除）的完整搭建步骤与注意事项，改为区分“仅本地文件存储”和“启用 OSS / CDN 公网访问”两种配置方式
 - 更新 [PROJECT_STATE.md](PROJECT_STATE.md)，记录该排障结论已沉淀进项目文档，并刷新文档元信息时间
 
 ### 变更原因
@@ -1006,7 +1353,7 @@
 
 ### 回滚说明
 
-- 如需回滚本次变更，可回退 [docs/setup-troubleshooting.md](docs/setup-troubleshooting.md)、[CHANGELOG.md](CHANGELOG.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md) 的文档修订
+- 如需回滚本次变更，可回退 `docs/setup-troubleshooting.md`（该文档现已删除）、[CHANGELOG.md](CHANGELOG.md) 与 [PROJECT_STATE.md](PROJECT_STATE.md) 的文档修订
 - 回滚后文档将恢复到“默认建议填写 `http://localhost` 占位值”的旧表述，部署人员可能继续混淆“未设置”和“空字符串”的差别
 
 ## 2026-03-26T15:13:37Z

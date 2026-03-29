@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VENV_DIR="${VENV_DIR:-.venv}"
+UV_BIN="${UV_BIN:-uv}"
 
-"${VENV_DIR}/bin/python" -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+exec "${UV_BIN}" run python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
