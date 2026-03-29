@@ -1,6 +1,46 @@
 # CHANGELOG
 
-## 2026-03-29T18:37:02Z
+## 2026-03-29T18:44:40Z
+
+### 变更内容
+
+- 更新 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)，将 `actions/github-script` 升级到 `v8`，消除 GitHub Actions 对 Node.js 20 运行时的弃用告警
+- 更新 [scripts/github/apply_main_branch_protection.sh](/home/ops/Projects/BingWall/scripts/github/apply_main_branch_protection.sh)，在设置 `main` 分支保护前，先把仓库级 GitHub Actions 工作流权限切换为 `Read and write permissions`，并允许 GitHub Actions 创建或批准 PR
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，同步记录本轮远端实测结果、当前阻塞点和最终需要的管理员脚本
+
+### 变更原因
+
+- 远端实测表明：`push dev` 后 `CI` 已成功，且 `CI` 成功后 `Auto Create PR` 已被正确触发
+- 首轮自动建 PR 失败的明确原因不是工作流没跑，而是 GitHub 返回 `GitHub Actions is not permitted to create or approve pull requests`
+- 为了把最后一步收敛成可复制的一条管理员命令，本次把仓库级 Actions 权限配置并入现有脚本，同时顺手消除 `actions/github-script@v7` 的 Node.js 20 弃用告警
+
+### 依赖变更
+
+- 无新增第三方运行时依赖
+- GitHub 官方 Action 从 `actions/github-script@v7` 调整为 `actions/github-script@v8`
+- 变更时间：`2026-03-29T18:44:40Z`
+- 依赖类型：无应用运行时依赖变更，仅 GitHub Actions 工作流依赖调整
+
+### 影响范围
+
+- 影响范围覆盖自动建 PR 工作流、GitHub 仓库管理员脚本和协作文档说明
+- 仓库业务代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
+- 更新后，只要在具备 `GITHUB_TOKEN` 的环境执行一次脚本，即可同时补齐“允许 Actions 创建 PR”和 `main` 分支保护两类远端仓库设置
+
+### 验证步骤
+
+- 执行 `uv sync --python 3.14 --frozen`
+- 执行 `make verify`
+- 执行 `bash -n scripts/github/apply_main_branch_protection.sh`
+- 远端验证 `CI` 运行成功：`https://github.com/OborozukiNoYume/BingWall/actions/runs/23716272326`
+- 远端验证 `Auto Create PR` 已被触发但因仓库权限失败：`https://github.com/OborozukiNoYume/BingWall/actions/runs/23716293395`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)、[scripts/github/apply_main_branch_protection.sh](/home/ops/Projects/BingWall/scripts/github/apply_main_branch_protection.sh)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会继续保留“自动建 PR 首轮因权限不足失败”的现状，且脚本不再覆盖 GitHub Actions 仓库级写权限设置
+
+## 2026-03-29T18:31:42Z
 
 ### 变更内容
 

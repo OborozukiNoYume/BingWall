@@ -55,8 +55,10 @@ GITHUB_TOKEN=<your_token> bash scripts/github/apply_main_branch_protection.sh
 
 说明：
 
+- 该脚本会先把仓库级 GitHub Actions 工作流权限切到 `Read and write permissions`，并允许 GitHub Actions 创建或批准 PR；这是 `Auto Create PR` 真正能建单的前提
 - 该脚本会把 `main` 分支配置为强制 PR、强制 `verify` 检查、强制至少 `1` 次 Review，并对管理员同样生效
 - 如果仓库后续更改默认校验任务名，需要同步更新工作流中的 job 名称和脚本里的必需检查上下文
+- 当前已实测 `push dev` 可触发 `CI`，且 `CI` 成功后会触发 `Auto Create PR`；本轮失败原因为仓库尚未开启“允许 GitHub Actions 创建或批准 PR”，不是工作流触发条件缺失
 
 ## 运行说明
 
