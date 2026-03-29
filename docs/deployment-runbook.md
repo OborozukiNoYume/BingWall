@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T14:08:33Z
+- 更新时间：2026-03-29T15:07:34Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -37,7 +37,7 @@
 
 说明：
 
-- 当前仓库已生成 `.python-version`、`.nvmrc` 与 `pyproject.toml`，并统一以 `uv` 创建和维护 `.venv`
+- 当前仓库已生成 `.python-version`、`.nvmrc`、`pyproject.toml` 与 `uv.lock`，并统一以 `uv sync` 创建和维护 `.venv`
 - 当前仓库已生成 `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example`
 - 当前已确认 `Python 3.14` 为一期开发基线，阶段一初始化代码时必须围绕该版本线生成运行时与依赖锁定文件
 - 当前后端依赖基线已固定为 `FastAPI 0.118.3`，该版本官方支持 `Python 3.14`，并兼容当前锁定的 `Starlette 0.47.3`
@@ -180,7 +180,7 @@
 
 当前已提供：
 
-- 开发环境依赖安装方式：`uv python install 3.14`、`uv venv --python 3.14 .venv`、`uv pip install --python .venv/bin/python -e ".[dev]"`
+- 开发环境依赖安装方式：`uv python install 3.14`、`uv sync --python 3.14 --frozen`，或直接执行内部等价的 `make setup`
 - 数据库初始化命令：`make db-migrate`
 - 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 自动公开开关：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`，默认 `true`；开启时，新采集内容会在资源全部就绪后自动公开
@@ -229,7 +229,7 @@
 ### 生产环境最小启动步骤
 
 1. 把仓库代码部署到 `/opt/bingwall/app`
-2. 使用 `uv python install 3.14`、`uv venv --python 3.14 /opt/bingwall/app/.venv` 和 `uv pip install --python /opt/bingwall/app/.venv/bin/python -e .` 准备生产虚拟环境
+2. 使用 `uv python install 3.14` 与 `uv sync --python 3.14 --frozen --no-dev` 准备生产虚拟环境
 3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `.venv/bin/python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`

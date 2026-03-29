@@ -3,48 +3,56 @@
 > 记录时间：2026-03-29
 > 环境：uv + Python 3.14, Ubuntu Linux
 
-## 问题 1：uv 安装指定版本时找不到包
+## 问题 1：`uv sync` 安装依赖失败
 
 ### 现象
 ```bash
-uv pip install --python .venv/bin/python fastapi==0.118.3
-# ERROR: No matching distribution found for fastapi==0.118.3
+uv sync --python 3.14 --frozen
+# error: Failed to download ...
 ```
 
 ### 原因
-常见原因不是版本真的不存在，而是镜像站同步滞后、网络超时，或者 `uv` 在解析索引时没拿到完整结果，最终返回了误导性的“找不到包”。
+常见原因不是仓库依赖真的写错，而是默认索引下载过慢、网络超时，或者镜像站同步滞后，导致 `uv sync` 在拉取 `uv.lock` 中声明的包时失败。
 
 ### 解决方案
 1. 优先使用仓库自带的精确依赖安装入口，避免手动去掉版本锁定：
    ```bash
    uv python install 3.14
-   uv venv --python 3.14 .venv
-   uv pip install --python .venv/bin/python -e ".[dev]"
+   uv sync --python 3.14 --frozen
    ```
-2. 如果需要单独排查，可显式指定官方索引重试精确版本安装：
+   或直接执行：
    ```bash
-   uv pip install --python .venv/bin/python --index-url https://pypi.org/simple fastapi==0.118.3
+   make setup
    ```
-3. 如仍失败，优先检查网络、代理或镜像同步状态，不要改成无版本约束安装
+2. 如果默认源下载太慢，可显式指定更快的镜像重试整仓同步：
+   ```bash
+   UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv sync --python 3.14 --frozen
+   ```
+3. 如仍失败，优先检查网络、代理或镜像同步状态，不要改成无锁定版本安装
 
 ---
 
-## 问题 2：Pillow 安装失败
+## 问题 2：切到 `uv sync` 后还在用旧的锁文件思路
 
 ### 现象
 ```bash
-uv pip install --python .venv/bin/python Pillow==12.1.1
-# ERROR: Could not find a version that satisfies the requirement Pillow==12.1.1
+项目里仍保留 requirements.lock.txt
+```
+
+或者继续执行：
+
+```bash
+uv pip install ...
 ```
 
 ### 原因
-同上，网络问题导致索引查询失败。
+这说明项目还停留在“`uv` 调用 `pip` 风格锁文件”的半迁移状态，不是真正的 `uv sync` 工作流。当前仓库已经改为以 `pyproject.toml + uv.lock` 作为唯一 Python 依赖来源。
 
 ### 解决方案
-不指定版本直接安装：
+统一使用：
 ```bash
-uv pip install --python .venv/bin/python Pillow
-# Successfully installed Pillow-12.1.1
+uv python install 3.14
+uv sync --python 3.14 --frozen
 ```
 
 ---
@@ -312,12 +320,18 @@ git pull origin dev
 ### 2. 创建 uv 虚拟环境
 ```bash
 uv python install 3.14
-uv venv --python 3.14 .venv
+uv sync --python 3.14 --frozen
 ```
 
 ### 3. 安装依赖
 ```bash
-uv pip install --python .venv/bin/python -e ".[dev]"
+uv sync --python 3.14 --frozen
+```
+
+如果希望直接走仓库自带脚本，也可以执行：
+
+```bash
+make setup
 ```
 
 ### 4. 配置环境变量

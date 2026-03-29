@@ -1,5 +1,49 @@
 # CHANGELOG
 
+## 2026-03-29T15:07:34Z
+
+### 变更内容
+
+- 更新 [pyproject.toml](/home/ops/Projects/BingWall/pyproject.toml)，把开发依赖从 `optional-dependencies` 迁移为 `dependency-groups`，使项目能够直接使用 `uv sync`
+- 更新 [Makefile](/home/ops/Projects/BingWall/Makefile)，把 `make setup` 改为 `uv sync --frozen` 工作流
+- 新增 [uv.lock](/home/ops/Projects/BingWall/uv.lock)，作为当前项目唯一的 Python 依赖锁文件
+- 删除 [requirements.lock.txt](/home/ops/Projects/BingWall/requirements.lock.txt) 与 [scripts/dev/bootstrap.sh](/home/ops/Projects/BingWall/scripts/dev/bootstrap.sh)，清理旧的 `pip` 锁文件和冗余开发引导脚本
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/setup-troubleshooting.md](/home/ops/Projects/BingWall/docs/setup-troubleshooting.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，把当前使用说明统一改成 `uv sync` / `uv.lock` 口径
+
+### 变更原因
+
+- 你明确要求项目真正转成 `uv` 原生工作流，能够直接使用 `uv sync`，并删除旧文件
+- 继续保留 `requirements.lock.txt` 只会让项目停留在“`uv` 调 `pip` 锁文件”的过渡状态，不符合这次要求
+- 因此本次采用最保守的最终收口方案：保留当前依赖版本不变，改为提交 `uv.lock`，并删除旧的 `requirements.lock.txt` 与冗余脚本
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:07:34Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 Python 依赖定义、环境准备入口、依赖锁文件和相关使用说明文档
+- 现在开发环境可直接执行 `uv sync --python 3.14 --frozen`，生产部署可执行 `uv sync --python 3.14 --frozen --no-dev`
+- Python 依赖锁定文件现已统一为 `uv.lock`；旧的 `requirements.lock.txt` 不再保留
+- 本次不包含 `systemd` 服务文件、`cron` 模板或任何业务代码路径调整
+
+### 验证步骤
+
+- 执行 `UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple uv lock`
+- 执行 `UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple make setup`
+- 执行 `./.venv/bin/python -m ruff format --check .`
+- 执行 `./.venv/bin/python -m ruff check .`
+- 执行 `./.venv/bin/python -m mypy app tests scripts/create_scheduled_collection_tasks.py scripts/install_cron.py scripts/run_resource_inspection.py scripts/run_wallpaper_archive.py scripts/run_backup.py scripts/run_restore.py scripts/verify_t2_5.py`
+- 执行 `./.venv/bin/python -m pytest`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [requirements.lock.txt](/home/ops/Projects/BingWall/requirements.lock.txt) 与 [scripts/dev/bootstrap.sh](/home/ops/Projects/BingWall/scripts/dev/bootstrap.sh)，回退 [pyproject.toml](/home/ops/Projects/BingWall/pyproject.toml)、[Makefile](/home/ops/Projects/BingWall/Makefile) 和相关文档文件中的本次修改，并删除 [uv.lock](/home/ops/Projects/BingWall/uv.lock)
+- 回滚后，项目会重新回到“`uv` 与旧 `pip` 锁文件并存”的过渡状态，不能再以 `uv sync` 作为唯一标准环境准备方式
+
 ## 2026-03-29T14:08:33Z
 
 ### 变更内容
