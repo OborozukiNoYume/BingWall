@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-03-29T19:09:38Z
+
+### 变更内容
+
+- 更新 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)，为 `actions/github-script` 增加 `github-token` 输入，优先读取仓库 Secret `GH_PR_TOKEN`，未配置时回退到默认 `GITHUB_TOKEN`
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，补充自动建 PR 的令牌注入方式与安全边界，明确 PAT 必须通过 GitHub Secret 配置，不能直接写入工作流文件
+
+### 变更原因
+
+- 你希望先把自动建 PR 所需的令牌接入点放进仓库，后续再手动补齐具体 Secret
+- 直接把明文 PAT 写进 `.github/workflows/*.yml` 会造成敏感凭据泄露，风险高且不符合仓库安全要求
+- 本次采用最保守实现，只补齐 Secret 注入入口和说明文档，不改业务代码、不改依赖版本、不扩大 GitHub 流程范围
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T19:09:38Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖自动建 PR 工作流与相关协作文档
+- 仓库业务代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
+- 配置 `GH_PR_TOKEN` 后，`Auto Create PR` 会优先使用该 Secret；未配置时仍会尝试使用默认 `GITHUB_TOKEN`
+
+### 验证步骤
+
+- 执行 `python - <<'PY'\nfrom pathlib import Path\nimport yaml\nprint(yaml.safe_load(Path('.github/workflows/auto-create-pr.yml').read_text(encoding='utf-8'))['jobs']['create_pull_request']['steps'][0]['with']['github-token'])\nPY`
+- 执行 `rg -n "GH_PR_TOKEN|GITHUB_TOKEN|Secret" README.md PROJECT_STATE.md .github/workflows/auto-create-pr.yml`
+- 人工复核 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)，确认未写入任何明文令牌，仅保留 Secret 引用表达式
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，自动建 PR 工作流将重新只依赖默认 `GITHUB_TOKEN`，不再预留独立 `GH_PR_TOKEN` Secret 注入入口
+
 ## 2026-03-29T18:44:40Z
 
 ### 变更内容
