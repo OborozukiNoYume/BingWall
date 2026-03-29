@@ -66,8 +66,8 @@ make run
 
 说明：
 
-- 本地开发态的 `make db-migrate`、`make verify`、`make run` 等命令现在统一通过 `uv run python` 执行，不再直接写死 `.venv/bin/python`
-- 生产环境的 `systemd` / `cron` 模板仍保留 `.venv/bin/python` 作为运行入口；这是刻意保留的稳定部署口径，不是遗漏
+- 现在本地开发、`systemd` 服务模板和 `cron` 模板都统一通过 `uv` 执行 Python 命令
+- 运行时统一采用 `uv run --no-sync python ...`，避免服务启动或计划任务执行时再去改动虚拟环境
 
 健康检查：
 
@@ -97,7 +97,7 @@ make verify-deploy
 - 后端目录骨架
 - `.python-version` 与 `.nvmrc` 运行时版本锁定
 - `.env.example` 配置示例与启动期必填校验
-- `uv python install 3.14`、`uv sync --python 3.14 --frozen` 开发环境准备入口，以及等价的 `make setup` 便捷入口；本地 `make db-migrate`、`make verify`、`make run` 等命令内部统一通过 `uv run python` 执行
+- `uv python install 3.14`、`uv sync --python 3.14 --frozen` 开发环境准备入口，以及等价的 `make setup` 便捷入口；本地与部署侧 Python 执行入口现已统一为 `uv run`
 - `make collect-bing MARKET=en-US COUNT=1` Bing 手动采集入口
 - `make collect-nasa-apod MARKET=global` NASA APOD 手动采集入口
 - `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口，会按当天 UTC 日期为已启用来源生成 `queued` 的 `cron` 任务；Bing 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场各建一条任务，并把窗口起点按 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 回溯
@@ -413,7 +413,7 @@ sudoedit /etc/bingwall/bingwall.env
 ### 3. 初始化数据库并安装服务配置
 
 ```bash
-sudo -u bingwall bash -lc 'set -a && source /etc/bingwall/bingwall.env && set +a && cd /opt/bingwall/app && .venv/bin/python -m app.repositories.migrations'
+sudo -u bingwall bash -lc 'set -a && source /etc/bingwall/bingwall.env && set +a && cd /opt/bingwall/app && uv run --no-sync python -m app.repositories.migrations'
 sudo install -o root -g root -m 0644 /opt/bingwall/app/deploy/systemd/bingwall-api.service /etc/systemd/system/bingwall-api.service
 sudo install -o root -g root -m 0644 /opt/bingwall/app/deploy/systemd/bingwall.tmpfiles.conf /etc/tmpfiles.d/bingwall.conf
 sudo install -o root -g root -m 0644 /opt/bingwall/app/deploy/nginx/bingwall.conf /etc/nginx/sites-available/bingwall.conf

@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-03-29T15:22:18Z
+
+### 变更内容
+
+- 更新 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[deploy/cron/bingwall-cron](/home/ops/Projects/BingWall/deploy/cron/bingwall-cron)、[scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py)、[scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py)、[Makefile](/home/ops/Projects/BingWall/Makefile) 与对应测试，把生产部署、计划任务安装、部署验收和 `make install-cron` 入口统一收敛为 `uv` 运行口径
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，同步记录“整个项目执行入口切到 `uv`”后的当前状态、验证方式、影响范围和回滚说明
+
+### 变更原因
+
+- 你明确要求“整个项目都转变为 `uv`”，这不只是依赖安装要使用 `uv sync`，还包括开发、部署、计划任务和验收脚本的运行入口也要统一到 `uv`
+- 如果继续保留 `systemd`、`cron`、安装脚本或恢复命令里的 `.venv/bin/python`，项目仍会停留在“依赖管理是 `uv`，执行入口还是旧 `venv`”的混合状态
+- 因此这次继续按最小闭环收口：不改业务逻辑和依赖版本，只把剩余执行入口全部切到 `uv`
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T15:22:18Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖本地开发入口、生产 `systemd` 模板、`cron` 模板、`cron` 安装脚本、部署验收脚本、相关测试和说明文档
+- 现在开发与部署侧 Python 命令都统一通过 `uv` 执行；运行阶段统一采用 `uv run --no-sync python ...`
+- `cron` 模板不再渲染 `.venv/bin/python`，而是在安装时解析 `uv` 的绝对路径并写入计划任务，降低 `cron` 默认 `PATH` 过短导致找不到 `uv` 的风险
+
+### 验证步骤
+
+- 执行 `make lint`
+- 执行 `make typecheck`
+- 执行 `uv run python -m pytest tests/integration/test_install_cron.py tests/unit/test_deploy_templates.py`
+- 执行 `bash -n scripts/dev/run-api.sh`
+- 执行 `uv run python scripts/install_cron.py --help`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [Makefile](/home/ops/Projects/BingWall/Makefile)、[deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[deploy/cron/bingwall-cron](/home/ops/Projects/BingWall/deploy/cron/bingwall-cron)、[scripts/install_cron.py](/home/ops/Projects/BingWall/scripts/install_cron.py)、[scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 和相关文档测试文件中的本次修改
+- 回滚后，项目会重新回到“`uv` 负责依赖同步，但生产和计划任务入口仍直接调用 `.venv/bin/python`”的混合状态
+
 ## 2026-03-29T15:15:38Z
 
 ### 变更内容

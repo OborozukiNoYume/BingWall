@@ -19,6 +19,8 @@ def test_systemd_service_uses_managed_env_and_restart_policy() -> None:
     content = (REPO_ROOT / "deploy/systemd/bingwall-api.service").read_text(encoding="utf-8")
 
     assert "EnvironmentFile=/etc/bingwall/bingwall.env" in content
+    assert "Environment=PATH=/usr/local/bin:/usr/bin:/bin" in content
+    assert "ExecStart=/usr/bin/env uv run --no-sync python -m uvicorn" in content
     assert "WorkingDirectory=/opt/bingwall/app" in content
     assert "SupplementaryGroups=www-data" in content
     assert "Restart=on-failure" in content
