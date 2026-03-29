@@ -1,5 +1,41 @@
 # CHANGELOG
 
+## 2026-03-29T19:47:19Z
+
+### 变更内容
+
+- 在 `dev` 分支合并 `origin/main`，解决 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的合并冲突
+- 保留 `dev` 上已落地的 `GH_PR_TOKEN` Secret 注入方案与对应文档说明，同时吸收 `main` 的最新提交历史，恢复 `dev -> main` PR 的可合并基础
+
+### 变更原因
+
+- 你明确要求继续推进 `dev -> main` 合并，但 GitHub 已提示当前 PR 存在必须先解决的冲突
+- 本次采用最保守路径，只在 `dev` 上吸收 `main` 并处理冲突，不直接改写 `main` 历史，不扩大到业务代码或依赖变更
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-03-29T19:47:19Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 GitHub 工作流与项目文档的合并冲突整理
+- 仓库业务代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
+- 推送本次 `dev` 更新后，现有 `dev -> main` PR 应可重新进入正常校验和人工合并流程
+
+### 验证步骤
+
+- 执行 `rg -n "^(<<<<<<<|=======|>>>>>>>)" .github/workflows/auto-create-pr.yml README.md PROJECT_STATE.md CHANGELOG.md`
+- 执行 `make verify`
+- 执行 `git status --short`
+
+### 回滚说明
+
+- 如需回滚本次变更，可回退本次合并提交，或把上述 4 个文件恢复到合并前版本后重新整理冲突
+- 回滚后，`dev -> main` PR 会重新回到 GitHub 提示“必须先解决冲突”的状态
+
 ## 2026-03-29T19:09:38Z
 
 ### 变更内容
@@ -36,7 +72,6 @@
 
 - 如需回滚本次变更，可恢复 [.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
 - 回滚后，自动建 PR 工作流将重新只依赖默认 `GITHUB_TOKEN`，不再预留独立 `GH_PR_TOKEN` Secret 注入入口
-
 ## 2026-03-29T18:44:40Z
 
 ### 变更内容
@@ -116,7 +151,6 @@
 
 - 如需回滚本次变更，可删除 [.github/workflows/ci.yml](/home/ops/Projects/BingWall/.github/workflows/ci.yml)、[.github/workflows/auto-create-pr.yml](/home/ops/Projects/BingWall/.github/workflows/auto-create-pr.yml) 与 [scripts/github/apply_main_branch_protection.sh](/home/ops/Projects/BingWall/scripts/github/apply_main_branch_protection.sh)，并恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
 - 回滚后，仓库会恢复到“推送 `dev` 不自动校验、不自动建 PR、`main` 保护规则不随仓库维护”的状态
-
 ## 2026-03-29T16:10:07Z
 
 ### 变更内容
@@ -463,7 +497,6 @@
 
 - 如需回滚本次变更，可将 [.python-version](.python-version) 恢复为 `3.14.2`，并将 [pyproject.toml](pyproject.toml) 中的 `requires-python` 恢复为 `==3.14.2`
 - 回滚后，项目环境准备会重新要求精确使用 `Python 3.14.2`
-
 ## 2026-03-29T07:58:59Z
 
 ### 变更内容
