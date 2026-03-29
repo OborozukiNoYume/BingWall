@@ -1,0 +1,80 @@
+name: Auto Create PR
+
+on:
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: auto-create-pr-dev-to-main
+  cancel-in-progress: false
+
+jobs:
+  create_pull_request:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'dev'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Create dev to main pull request when needed
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const base = "main";
+            const head = "dev";
+
+            const { data: comparison } = await github.rest.repos.compareCommitsWithBasehead({
+              owner,
+              repo,
+              basehead: `${base}...${head}`,
+            });
+
+            if ((comparison.ahead_by ?? 0) < 1) {
+              core.info(`Skip: ${head} is not ahead of ${base}.`);
+              return;
+            }
+
+            const { data: openPullRequests } = await github.rest.pulls.list({
+              owner,
+              repo,
+              state: "open",
+              base,
+              head: `${owner}:${head}`,
+              per_page: 100,
+            });
+
+            if (openPullRequests.length > 0) {
+              core.info(`Skip: open PR already exists: #${openPullRequests[0].number}.`);
+              return;
+            }
+
+            const body = [
+              "## 自动创建说明",
+              "",
+              "- 触发来源：`dev` 分支 CI 成功",
+              "- 目标分支：`main`",
+              "- 合并前仍需人工 Review，并确认所有必需检查为绿色",
+            ].join("\n");
+
+            const { data: pullRequest } = await github.rest.pulls.create({
+              owner,
+              repo,
+              title: "chore: merge dev into main",
+              head,
+              base,
+              body,
+              maintainer_can_modify: true,
+            });
+
+            core.info(`Created PR #${pullRequest.number}: ${pullRequest.html_url}`);
