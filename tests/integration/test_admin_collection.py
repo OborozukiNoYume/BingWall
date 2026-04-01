@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from datetime import UTC
+from datetime import datetime
+from datetime import timedelta
 import json
 from pathlib import Path
 import sqlite3
@@ -21,7 +24,13 @@ from tests.integration.test_bing_collection_service import make_metadata
 from app.services.source_collection import SourceCollectionService
 
 
+def iso_utc_days_ago(days: int) -> str:
+    return (datetime.now(tz=UTC).date() - timedelta(days=days)).isoformat()
+
+
 def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
+    date_from = iso_utc_days_ago(2)
+    date_to = iso_utc_days_ago(1)
     database_path = prepare_database(tmp_path)
     seed_admin_user(
         database_path=database_path,
@@ -37,8 +46,8 @@ def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
             json={
                 "source_type": "bing",
                 "market_code": "en-US",
-                "date_from": "2026-03-23",
-                "date_to": "2026-03-24",
+                "date_from": date_from,
+                "date_to": date_to,
                 "force_refresh": False,
             },
         )
@@ -61,14 +70,14 @@ def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
     assert list_response.status_code == 200
     assert list_payload["pagination"]["total"] == 1
     assert list_payload["data"]["items"][0]["market_code"] == "en-US"
-    assert list_payload["data"]["items"][0]["date_from"] == "2026-03-23"
-    assert list_payload["data"]["items"][0]["date_to"] == "2026-03-24"
+    assert list_payload["data"]["items"][0]["date_from"] == date_from
+    assert list_payload["data"]["items"][0]["date_to"] == date_to
     assert detail_response.status_code == 200
     assert detail_payload["data"]["request_snapshot"] == {
         "source_type": "bing",
         "market_code": "en-US",
-        "date_from": "2026-03-23",
-        "date_to": "2026-03-24",
+        "date_from": date_from,
+        "date_to": date_to,
         "backtrack_days": None,
         "force_refresh": False,
         "count": None,
@@ -112,6 +121,7 @@ def test_admin_collection_task_create_and_list_detail(tmp_path: Path) -> None:
 
 
 def test_admin_collection_task_can_be_consumed_manually(tmp_path: Path, monkeypatch: Any) -> None:
+    collection_date = iso_utc_days_ago(1)
     database_path = prepare_database(tmp_path)
     seed_admin_user(
         database_path=database_path,
@@ -122,8 +132,8 @@ def test_admin_collection_task_can_be_consumed_manually(tmp_path: Path, monkeypa
     metadata = [
         make_metadata(
             market_code="en-US",
-            wallpaper_date="2026-03-24",
-            source_key="bing:en-US:2026-03-24:OHR.Today",
+            wallpaper_date=collection_date,
+            source_key=f"bing:en-US:{collection_date}:OHR.Today",
             source_url="https://www.bing.com/th?id=OHR.Today_1920x1080.jpg",
         )
     ]
@@ -147,8 +157,8 @@ def test_admin_collection_task_can_be_consumed_manually(tmp_path: Path, monkeypa
             json={
                 "source_type": "bing",
                 "market_code": "en-US",
-                "date_from": "2026-03-24",
-                "date_to": "2026-03-24",
+                "date_from": collection_date,
+                "date_to": collection_date,
                 "force_refresh": False,
             },
         )
@@ -233,6 +243,8 @@ def test_admin_collection_task_manual_consume_rejects_non_queued_status(tmp_path
 
 
 def test_manual_collection_consumer_updates_task_detail_and_logs(tmp_path: Path) -> None:
+    date_from = iso_utc_days_ago(2)
+    date_to = iso_utc_days_ago(1)
     database_path = prepare_database(tmp_path)
     seed_admin_user(
         database_path=database_path,
@@ -248,8 +260,8 @@ def test_manual_collection_consumer_updates_task_detail_and_logs(tmp_path: Path)
             json={
                 "source_type": "bing",
                 "market_code": "en-US",
-                "date_from": "2026-03-23",
-                "date_to": "2026-03-24",
+                "date_from": date_from,
+                "date_to": date_to,
                 "force_refresh": False,
             },
         )
@@ -261,14 +273,14 @@ def test_manual_collection_consumer_updates_task_detail_and_logs(tmp_path: Path)
         metadata=[
             make_metadata(
                 market_code="en-US",
-                wallpaper_date="2026-03-24",
-                source_key="bing:en-US:2026-03-24:OHR.Today",
+                wallpaper_date=date_to,
+                source_key=f"bing:en-US:{date_to}:OHR.Today",
                 source_url="https://www.bing.com/th?id=OHR.Today_1920x1080.jpg",
             ),
             make_metadata(
                 market_code="en-US",
-                wallpaper_date="2026-03-23",
-                source_key="bing:en-US:2026-03-23:OHR.Yesterday",
+                wallpaper_date=date_from,
+                source_key=f"bing:en-US:{date_from}:OHR.Yesterday",
                 source_url="https://www.bing.com/th?id=OHR.Yesterday_1920x1080.jpg",
             ),
         ],
@@ -385,6 +397,7 @@ def test_admin_collection_retry_and_logs_query(tmp_path: Path) -> None:
 
 
 def test_manual_collection_consumer_supports_nasa_apod_tasks(tmp_path: Path) -> None:
+    collection_date = iso_utc_days_ago(1)
     database_path = prepare_database(tmp_path)
     seed_admin_user(
         database_path=database_path,
@@ -400,8 +413,8 @@ def test_manual_collection_consumer_supports_nasa_apod_tasks(tmp_path: Path) -> 
             json={
                 "source_type": "nasa_apod",
                 "market_code": "global",
-                "date_from": "2026-03-24",
-                "date_to": "2026-03-24",
+                "date_from": collection_date,
+                "date_to": collection_date,
                 "force_refresh": False,
             },
         )
@@ -412,8 +425,8 @@ def test_manual_collection_consumer_supports_nasa_apod_tasks(tmp_path: Path) -> 
         source_type="nasa_apod",
         metadata=[
             make_nasa_metadata(
-                wallpaper_date="2026-03-24",
-                source_key="nasa_apod:global:2026-03-24:moonrise",
+                wallpaper_date=collection_date,
+                source_key=f"nasa_apod:global:{collection_date}:moonrise",
                 source_url="https://apod.nasa.gov/apod/image/2603/moonrise.jpg",
             )
         ],
@@ -606,6 +619,8 @@ def test_manual_collection_consumer_keeps_manual_date_matching_strict(tmp_path: 
 
 
 def test_admin_collection_task_create_rejects_out_of_window_date_range(tmp_path: Path) -> None:
+    date_from = iso_utc_days_ago(10)
+    date_to = iso_utc_days_ago(1)
     database_path = prepare_database(tmp_path)
     seed_admin_user(
         database_path=database_path,
@@ -621,8 +636,8 @@ def test_admin_collection_task_create_rejects_out_of_window_date_range(tmp_path:
             json={
                 "source_type": "bing",
                 "market_code": "en-US",
-                "date_from": "2026-03-10",
-                "date_to": "2026-03-24",
+                "date_from": date_from,
+                "date_to": date_to,
                 "force_refresh": False,
             },
         )
