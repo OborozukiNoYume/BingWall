@@ -169,3 +169,7 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Local AI assistant skill/config directories
+.claude/
+.codex/
