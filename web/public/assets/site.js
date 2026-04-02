@@ -35,8 +35,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 async function loadSiteInfo() {
   try {
     const data = await fetchEnvelope("/api/public/site-info");
-    const nameNodes = document.querySelectorAll(".site-name, .brand-mark");
-    const descriptionNodes = document.querySelectorAll(".site-description");
+    const nameNodes = document.querySelectorAll("[data-site-name], [data-brand-mark]");
+    const descriptionNodes = document.querySelectorAll("[data-site-description]");
     document.title = document.title.replace("BingWall", data.site_name);
     nameNodes.forEach((node) => {
       node.textContent = data.site_name;
@@ -45,7 +45,7 @@ async function loadSiteInfo() {
       node.textContent = data.site_description;
     });
   } catch {
-    const descriptionNode = document.querySelector(".site-description");
+    const descriptionNode = document.querySelector("[data-site-description]");
     if (descriptionNode instanceof HTMLElement) {
       descriptionNode.textContent = "公开站点说明暂时不可用，请稍后重试。";
     }
@@ -70,14 +70,14 @@ async function renderHomePage() {
     }
 
     appRoot.innerHTML = `
-      <div class="section-head">
+      <div class="flex items-baseline justify-between gap-4 mb-5">
         <div>
-          <h2>最新壁纸</h2>
-          <p class="meta-note">首页默认展示最新 6 项公开内容。</p>
+          <h2 class="text-lg font-bold">最新壁纸</h2>
+          <p class="text-sm text-stone-500">首页默认展示最新 6 项公开内容。</p>
         </div>
-        <a class="button-link" href="/wallpapers">查看完整列表</a>
+        <a class="text-sm text-amber-600 hover:underline" href="/wallpapers">查看完整列表</a>
       </div>
-      <section class="card-grid">${items.map(renderWallpaperCard).join("")}</section>
+      <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">${items.map(renderWallpaperCard).join("")}</section>
     `;
   } catch (error) {
     setServiceBusyState(error);
@@ -108,27 +108,27 @@ async function renderDetailPage(id) {
   try {
     const detail = await fetchEnvelope(`/api/public/wallpapers/${encodeURIComponent(id)}`);
     const downloadBlock = detail.is_downloadable
-      ? `<a class="button" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer" data-download-wallpaper-id="${escapeHtml(detail.id)}" data-download-channel="public_detail">下载原图</a>`
-      : `<button class="button-secondary" type="button" disabled>当前不可下载</button>`;
+      ? `<a class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer no-underline" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer" data-download-wallpaper-id="${escapeHtml(detail.id)}" data-download-channel="public_detail">下载原图</a>`
+      : `<button class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer opacity-50" type="button" disabled>当前不可下载</button>`;
 
     appRoot.innerHTML = `
-      <div class="detail-layout">
-        <section class="detail-media">
-          <div class="detail-preview">
-            <img src="${escapeHtml(detail.preview_url)}" alt="${escapeHtml(detail.title)}" />
+      <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)] gap-5">
+        <section>
+          <div class="overflow-hidden border border-stone-200/60 rounded-2xl bg-stone-100 min-h-[320px] shadow-sm">
+            <img src="${escapeHtml(detail.preview_url)}" alt="${escapeHtml(detail.title)}" class="w-full" />
           </div>
-          <div class="button-row">
+          <div class="flex flex-wrap gap-3 mt-4">
             ${downloadBlock}
-            <a class="button-secondary" href="/wallpapers">返回列表</a>
+            <a class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer no-underline text-stone-600 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]" href="/wallpapers">返回列表</a>
           </div>
         </section>
-        <aside class="detail-meta">
-          <div class="status-card">
-            <p class="eyebrow">壁纸详情</p>
-            <h2>${escapeHtml(detail.title)}</h2>
-            <p class="detail-copy">${escapeHtml(detail.description || "当前没有补充说明。")}</p>
+        <aside>
+          <div class="border border-stone-200/60 rounded-2xl bg-stone-50 p-5 grid gap-3 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-widest text-amber-600">壁纸详情</p>
+            <h2 class="text-lg font-bold">${escapeHtml(detail.title)}</h2>
+            <p class="text-sm text-stone-600">${escapeHtml(detail.description || "当前没有补充说明。")}</p>
           </div>
-          <div class="meta-list">
+          <div class="grid gap-0 mt-4">
             ${renderMetaItem("版权信息", detail.copyright_text || "未提供")}
             ${renderMetaItem("发布日期", detail.wallpaper_date)}
             ${renderMetaItem("地区", detail.market_code)}
@@ -204,90 +204,90 @@ function renderListView({ filters, listPayload, state }) {
   };
 
   appRoot.innerHTML = `
-    <section class="market-spotlight-panel" aria-labelledby="market-spotlight-heading">
-      <div class="section-head">
+    <section class="mb-6" aria-labelledby="market-spotlight-heading">
+      <div class="flex items-baseline justify-between gap-4 mb-3">
         <div>
-          <h2 id="market-spotlight-heading">按市场查看最新壁纸</h2>
-          <p class="meta-note">固定支持 ${MARKET_SPOTLIGHT_OPTIONS.map((option) => escapeHtml(option.code)).join(" / ")}，单独调用公开单条接口，不影响下方分页列表。</p>
+          <h2 id="market-spotlight-heading" class="text-lg font-bold">按市场查看最新壁纸</h2>
+          <p class="text-sm text-stone-500">固定支持 ${MARKET_SPOTLIGHT_OPTIONS.map((option) => escapeHtml(option.code)).join(" / ")}，单独调用公开单条接口，不影响下方分页列表。</p>
         </div>
       </div>
-      <form class="market-spotlight-form" id="market-spotlight-form">
-        <div class="field">
-          <label for="market-spotlight-code">市场</label>
-          <select id="market-spotlight-code" name="market_spotlight_code">
+      <form class="grid gap-3" id="market-spotlight-form">
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="market-spotlight-code">市场</label>
+          <select id="market-spotlight-code" name="market_spotlight_code" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
             ${MARKET_SPOTLIGHT_OPTIONS.map(
               (option) => `<option value="${escapeHtml(option.code)}" ${selectedMarketSpotlightCode === option.code ? "selected" : ""}>${escapeHtml(option.code)} | ${escapeHtml(option.label)}</option>`,
             ).join("")}
           </select>
         </div>
       </form>
-      <div class="market-spotlight-result" id="market-spotlight-result" aria-live="polite"></div>
+      <div id="market-spotlight-result" aria-live="polite" class="mt-3"></div>
     </section>
-    <section class="date-lookup-panel" aria-labelledby="date-lookup-heading">
-      <div class="section-head">
+    <section class="mb-6" aria-labelledby="date-lookup-heading">
+      <div class="flex items-baseline justify-between gap-4 mb-3">
         <div>
-          <h2 id="date-lookup-heading">按日期查找壁纸</h2>
-          <p class="meta-note">选择一个 <code>YYYY-MM-DD</code> 日期，单独调用公开单条接口查找当天对应的公开壁纸，不影响下方分页列表。</p>
+          <h2 id="date-lookup-heading" class="text-lg font-bold">按日期查找壁纸</h2>
+          <p class="text-sm text-stone-500">选择一个 <code class="font-mono text-xs bg-stone-100 px-1 rounded">YYYY-MM-DD</code> 日期，单独调用公开单条接口查找当天对应的公开壁纸，不影响下方分页列表。</p>
         </div>
       </div>
-      <form class="date-lookup-form" id="date-lookup-form">
-        <div class="field">
-          <label for="date-lookup-input">日期</label>
-          <input id="date-lookup-input" name="date_lookup" type="date" value="${escapeHtml(selectedLookupDate)}" />
+      <form class="grid gap-3" id="date-lookup-form">
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="date-lookup-input">日期</label>
+          <input id="date-lookup-input" name="date_lookup" type="date" value="${escapeHtml(selectedLookupDate)}" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
         </div>
-        <div class="button-row">
-          <button class="button" type="submit">查找壁纸</button>
+        <div class="flex flex-wrap gap-3">
+          <button class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer border-0" type="submit">查找壁纸</button>
         </div>
       </form>
-      <div class="date-lookup-result" id="date-lookup-result" aria-live="polite"></div>
+      <div id="date-lookup-result" aria-live="polite" class="mt-3"></div>
     </section>
-    <div class="section-head">
+    <div class="flex items-baseline justify-between gap-4 mb-4">
       <div>
-        <h2>筛选公开壁纸</h2>
-        <p class="meta-note">只显示已启用、允许公开、资源已就绪且处于发布时间窗口内的内容。</p>
+        <h2 class="text-lg font-bold">筛选公开壁纸</h2>
+        <p class="text-sm text-stone-500">只显示已启用、允许公开、资源已就绪且处于发布时间窗口内的内容。</p>
       </div>
-      <p class="pagination-note">第 ${page} 页 / 共 ${totalPages || 1} 页</p>
+      <p class="text-sm text-stone-500">第 ${page} 页 / 共 ${totalPages || 1} 页</p>
     </div>
-    <form class="filter-form" id="wallpaper-filter-form">
-      <div class="filter-grid">
-        <div class="field">
-          <label for="keyword">关键词</label>
-          <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" />
+    <form class="grid gap-4 mb-5" id="wallpaper-filter-form">
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="keyword">关键词</label>
+          <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
         </div>
-        <div class="field">
-          <label for="market-code">地区</label>
-          <select id="market-code" name="market_code">
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="market-code">地区</label>
+          <select id="market-code" name="market_code" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
             <option value="">全部地区</option>
             ${markets.map((market) => `<option value="${escapeHtml(market.code)}">${escapeHtml(market.label)}</option>`).join("")}
           </select>
         </div>
-        <div class="field">
-          <label for="resolution-min-width">最小宽度</label>
-          <input id="resolution-min-width" name="resolution_min_width" type="number" min="1" placeholder="例如 1920" />
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="resolution-min-width">最小宽度</label>
+          <input id="resolution-min-width" name="resolution_min_width" type="number" min="1" placeholder="例如 1920" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
         </div>
-        <div class="field">
-          <label for="resolution-min-height">最小高度</label>
-          <input id="resolution-min-height" name="resolution_min_height" type="number" min="1" placeholder="例如 1080" />
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="resolution-min-height">最小高度</label>
+          <input id="resolution-min-height" name="resolution_min_height" type="number" min="1" placeholder="例如 1080" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
         </div>
-        <div class="field">
-          <label for="page-size">每页数量</label>
-          <select id="page-size" name="page_size">
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="page-size">每页数量</label>
+          <select id="page-size" name="page_size" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
             <option value="12">12</option>
             <option value="20">20</option>
             <option value="40">40</option>
           </select>
         </div>
       </div>
-      <div class="field">
-        <label>标签</label>
+      <div class="grid gap-1">
+        <label class="text-sm font-medium">标签</label>
         ${
           tags.length === 0
-            ? `<div class="status-card"><p class="status-copy">当前没有可公开筛选的标签。</p></div>`
-            : `<div class="tag-filter-grid">
+            ? `<div class="border border-stone-200 rounded-xl bg-stone-50 p-4 text-sm text-stone-500">当前没有可公开筛选的标签。</div>`
+            : `<div class="flex flex-wrap gap-2">
                 ${tags
                   .map(
                     (tag) => `
-                      <label class="tag-filter-chip">
+                      <label class="inline-flex items-center gap-2 border border-stone-200 rounded-full bg-white px-3 py-2 cursor-pointer text-sm hover:bg-stone-50 hover:border-stone-300 transition-colors duration-150">
                         <input type="checkbox" name="tag_keys" value="${escapeHtml(tag.tag_key)}" ${selectedTagKeys.includes(tag.tag_key) ? "checked" : ""} />
                         <span>${escapeHtml(tag.tag_name)}</span>
                       </label>
@@ -297,13 +297,13 @@ function renderListView({ filters, listPayload, state }) {
               </div>`
         }
       </div>
-      <div class="button-row">
-        <button class="button" type="submit">刷新结果</button>
-        <button class="button-secondary" id="reset-filters" type="button">重置筛选</button>
+      <div class="flex flex-wrap gap-3">
+        <button class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer border-0" type="submit">刷新结果</button>
+        <button class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer text-stone-600 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]" id="reset-filters" type="button">重置筛选</button>
       </div>
     </form>
     <section id="wallpaper-list-results"></section>
-    <nav class="pagination" id="wallpaper-pagination" aria-label="分页导航"></nav>
+    <nav class="flex flex-wrap gap-3 mt-4" id="wallpaper-pagination" aria-label="分页导航"></nav>
   `;
 
   const filterForm = document.querySelector("#wallpaper-filter-form");
@@ -363,7 +363,7 @@ function renderListView({ filters, listPayload, state }) {
       actionLabel: "返回首页",
     });
   } else {
-    resultsNode.innerHTML = `<section class="card-grid">${items.map(renderWallpaperCard).join("")}</section>`;
+    resultsNode.innerHTML = `<section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">${items.map(renderWallpaperCard).join("")}</section>`;
   }
 
   paginationNode.innerHTML = renderPagination(page, totalPages, state);
@@ -490,25 +490,25 @@ function renderDateLookupMarkup(detail) {
 function renderFeatureWallpaperMarkup(detail, eyebrow) {
   const downloadMarkup =
     detail.is_downloadable && detail.download_url
-      ? `<a class="button-secondary" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer">下载当前默认分辨率</a>`
-      : `<button class="button-secondary" type="button" disabled>当前不可下载</button>`;
+      ? `<a class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer no-underline text-stone-600 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer">下载当前默认分辨率</a>`
+      : `<button class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer opacity-50" type="button" disabled>当前不可下载</button>`;
 
   return `
-    <article class="market-spotlight-card">
-      <a class="market-spotlight-media" href="/wallpapers/${escapeHtml(detail.id)}">
-        <img src="${escapeHtml(detail.preview_url)}" alt="${escapeHtml(detail.title)}" loading="lazy" />
+    <article class="grid grid-cols-1 md:grid-cols-[minmax(280px,1.2fr)_minmax(0,1fr)] gap-4 border border-stone-200/60 rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md transition-shadow duration-200">
+      <a class="block aspect-[16/10] bg-stone-100 overflow-hidden" href="/wallpapers/${escapeHtml(detail.id)}">
+        <img src="${escapeHtml(detail.preview_url)}" alt="${escapeHtml(detail.title)}" loading="lazy" class="w-full h-full object-cover" />
       </a>
-      <div class="market-spotlight-body">
-        <p class="eyebrow">${escapeHtml(eyebrow)}</p>
-        <h3><a href="/wallpapers/${escapeHtml(detail.id)}">${escapeHtml(detail.title)}</a></h3>
-        <p class="detail-copy">${escapeHtml(detail.description || detail.subtitle || "当前没有补充说明。")}</p>
-        <div class="wallpaper-meta">
-          <span>${escapeHtml(detail.market_code)}</span>
-          <span>${escapeHtml(detail.wallpaper_date)}</span>
-          <span>${escapeHtml(formatResolution(detail.width, detail.height))}</span>
+      <div class="grid gap-3 p-5 content-start">
+        <p class="text-xs font-semibold uppercase tracking-widest text-amber-600">${escapeHtml(eyebrow)}</p>
+        <h3 class="font-bold"><a href="/wallpapers/${escapeHtml(detail.id)}" class="hover:text-amber-600 no-underline">${escapeHtml(detail.title)}</a></h3>
+        <p class="text-sm text-stone-600">${escapeHtml(detail.description || detail.subtitle || "当前没有补充说明。")}</p>
+        <div class="flex flex-wrap gap-2 text-sm text-stone-500">
+          <span class="bg-stone-100 rounded-full px-2.5 py-0.5 text-xs">${escapeHtml(detail.market_code)}</span>
+          <span class="bg-stone-100 rounded-full px-2.5 py-0.5 text-xs">${escapeHtml(detail.wallpaper_date)}</span>
+          <span class="bg-stone-100 rounded-full px-2.5 py-0.5 text-xs">${escapeHtml(formatResolution(detail.width, detail.height))}</span>
         </div>
-        <div class="button-row">
-          <a class="button" href="/wallpapers/${escapeHtml(detail.id)}">查看详情</a>
+        <div class="flex flex-wrap gap-3">
+          <a class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer no-underline" href="/wallpapers/${escapeHtml(detail.id)}">查看详情</a>
           ${downloadMarkup}
         </div>
       </div>
@@ -518,16 +518,16 @@ function renderFeatureWallpaperMarkup(detail, eyebrow) {
 
 function renderWallpaperCard(item) {
   return `
-    <article class="wallpaper-card">
-      <a class="wallpaper-card-media" href="${escapeHtml(item.detail_url)}">
-        <img src="${escapeHtml(item.thumbnail_url)}" alt="${escapeHtml(item.title)}" loading="lazy" />
+    <article class="group grid gap-0 border border-stone-200/60 rounded-2xl overflow-hidden bg-white shadow-sm hover:shadow-md hover:-translate-y-0.5">
+      <a class="block aspect-[16/10] bg-stone-100 overflow-hidden" href="${escapeHtml(item.detail_url)}">
+        <img src="${escapeHtml(item.thumbnail_url)}" alt="${escapeHtml(item.title)}" loading="lazy" class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
       </a>
-      <div class="wallpaper-card-body">
-        <h3><a href="${escapeHtml(item.detail_url)}">${escapeHtml(item.title)}</a></h3>
-        <p class="detail-copy">${escapeHtml(item.subtitle || "当前没有补充副标题。")}</p>
-        <div class="wallpaper-meta">
-          <span>${escapeHtml(item.market_code)}</span>
-          <span>${escapeHtml(item.wallpaper_date)}</span>
+      <div class="grid gap-2 p-4">
+        <h3 class="font-bold text-sm"><a href="${escapeHtml(item.detail_url)}" class="hover:text-amber-600 no-underline">${escapeHtml(item.title)}</a></h3>
+        <p class="text-sm text-stone-500">${escapeHtml(item.subtitle || "当前没有补充副标题。")}</p>
+        <div class="flex flex-wrap gap-2 text-stone-500">
+          <span class="bg-stone-100 rounded-full px-2.5 py-0.5 text-xs">${escapeHtml(item.market_code)}</span>
+          <span class="bg-stone-100 rounded-full px-2.5 py-0.5 text-xs">${escapeHtml(item.wallpaper_date)}</span>
         </div>
       </div>
     </article>
@@ -536,9 +536,9 @@ function renderWallpaperCard(item) {
 
 function renderMetaItem(label, value) {
   return `
-    <div class="meta-item">
-      <strong>${escapeHtml(label)}</strong>
-      <p>${escapeHtml(value)}</p>
+    <div class="border-t border-stone-100 py-3 px-1 grid gap-0.5">
+      <strong class="text-sm">${escapeHtml(label)}</strong>
+      <p class="text-sm text-stone-600">${escapeHtml(value)}</p>
     </div>
   `;
 }
@@ -553,11 +553,11 @@ function renderPagination(currentPage, totalPages, state) {
   const links = [];
 
   if (prevPage) {
-    links.push(`<a class="button-secondary" href="${buildListHref({ ...state, page: String(prevPage) })}" data-page-target="${prevPage}">上一页</a>`);
+    links.push(`<a class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer no-underline text-stone-600 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]" href="${buildListHref({ ...state, page: String(prevPage) })}" data-page-target="${prevPage}">上一页</a>`);
   }
 
   if (nextPage) {
-    links.push(`<a class="button-secondary" href="${buildListHref({ ...state, page: String(nextPage) })}" data-page-target="${nextPage}">下一页</a>`);
+    links.push(`<a class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer no-underline text-stone-600 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]" href="${buildListHref({ ...state, page: String(nextPage) })}" data-page-target="${nextPage}">下一页</a>`);
   }
 
   return links.join("");
@@ -721,13 +721,13 @@ function setServiceBusyState(error) {
 function renderStatusMarkup({ title, copy, actionHref, actionLabel }) {
   const actionMarkup =
     actionHref && actionLabel
-      ? `<div class="button-row"><a class="button-secondary" href="${escapeHtml(actionHref)}">${escapeHtml(actionLabel)}</a></div>`
+      ? `<div class="flex flex-wrap gap-3"><a class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer no-underline text-stone-600 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]" href="${escapeHtml(actionHref)}">${escapeHtml(actionLabel)}</a></div>`
       : "";
 
   return `
-    <div class="status-card">
-      <h2>${escapeHtml(title)}</h2>
-      <p class="status-copy">${escapeHtml(copy)}</p>
+    <div class="border border-stone-200/60 rounded-2xl bg-stone-50 p-5 grid gap-3 shadow-sm">
+      <h2 class="font-semibold">${escapeHtml(title)}</h2>
+      <p class="text-sm text-stone-600">${escapeHtml(copy)}</p>
       ${actionMarkup}
     </div>
   `;

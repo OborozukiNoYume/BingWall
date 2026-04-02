@@ -175,16 +175,16 @@ def render_public_page(
     home_api_shortcuts = ""
     if page_name == "home":
         home_api_shortcuts = """
-          <div class="api-shortcuts" aria-label="公开接口快捷入口">
-            <article class="api-shortcut-card">
-              <p class="api-shortcut-label">今日壁纸 API</p>
-              <code>/api/public/wallpapers/today</code>
-              <a class="button-link" href="/api/public/wallpapers/today" target="_blank" rel="noreferrer">查看接口返回</a>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-6" aria-label="公开接口快捷入口">
+            <article class="grid gap-2 border border-stone-200/60 rounded-xl bg-white p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+              <p class="text-xs font-semibold uppercase tracking-widest text-amber-600">今日壁纸 API</p>
+              <code class="text-sm font-mono text-stone-600">/api/public/wallpapers/today</code>
+              <a class="text-sm text-amber-600 hover:underline" href="/api/public/wallpapers/today" target="_blank" rel="noreferrer">查看接口返回</a>
             </article>
-            <article class="api-shortcut-card">
-              <p class="api-shortcut-label">随机壁纸 API</p>
-              <code>/api/public/wallpapers/random</code>
-              <a class="button-link" href="/api/public/wallpapers/random" target="_blank" rel="noreferrer">查看接口返回</a>
+            <article class="grid gap-2 border border-stone-200/60 rounded-xl bg-white p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+              <p class="text-xs font-semibold uppercase tracking-widest text-amber-600">随机壁纸 API</p>
+              <code class="text-sm font-mono text-stone-600">/api/public/wallpapers/random</code>
+              <a class="text-sm text-amber-600 hover:underline" href="/api/public/wallpapers/random" target="_blank" rel="noreferrer">查看接口返回</a>
             </article>
           </div>
         """
@@ -197,36 +197,36 @@ def render_public_page(
     <link rel="stylesheet" href="/assets/site.css" />
   </head>
   <body data-page="{page_name}"{wallpaper_id_attr}>
-    <div class="page-shell">
-      <header class="masthead">
-        <a class="brand-mark" href="/">BingWall</a>
-        <nav class="primary-nav" aria-label="公开导航">
-          <a href="/">首页</a>
-          <a href="/wallpapers">壁纸列表</a>
+    <div class="max-w-[1180px] mx-auto px-4 pt-6 pb-12">
+      <header class="flex items-center justify-between gap-4 bg-white border border-stone-200/60 rounded-2xl px-5 py-4 mb-5 shadow-sm">
+        <a class="text-xl font-bold tracking-wider no-underline hover:opacity-80" href="/" data-brand-mark>BingWall</a>
+        <nav class="flex gap-4 flex-wrap" aria-label="公开导航">
+          <a class="text-sm font-medium text-stone-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/">首页</a>
+          <a class="text-sm font-medium text-stone-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/wallpapers">壁纸列表</a>
         </nav>
       </header>
-      <main class="page-main">
-        <section class="hero-panel">
-          <p class="eyebrow">公开前端</p>
-          <h1>{page_heading}</h1>
-          <p class="hero-copy">{page_summary}</p>
-          <div class="site-copy" data-site-copy>
-            <p class="site-name">BingWall</p>
-            <p class="site-description">正在加载站点说明...</p>
+      <main class="grid gap-5">
+        <section class="bg-white border border-stone-200/60 rounded-2xl p-7 shadow-sm">
+          <p class="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-600">公开前端</p>
+          <h1 class="text-2xl font-bold">{page_heading}</h1>
+          <p class="mt-2 text-stone-600">{page_summary}</p>
+          <div class="mt-4 text-sm text-stone-500" data-site-copy>
+            <p class="font-semibold" data-site-name>BingWall</p>
+            <p data-site-description>正在加载站点说明...</p>
           </div>
 {home_api_shortcuts}
         </section>
-        <section class="content-panel" id="app-root" aria-live="polite">
+        <section class="bg-white border border-stone-200/60 rounded-2xl p-7 shadow-sm min-h-[420px]" id="app-root" aria-live="polite">
           <noscript>
-            <div class="status-card status-card-warning">
-              <h2>需要启用 JavaScript</h2>
-              <p>当前公开前端通过公开 API 获取数据，请启用浏览器 JavaScript 后重试。</p>
+            <div class="border border-amber-300 rounded-xl bg-amber-50 p-4 shadow-sm">
+              <h2 class="font-semibold">需要启用 JavaScript</h2>
+              <p class="text-sm text-stone-600 mt-1">当前公开前端通过公开 API 获取数据，请启用浏览器 JavaScript 后重试。</p>
             </div>
           </noscript>
         </section>
       </main>
-      <footer class="site-footer">
-        <p>公开页面仅通过 <code>/api/public/*</code> 接口读取数据。</p>
+      <footer class="bg-white border border-stone-200/60 rounded-2xl mt-5 px-5 py-4 text-sm text-stone-500 shadow-sm">
+        <p>公开页面仅通过 <code class="font-mono text-xs">/api/public/*</code> 接口读取数据。</p>
       </footer>
     </div>
     <script type="module" src="/assets/site.js"></script>
@@ -256,38 +256,38 @@ def render_admin_page(
     <link rel="stylesheet" href="/admin-assets/admin.css" />
   </head>
   <body data-page="{page_name}"{wallpaper_id_attr}{task_id_attr}>
-    <div class="admin-shell">
-      <header class="admin-header">
+    <div class="max-w-[1240px] mx-auto px-4 pt-6 pb-12">
+      <header class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-slate-200/60 rounded-2xl px-6 py-5 mb-5 shadow-sm">
         <div>
-          <a class="admin-brand" href="/admin/wallpapers">BingWall Admin</a>
-          <p class="admin-caption">后台页面只通过 <code>/api/admin/*</code> 读取与修改数据。</p>
+          <a class="text-xl font-extrabold tracking-wider no-underline hover:opacity-80" href="/admin/wallpapers">BingWall Admin</a>
+          <p class="text-sm text-slate-500 mt-1">后台页面只通过 <code class="font-mono text-xs bg-slate-100 px-1 rounded">/api/admin/*</code> 读取与修改数据。</p>
         </div>
-        <nav class="admin-nav" aria-label="后台导航">
-          <a href="/admin/wallpapers">内容管理</a>
-          <a href="/admin/tags">标签管理</a>
-          <a href="/admin/change-password">修改密码</a>
-          <a href="/admin/tasks">采集任务</a>
-          <a href="/admin/download-stats">下载统计</a>
-          <a href="/admin/logs">结构化日志</a>
-          <a href="/admin/audit-logs">审计记录</a>
-          <a href="/admin/login">登录</a>
+        <nav class="flex flex-wrap gap-3" aria-label="后台导航">
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/wallpapers">内容管理</a>
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/tags">标签管理</a>
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/change-password">修改密码</a>
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/tasks">采集任务</a>
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/download-stats">下载统计</a>
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/logs">结构化日志</a>
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/audit-logs">审计记录</a>
+          <a class="text-sm font-medium text-slate-600 hover:text-amber-600 no-underline px-2 py-1 rounded-lg hover:bg-amber-50" href="/admin/login">登录</a>
         </nav>
       </header>
-      <main class="admin-main">
-        <section class="admin-hero">
-          <p class="admin-eyebrow">管理后台</p>
-          <h1>{page_heading}</h1>
-          <p class="admin-summary">{page_summary}</p>
-          <div class="admin-session-bar">
-            <p class="admin-session-copy" data-admin-session>正在检查后台会话...</p>
-            <button class="ghost-button" type="button" data-admin-logout>退出登录</button>
+      <main class="grid gap-5">
+        <section class="bg-white border border-slate-200/60 rounded-2xl p-7 shadow-sm">
+          <p class="mb-2 text-xs font-semibold uppercase tracking-widest text-amber-600">管理后台</p>
+          <h1 class="text-2xl font-bold">{page_heading}</h1>
+          <p class="mt-2 text-slate-500">{page_summary}</p>
+          <div class="flex items-center justify-between gap-3 mt-4">
+            <p class="text-sm text-slate-500" data-admin-session>正在检查后台会话...</p>
+            <button class="inline-flex items-center justify-center h-10 rounded-full border border-slate-200 bg-transparent px-4 cursor-pointer text-sm hover:bg-slate-50 hover:border-slate-300 active:scale-[0.98]" type="button" data-admin-logout>退出登录</button>
           </div>
         </section>
-        <section class="admin-panel" id="admin-root" aria-live="polite">
+        <section class="bg-white border border-slate-200/60 rounded-2xl p-7 shadow-sm min-h-[420px]" id="admin-root" aria-live="polite">
           <noscript>
-            <div class="notice-card notice-card-warning">
-              <h2>需要启用 JavaScript</h2>
-              <p>当前后台页面完全依赖后台 API，请启用浏览器 JavaScript 后重试。</p>
+            <div class="border border-orange-300 rounded-xl bg-orange-50 p-4 shadow-sm">
+              <h2 class="font-semibold">需要启用 JavaScript</h2>
+              <p class="text-sm text-slate-600 mt-1">当前后台页面完全依赖后台 API，请启用浏览器 JavaScript 后重试。</p>
             </div>
           </noscript>
         </section>

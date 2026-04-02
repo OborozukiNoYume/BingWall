@@ -173,3 +173,9 @@ __marimo__/
 # Local AI assistant skill/config directories
 .claude/
 .codex/
+
+# Node.js
+node_modules/
+
+# Local runtime data
+runtime/

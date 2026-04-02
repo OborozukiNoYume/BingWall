@@ -7,6 +7,64 @@ const sessionCopyNode = document.querySelector("[data-admin-session]");
 const logoutButton = document.querySelector("[data-admin-logout]");
 const SESSION_STORAGE_KEY = "bingwall_admin_session";
 
+// Tailwind design tokens
+const TW = {
+  panel: "border border-slate-200/60 rounded-2xl bg-slate-50 p-6 grid gap-5 shadow-sm",
+  card: "border border-slate-200/60 rounded-xl bg-slate-50 grid gap-4 p-6 shadow-sm",
+  cardWide: "col-span-full",
+  form: "grid gap-4",
+  filterGrid: "grid grid-cols-2 sm:grid-cols-3 gap-3",
+  field: "grid gap-1",
+  label: "text-sm font-medium",
+  input: "w-full border border-slate-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none",
+  primaryBtn: "inline-flex items-center justify-center h-10 rounded-full bg-slate-800 text-white px-5 text-sm cursor-pointer border-0 hover:bg-slate-700 hover:shadow-sm active:scale-[0.98]",
+  ghostBtn: "inline-flex items-center justify-center h-10 rounded-full border border-slate-200 bg-transparent px-4 text-sm cursor-pointer text-slate-600 hover:bg-slate-50 hover:border-slate-300 no-underline active:scale-[0.98]",
+  miniBtn: "inline-flex items-center justify-center h-8 rounded-full border border-slate-200 bg-transparent px-3 text-xs cursor-pointer hover:bg-slate-50 hover:border-slate-300 active:scale-[0.97]",
+  notice: "border border-slate-200/60 rounded-xl bg-slate-50 p-4 grid gap-1 shadow-sm",
+  noticeWarn: "border border-orange-300 bg-orange-50 p-4 grid gap-1 shadow-sm",
+  panelHead: "flex items-start justify-between gap-4 mb-5",
+  detailGrid: "grid grid-cols-1 lg:grid-cols-2 gap-4",
+  tableCard: "overflow-hidden border border-slate-200/60 rounded-xl mt-4 shadow-sm",
+  tableWrapper: "overflow-x-auto",
+  dataTable: "w-full border-collapse text-sm",
+  th: "border-b border-slate-200 bg-slate-100 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600",
+  td: "border-b border-slate-100 px-4 py-3 align-top hover:bg-slate-50/50",
+  btnRow: "flex flex-wrap gap-3",
+  metaPill: "inline-flex items-center h-7 rounded-full bg-slate-100 px-3 text-sm font-medium text-slate-600",
+  statusBadge: "inline-flex items-center rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700",
+  mutedInline: "text-sm text-slate-500",
+  stackedCopy: "grid gap-0.5",
+  tableTitle: "grid gap-0.5",
+  inlineLink: "text-sm text-amber-600 hover:underline",
+  statsGrid: "grid grid-cols-2 sm:grid-cols-3 gap-3 mt-4",
+  statsCard: "border border-slate-200/60 rounded-xl p-4 grid gap-1 bg-white text-center shadow-sm hover:shadow-md transition-shadow duration-200",
+  tagChipGrid: "grid grid-cols-2 gap-3",
+  tagChip: "flex items-start gap-2 border border-slate-200/60 rounded-xl bg-white p-3 shadow-sm hover:shadow-md hover:border-slate-300 transition-all duration-200",
+  checkboxRow: "inline-flex items-center gap-2 text-sm text-slate-600",
+  previewFrame: "grid place-items-center min-h-[260px] overflow-hidden border border-slate-200/60 rounded-xl bg-slate-100 shadow-sm",
+  emptyPreview: "text-sm text-slate-400",
+  eyebrow: "text-xs font-semibold uppercase tracking-widest text-amber-600 mb-2",
+  mutedCopy: "text-sm text-slate-500 mt-1",
+};
+
+function statusBadgeClasses(status) {
+  const base = "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold";
+  const map = {
+    enabled: "bg-emerald-50 text-emerald-700",
+    disabled: "bg-amber-50 text-amber-700",
+    deleted: "bg-rose-50 text-rose-700",
+    draft: "bg-slate-100 text-slate-600",
+    ready: "bg-emerald-50 text-emerald-700",
+    pending: "bg-amber-50 text-amber-700",
+    failed: "bg-rose-50 text-rose-700",
+    queued: "bg-blue-50 text-blue-700",
+    running: "bg-sky-50 text-sky-700",
+    succeeded: "bg-emerald-50 text-emerald-700",
+    partially_failed: "bg-orange-50 text-orange-700",
+  };
+  return `${base} ${map[status] || "bg-slate-100 text-slate-600"}`;
+}
+
 document.addEventListener("DOMContentLoaded", async () => {
   bindLogoutButton();
 
@@ -101,26 +159,26 @@ function bindLogoutButton() {
 
 function renderLoginPage() {
   adminRoot.innerHTML = `
-    <section class="auth-card">
+    <section class="${TW.panel}">
       <div>
-        <p class="admin-eyebrow">后台认证</p>
+        <p class="${TW.eyebrow}">后台认证</p>
         <h2>登录后再进行内容管理</h2>
-        <p class="muted-copy">登录成功后，浏览器只保存会话令牌；后台页面不会直接读取数据库文件。</p>
+        <p class="${TW.mutedCopy}">登录成功后，浏览器只保存会话令牌；后台页面不会直接读取数据库文件。</p>
       </div>
-      <form class="admin-form" id="admin-login-form">
-        <div class="field-group">
-          <label for="username">用户名</label>
-          <input id="username" name="username" type="text" autocomplete="username" required />
+      <form class="${TW.form}" id="admin-login-form">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="username">用户名</label>
+          <input class="${TW.input}" id="username" name="username" type="text" autocomplete="username" required />
         </div>
-        <div class="field-group">
-          <label for="password">密码</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="password">密码</label>
+          <input class="${TW.input}" id="password" name="password" type="password" autocomplete="current-password" required />
         </div>
-        <div class="button-row">
-          <button class="primary-button" type="submit">登录后台</button>
+        <div class="${TW.btnRow}">
+          <button class="${TW.primaryBtn}" type="submit">登录后台</button>
         </div>
       </form>
-      <div class="notice-card" id="login-feedback">
+      <div class="${TW.notice}" id="login-feedback">
         <h3>说明</h3>
         <p>默认通过 <code>/api/admin/auth/login</code> 创建会话。</p>
       </div>
@@ -158,16 +216,16 @@ function renderLoginPage() {
 
 function renderChangePasswordPage(session) {
   adminRoot.innerHTML = `
-    <section class="auth-card">
+    <section class="${TW.panel}">
       <div>
-        <p class="admin-eyebrow">账号安全</p>
+        <p class="${TW.eyebrow}">账号安全</p>
         <h2>修改后台密码</h2>
-        <p class="muted-copy">提交成功后，当前账号的后台会话会立即失效，需使用新密码重新登录。</p>
+        <p class="${TW.mutedCopy}">提交成功后，当前账号的后台会话会立即失效，需使用新密码重新登录。</p>
       </div>
-      <form class="admin-form" id="admin-change-password-form">
-        <div class="field-group">
-          <label for="current-password">当前密码</label>
-          <input
+      <form class="${TW.form}" id="admin-change-password-form">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="current-password">当前密码</label>
+          <input class="${TW.input}"
             id="current-password"
             name="current_password"
             type="password"
@@ -175,9 +233,9 @@ function renderChangePasswordPage(session) {
             required
           />
         </div>
-        <div class="field-group">
-          <label for="new-password">新密码</label>
-          <input
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="new-password">新密码</label>
+          <input class="${TW.input}"
             id="new-password"
             name="new_password"
             type="password"
@@ -185,9 +243,9 @@ function renderChangePasswordPage(session) {
             required
           />
         </div>
-        <div class="field-group">
-          <label for="confirm-new-password">确认新密码</label>
-          <input
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="confirm-new-password">确认新密码</label>
+          <input class="${TW.input}"
             id="confirm-new-password"
             name="confirm_new_password"
             type="password"
@@ -195,12 +253,12 @@ function renderChangePasswordPage(session) {
             required
           />
         </div>
-        <div class="button-row">
-          <button class="primary-button" type="submit">保存新密码</button>
-          <a class="ghost-button" href="/admin/wallpapers">返回内容管理</a>
+        <div class="${TW.btnRow}">
+          <button class="${TW.primaryBtn}" type="submit">保存新密码</button>
+          <a class="${TW.ghostBtn}" href="/admin/wallpapers">返回内容管理</a>
         </div>
       </form>
-      <div class="notice-card" id="change-password-feedback">
+      <div class="${TW.notice}" id="change-password-feedback">
         <h3>说明</h3>
         <p>当前页面通过 <code>/api/admin/auth/change-password</code> 校验当前密码并更新后台口令。</p>
       </div>
@@ -278,22 +336,22 @@ function renderWallpaperListView(session, payload, state) {
   const pagination = payload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>后台内容列表</h2>
-        <p class="muted-copy">支持按内容状态、资源状态、地区和创建时间过滤。</p>
+        <p class="${TW.mutedCopy}">支持按内容状态、资源状态、地区和创建时间过滤。</p>
       </div>
-      <p class="meta-pill">第 ${pagination.page} 页 / 共 ${pagination.total_pages || 1} 页</p>
+      <p class="${TW.metaPill}">第 ${pagination.page} 页 / 共 ${pagination.total_pages || 1} 页</p>
     </div>
-    <form class="admin-form" id="wallpaper-filter-form">
-      <div class="filter-grid">
-        <div class="field-group">
-          <label for="keyword">关键词</label>
-          <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" />
+    <form class="${TW.form}" id="wallpaper-filter-form">
+      <div class="${TW.filterGrid}">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="keyword">关键词</label>
+          <input class="${TW.input}" id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" />
         </div>
-        <div class="field-group">
-          <label for="content-status">内容状态</label>
-          <select id="content-status" name="content_status">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="content-status">内容状态</label>
+          <select class="${TW.input}" id="content-status" name="content_status">
             <option value="">全部</option>
             <option value="draft">draft</option>
             <option value="enabled">enabled</option>
@@ -301,59 +359,59 @@ function renderWallpaperListView(session, payload, state) {
             <option value="deleted">deleted</option>
           </select>
         </div>
-        <div class="field-group">
-          <label for="image-status">资源状态</label>
-          <select id="image-status" name="image_status">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="image-status">资源状态</label>
+          <select class="${TW.input}" id="image-status" name="image_status">
             <option value="">全部</option>
             <option value="pending">pending</option>
             <option value="ready">ready</option>
             <option value="failed">failed</option>
           </select>
         </div>
-        <div class="field-group">
-          <label for="market-code">地区</label>
-          <input id="market-code" name="market_code" type="text" placeholder="例如 en-US" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="market-code">地区</label>
+          <input class="${TW.input}" id="market-code" name="market_code" type="text" placeholder="例如 en-US" />
         </div>
-        <div class="field-group">
-          <label for="created-from">创建开始时间</label>
-          <input id="created-from" name="created_from_utc" type="datetime-local" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="created-from">创建开始时间</label>
+          <input class="${TW.input}" id="created-from" name="created_from_utc" type="datetime-local" />
         </div>
-        <div class="field-group">
-          <label for="created-to">创建结束时间</label>
-          <input id="created-to" name="created_to_utc" type="datetime-local" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="created-to">创建结束时间</label>
+          <input class="${TW.input}" id="created-to" name="created_to_utc" type="datetime-local" />
         </div>
-        <div class="field-group">
-          <label for="page-size">每页数量</label>
-          <select id="page-size" name="page_size">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="page-size">每页数量</label>
+          <select class="${TW.input}" id="page-size" name="page_size">
             <option value="10">10</option>
             <option value="20">20</option>
             <option value="50">50</option>
           </select>
         </div>
       </div>
-      <div class="button-row">
-        <button class="primary-button" type="submit">刷新列表</button>
-        <button class="ghost-button" id="reset-wallpaper-filters" type="button">重置筛选</button>
+      <div class="${TW.btnRow}">
+        <button class="${TW.primaryBtn}" type="submit">刷新列表</button>
+        <button class="${TW.ghostBtn}" id="reset-wallpaper-filters" type="button">重置筛选</button>
       </div>
     </form>
     <div id="wallpaper-feedback"></div>
-    <section class="table-card">
-      <div class="table-wrapper">
-        <table class="data-table">
+    <section class="${TW.tableCard}">
+      <div class="${TW.tableWrapper}">
+        <table class="${TW.dataTable}">
           <thead>
             <tr>
-              <th>内容</th>
-              <th>状态</th>
-              <th>资源</th>
-              <th>失败原因</th>
-              <th>操作</th>
+              <th class="${TW.th}">内容</th>
+              <th class="${TW.th}">状态</th>
+              <th class="${TW.th}">资源</th>
+              <th class="${TW.th}">失败原因</th>
+              <th class="${TW.th}">操作</th>
             </tr>
           </thead>
           <tbody id="wallpaper-table-body"></tbody>
         </table>
       </div>
     </section>
-    <nav class="button-row" id="wallpaper-pagination" aria-label="后台内容分页"></nav>
+    <nav class="${TW.btnRow}" id="wallpaper-pagination" aria-label="后台内容分页"></nav>
   `;
 
   const filterForm = document.querySelector("#wallpaper-filter-form");
@@ -381,8 +439,8 @@ function renderWallpaperListView(session, payload, state) {
   if (items.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="5">
-          <div class="notice-card">
+        <td colspan="5" class="${TW.td}">
+          <div class="${TW.notice}">
             <h3>当前没有匹配内容</h3>
             <p>可以调整筛选条件，或先完成采集和资源入库。</p>
           </div>
@@ -444,33 +502,58 @@ function renderWallpaperDetailView(session, detail, availableTags) {
   const recentOperations = Array.isArray(detail.recent_operations) ? detail.recent_operations : [];
   const currentTags = Array.isArray(detail.tags) ? detail.tags : [];
   const tagOptions = Array.isArray(availableTags) ? availableTags : [];
+  const previewUnavailableTitle = "默认资源加载失败";
+  const previewUnavailableMessage = detail.preview_url
+    ? "当前默认资源地址无法加载，可能是文件缺失、权限异常或上游地址不可达。"
+    : "当前没有可展示资源";
+  const previewUnavailableLinks = [
+    detail.preview_url
+      ? `<a class="${TW.inlineLink}" href="${escapeHtml(detail.preview_url)}" target="_blank" rel="noreferrer">打开默认资源地址</a>`
+      : "",
+    detail.origin_image_url
+      ? `<a class="${TW.inlineLink}" href="${escapeHtml(detail.origin_image_url)}" target="_blank" rel="noreferrer">打开来源原图地址</a>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join('<span class="text-slate-300">/</span>');
+  const previewUnavailableMarkup = `
+    <div class="${TW.noticeWarn}">
+      <h4>${previewUnavailableTitle}</h4>
+      <p>${previewUnavailableMessage}</p>
+      ${previewUnavailableLinks ? `<div class="${TW.btnRow}">${previewUnavailableLinks}</div>` : ""}
+    </div>
+  `;
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>${escapeHtml(detail.title)}</h2>
-        <p class="muted-copy">内容详情页通过 <code>/api/admin/wallpapers/${escapeHtml(String(detail.id))}</code> 读取。</p>
+        <p class="${TW.mutedCopy}">内容详情页通过 <code>/api/admin/wallpapers/${escapeHtml(String(detail.id))}</code> 读取。</p>
       </div>
-      <div class="button-row">
-        <a class="ghost-button" href="/admin/wallpapers">返回列表</a>
-        <a class="ghost-button" href="/admin/audit-logs?target_type=wallpaper&target_id=${escapeHtml(String(detail.id))}">查看审计</a>
+      <div class="${TW.btnRow}">
+        <a class="${TW.ghostBtn}" href="/admin/wallpapers">返回列表</a>
+        <a class="${TW.ghostBtn}" href="/admin/audit-logs?target_type=wallpaper&target_id=${escapeHtml(String(detail.id))}">查看审计</a>
       </div>
     </div>
     <div id="detail-feedback"></div>
-    <section class="detail-grid">
-      <article class="detail-card media-card">
-        <div class="preview-frame">
-          ${detail.preview_url ? `<img src="${escapeHtml(detail.preview_url)}" alt="${escapeHtml(detail.title)}" />` : `<div class="empty-preview">当前没有可展示资源</div>`}
+    <section class="${TW.detailGrid}">
+      <article class="${TW.card} media-card">
+        <div class="${TW.previewFrame}" data-preview-frame>
+          ${
+            detail.preview_url
+              ? `<img src="${escapeHtml(detail.preview_url)}" alt="${escapeHtml(detail.title)}" data-preview-image />`
+              : previewUnavailableMarkup
+          }
         </div>
-        <div class="button-row">
+        <div class="${TW.btnRow}">
           ${renderStatusButton(detail.id, "enabled", "启用")}
           ${renderStatusButton(detail.id, "disabled", "禁用")}
           ${renderStatusButton(detail.id, "deleted", "逻辑删除")}
         </div>
       </article>
-      <article class="detail-card">
+      <article class="${TW.card}">
         <h3>当前状态</h3>
-        <dl class="detail-list">
+        <dl class="grid gap-0">
           ${renderDetailRow("内容状态", detail.content_status)}
           ${renderDetailRow("公开展示", detail.is_public ? "是" : "否")}
           ${renderDetailRow("允许下载", detail.is_downloadable ? "是" : "否")}
@@ -480,9 +563,9 @@ function renderWallpaperDetailView(session, detail, availableTags) {
           ${renderDetailRow("逻辑删除时间", detail.deleted_at_utc || "未删除")}
         </dl>
       </article>
-      <article class="detail-card">
+      <article class="${TW.card}">
         <h3>展示与来源字段</h3>
-        <dl class="detail-list">
+        <dl class="grid gap-0">
           ${renderDetailRow("副标题", detail.subtitle || "无")}
           ${renderDetailRow("说明", detail.description || "无")}
           ${renderDetailRow("版权", detail.copyright_text || "无")}
@@ -494,9 +577,9 @@ function renderWallpaperDetailView(session, detail, availableTags) {
           ${renderDetailRow("壁纸日期", detail.wallpaper_date)}
         </dl>
       </article>
-      <article class="detail-card">
+      <article class="${TW.card}">
         <h3>资源信息</h3>
-        <dl class="detail-list">
+        <dl class="grid gap-0">
           ${renderDetailRow("相对路径", detail.resource_relative_path || "无")}
           ${renderDetailRow("存储后端", detail.storage_backend || "无")}
           ${renderDetailRow("资源类型", detail.resource_type || "无")}
@@ -507,30 +590,30 @@ function renderWallpaperDetailView(session, detail, availableTags) {
           ${renderDetailRow("原始图片", detail.origin_image_url || "无")}
         </dl>
       </article>
-      <article class="detail-card">
-        <div class="panel-head">
+      <article class="${TW.card}">
+        <div class="${TW.panelHead}">
           <div>
             <h3>标签绑定</h3>
-            <p class="muted-copy">这里通过 <code>/api/admin/wallpapers/${escapeHtml(String(detail.id))}/tags</code> 提交绑定关系。</p>
+            <p class="${TW.mutedCopy}">这里通过 <code>/api/admin/wallpapers/${escapeHtml(String(detail.id))}/tags</code> 提交绑定关系。</p>
           </div>
-          <a class="inline-link" href="/admin/tags">前往标签管理</a>
+          <a class="${TW.inlineLink}" href="/admin/tags">前往标签管理</a>
         </div>
-        <div class="notice-card">
+        <div class="${TW.notice}">
           <h4>当前已绑定标签</h4>
           <p>${currentTags.length === 0 ? "当前没有绑定标签。" : currentTags.map((item) => `${item.tag_name} (${item.tag_key})`).join(" / ")}</p>
         </div>
         ${
           tagOptions.length === 0
-            ? `<div class="notice-card notice-card-warning"><h4>还没有可维护标签</h4><p>请先去标签管理页创建标签，再回来为内容绑定。</p></div>`
+            ? `<div class="${TW.noticeWarn}"><h4>还没有可维护标签</h4><p>请先去标签管理页创建标签，再回来为内容绑定。</p></div>`
             : `
-              <form class="admin-form" id="wallpaper-tag-form">
-                <div class="tag-chip-grid">
+              <form class="${TW.form}" id="wallpaper-tag-form">
+                <div class="${TW.tagChipGrid}">
                   ${tagOptions
                     .map((tag) => {
                       const checked = currentTags.some((item) => Number(item.id) === Number(tag.id));
                       const disabledCopy = tag.status === "disabled" ? "（已停用，仅后台可见）" : "";
                       return `
-                        <label class="tag-chip">
+                        <label class="${TW.tagChip}">
                           <input type="checkbox" name="tag_ids" value="${escapeHtml(String(tag.id))}" ${checked ? "checked" : ""} />
                           <span>
                             <strong>${escapeHtml(tag.tag_name)}</strong>
@@ -541,20 +624,20 @@ function renderWallpaperDetailView(session, detail, availableTags) {
                     })
                     .join("")}
                 </div>
-                <div class="field-group">
-                  <label for="tag-operator-reason">绑定原因</label>
-                  <input id="tag-operator-reason" name="operator_reason" type="text" placeholder="例如：补充主题标签" required />
+                <div class="${TW.field}">
+                  <label class="${TW.label}" for="tag-operator-reason">绑定原因</label>
+                  <input class="${TW.input}" id="tag-operator-reason" name="operator_reason" type="text" placeholder="例如：补充主题标签" required />
                 </div>
-                <div class="button-row">
-                  <button class="primary-button" type="submit">保存标签绑定</button>
+                <div class="${TW.btnRow}">
+                  <button class="${TW.primaryBtn}" type="submit">保存标签绑定</button>
                 </div>
               </form>
             `
         }
       </article>
-      <article class="detail-card detail-card-wide">
+      <article class="${TW.card} ${TW.cardWide}">
         <h3>最近操作记录</h3>
-        ${recentOperations.length === 0 ? `<div class="notice-card"><h4>暂无最近操作</h4><p>该内容尚未产生后台状态变更记录。</p></div>` : renderRecentOperationList(recentOperations)}
+        ${recentOperations.length === 0 ? `<div class="${TW.notice}"><h4>暂无最近操作</h4><p>该内容尚未产生后台状态变更记录。</p></div>` : renderRecentOperationList(recentOperations)}
       </article>
     </section>
   `;
@@ -564,8 +647,34 @@ function renderWallpaperDetailView(session, detail, availableTags) {
     return;
   }
 
+  bindDetailPreviewFallback({
+    frameSelector: "[data-preview-frame]",
+    imageSelector: "[data-preview-image]",
+    fallbackMarkup: previewUnavailableMarkup,
+  });
   bindWallpaperStatusActions(session, feedback);
   bindWallpaperTagActions(session, feedback, detail.id);
+}
+
+function bindDetailPreviewFallback({ frameSelector, imageSelector, fallbackMarkup }) {
+  const frame = document.querySelector(frameSelector);
+  const image = document.querySelector(imageSelector);
+  if (!(frame instanceof HTMLElement) || !(image instanceof HTMLImageElement)) {
+    return;
+  }
+
+  if (image.complete && image.naturalWidth === 0) {
+    frame.innerHTML = fallbackMarkup;
+    return;
+  }
+
+  image.addEventListener(
+    "error",
+    () => {
+      frame.innerHTML = fallbackMarkup;
+    },
+    { once: true },
+  );
 }
 
 async function renderTagManagementPage(session) {
@@ -586,89 +695,89 @@ function renderTagManagementView(session, payload, state) {
   const items = Array.isArray(payload.data.items) ? payload.data.items : [];
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>标签维护</h2>
-        <p class="muted-copy">标签定义统一保存在 <code>tags</code> 表中，内容绑定保存在 <code>wallpaper_tags</code> 表中。</p>
+        <p class="${TW.mutedCopy}">标签定义统一保存在 <code>tags</code> 表中，内容绑定保存在 <code>wallpaper_tags</code> 表中。</p>
       </div>
-      <p class="meta-pill">共 ${items.length} 个标签</p>
+      <p class="${TW.metaPill}">共 ${items.length} 个标签</p>
     </div>
-    <section class="detail-grid">
-      <article class="detail-card">
+    <section class="${TW.detailGrid}">
+      <article class="${TW.card}">
         <h3>创建 / 更新标签</h3>
-        <form class="admin-form" id="tag-form">
+        <form class="${TW.form}" id="tag-form">
           <input type="hidden" name="tag_id" />
-          <div class="filter-grid">
-            <div class="field-group">
-              <label for="tag-key">稳定键</label>
-              <input id="tag-key" name="tag_key" type="text" placeholder="例如 theme_landscape" required />
+          <div class="${TW.filterGrid}">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-key">稳定键</label>
+              <input class="${TW.input}" id="tag-key" name="tag_key" type="text" placeholder="例如 theme_landscape" required />
             </div>
-            <div class="field-group">
-              <label for="tag-name">标签名</label>
-              <input id="tag-name" name="tag_name" type="text" placeholder="例如 风景" required />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-name">标签名</label>
+              <input class="${TW.input}" id="tag-name" name="tag_name" type="text" placeholder="例如 风景" required />
             </div>
-            <div class="field-group">
-              <label for="tag-category">分类</label>
-              <input id="tag-category" name="tag_category" type="text" placeholder="例如 theme" />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-category">分类</label>
+              <input class="${TW.input}" id="tag-category" name="tag_category" type="text" placeholder="例如 theme" />
             </div>
-            <div class="field-group">
-              <label for="tag-status">状态</label>
-              <select id="tag-status" name="status">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-status">状态</label>
+              <select class="${TW.input}" id="tag-status" name="status">
                 <option value="enabled">enabled</option>
                 <option value="disabled">disabled</option>
               </select>
             </div>
-            <div class="field-group">
-              <label for="tag-sort-weight">排序权重</label>
-              <input id="tag-sort-weight" name="sort_weight" type="number" value="0" />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-sort-weight">排序权重</label>
+              <input class="${TW.input}" id="tag-sort-weight" name="sort_weight" type="number" value="0" />
             </div>
-            <div class="field-group">
-              <label for="tag-operator-reason">操作原因</label>
-              <input id="tag-operator-reason" name="operator_reason" type="text" placeholder="例如：新增公开主题标签" required />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-operator-reason">操作原因</label>
+              <input class="${TW.input}" id="tag-operator-reason" name="operator_reason" type="text" placeholder="例如：新增公开主题标签" required />
             </div>
           </div>
-          <div class="button-row">
-            <button class="primary-button" type="submit">保存标签</button>
-            <button class="ghost-button" id="reset-tag-form" type="button">清空表单</button>
+          <div class="${TW.btnRow}">
+            <button class="${TW.primaryBtn}" type="submit">保存标签</button>
+            <button class="${TW.ghostBtn}" id="reset-tag-form" type="button">清空表单</button>
           </div>
         </form>
         <div id="tag-form-feedback"></div>
       </article>
-      <article class="detail-card">
+      <article class="${TW.card}">
         <h3>标签筛选</h3>
-        <form class="admin-form" id="tag-filter-form">
-          <div class="filter-grid">
-            <div class="field-group">
-              <label for="tag-filter-status">状态</label>
-              <select id="tag-filter-status" name="status">
+        <form class="${TW.form}" id="tag-filter-form">
+          <div class="${TW.filterGrid}">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-filter-status">状态</label>
+              <select class="${TW.input}" id="tag-filter-status" name="status">
                 <option value="">全部</option>
                 <option value="enabled">enabled</option>
                 <option value="disabled">disabled</option>
               </select>
             </div>
-            <div class="field-group">
-              <label for="tag-filter-category">分类</label>
-              <input id="tag-filter-category" name="tag_category" type="text" placeholder="例如 theme" />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="tag-filter-category">分类</label>
+              <input class="${TW.input}" id="tag-filter-category" name="tag_category" type="text" placeholder="例如 theme" />
             </div>
           </div>
-          <div class="button-row">
-            <button class="primary-button" type="submit">刷新标签列表</button>
-            <button class="ghost-button" id="reset-tag-filters" type="button">重置筛选</button>
+          <div class="${TW.btnRow}">
+            <button class="${TW.primaryBtn}" type="submit">刷新标签列表</button>
+            <button class="${TW.ghostBtn}" id="reset-tag-filters" type="button">重置筛选</button>
           </div>
         </form>
       </article>
     </section>
-    <section class="table-card">
-      <div class="table-wrapper">
-        <table class="data-table">
+    <section class="${TW.tableCard}">
+      <div class="${TW.tableWrapper}">
+        <table class="${TW.dataTable}">
           <thead>
             <tr>
-              <th>标签</th>
-              <th>状态</th>
-              <th>分类</th>
-              <th>排序</th>
-              <th>内容数</th>
-              <th>操作</th>
+              <th class="${TW.th}">标签</th>
+              <th class="${TW.th}">状态</th>
+              <th class="${TW.th}">分类</th>
+              <th class="${TW.th}">排序</th>
+              <th class="${TW.th}">内容数</th>
+              <th class="${TW.th}">操作</th>
             </tr>
           </thead>
           <tbody id="tag-table-body"></tbody>
@@ -697,8 +806,8 @@ function renderTagManagementView(session, payload, state) {
   if (items.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6">
-          <div class="notice-card">
+        <td colspan="6" class="${TW.td}">
+          <div class="${TW.notice}">
             <h3>当前没有匹配标签</h3>
             <p>可以先创建标签，或者调整状态与分类筛选条件。</p>
           </div>
@@ -795,55 +904,55 @@ function renderTaskListView(session, payload, state) {
   const pagination = payload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>采集任务与后台观测</h2>
-        <p class="muted-copy">手动创建任务后，可由 cron 自动消费，也可在本页对 queued 任务执行一次人工触发。</p>
+        <p class="${TW.mutedCopy}">手动创建任务后，可由 cron 自动消费，也可在本页对 queued 任务执行一次人工触发。</p>
       </div>
-      <p class="meta-pill">共 ${pagination.total} 条任务</p>
+      <p class="${TW.metaPill}">共 ${pagination.total} 条任务</p>
     </div>
-    <section class="detail-grid">
-      <article class="detail-card">
+    <section class="${TW.detailGrid}">
+      <article class="${TW.card}">
         <h3>创建手动采集任务</h3>
-        <form class="admin-form" id="task-create-form">
-          <div class="filter-grid">
-            <div class="field-group">
-              <label for="task-source-type">来源类型</label>
-              <select id="task-source-type" name="source_type">
+        <form class="${TW.form}" id="task-create-form">
+          <div class="${TW.filterGrid}">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-source-type">来源类型</label>
+              <select class="${TW.input}" id="task-source-type" name="source_type">
                 <option value="bing">bing</option>
                 <option value="nasa_apod">nasa_apod</option>
               </select>
             </div>
-            <div class="field-group">
-              <label for="task-market-code">地区</label>
-              <input id="task-market-code" name="market_code" type="text" value="en-US" required />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-market-code">地区</label>
+              <input class="${TW.input}" id="task-market-code" name="market_code" type="text" value="en-US" required />
             </div>
-            <div class="field-group">
-              <label for="task-date-from">开始日期</label>
-              <input id="task-date-from" name="date_from" type="date" required />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-date-from">开始日期</label>
+              <input class="${TW.input}" id="task-date-from" name="date_from" type="date" required />
             </div>
-            <div class="field-group">
-              <label for="task-date-to">结束日期</label>
-              <input id="task-date-to" name="date_to" type="date" required />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-date-to">结束日期</label>
+              <input class="${TW.input}" id="task-date-to" name="date_to" type="date" required />
             </div>
           </div>
-          <label class="checkbox-row">
+          <label class="${TW.checkboxRow}">
             <input id="task-force-refresh" name="force_refresh" type="checkbox" />
             <span>记录 force_refresh 请求参数</span>
           </label>
-          <div class="button-row">
-            <button class="primary-button" type="submit">创建 queued 任务</button>
+          <div class="${TW.btnRow}">
+            <button class="${TW.primaryBtn}" type="submit">创建 queued 任务</button>
           </div>
         </form>
         <div id="task-create-feedback"></div>
       </article>
-      <article class="detail-card">
+      <article class="${TW.card}">
         <h3>任务筛选</h3>
-        <form class="admin-form" id="task-filter-form">
-          <div class="filter-grid">
-            <div class="field-group">
-              <label for="task-status-filter">任务状态</label>
-              <select id="task-status-filter" name="task_status">
+        <form class="${TW.form}" id="task-filter-form">
+          <div class="${TW.filterGrid}">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-status-filter">任务状态</label>
+              <select class="${TW.input}" id="task-status-filter" name="task_status">
                 <option value="">全部</option>
                 <option value="queued">queued</option>
                 <option value="running">running</option>
@@ -852,65 +961,65 @@ function renderTaskListView(session, payload, state) {
                 <option value="failed">failed</option>
               </select>
             </div>
-            <div class="field-group">
-              <label for="task-trigger-filter">触发方式</label>
-              <select id="task-trigger-filter" name="trigger_type">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-trigger-filter">触发方式</label>
+              <select class="${TW.input}" id="task-trigger-filter" name="trigger_type">
                 <option value="">全部</option>
                 <option value="admin">admin</option>
                 <option value="cron">cron</option>
                 <option value="manual">manual</option>
               </select>
             </div>
-            <div class="field-group">
-              <label for="task-source-filter">来源类型</label>
-              <select id="task-source-filter" name="source_type">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-source-filter">来源类型</label>
+              <select class="${TW.input}" id="task-source-filter" name="source_type">
                 <option value="">全部</option>
                 <option value="bing">bing</option>
                 <option value="nasa_apod">nasa_apod</option>
               </select>
             </div>
-            <div class="field-group">
-              <label for="task-created-from">创建开始时间</label>
-              <input id="task-created-from" name="created_from_utc" type="datetime-local" />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-created-from">创建开始时间</label>
+              <input class="${TW.input}" id="task-created-from" name="created_from_utc" type="datetime-local" />
             </div>
-            <div class="field-group">
-              <label for="task-created-to">创建结束时间</label>
-              <input id="task-created-to" name="created_to_utc" type="datetime-local" />
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-created-to">创建结束时间</label>
+              <input class="${TW.input}" id="task-created-to" name="created_to_utc" type="datetime-local" />
             </div>
-            <div class="field-group">
-              <label for="task-page-size">每页数量</label>
-              <select id="task-page-size" name="page_size">
+            <div class="${TW.field}">
+              <label class="${TW.label}" for="task-page-size">每页数量</label>
+              <select class="${TW.input}" id="task-page-size" name="page_size">
                 <option value="10">10</option>
                 <option value="20">20</option>
                 <option value="50">50</option>
               </select>
             </div>
           </div>
-          <div class="button-row">
-            <button class="primary-button" type="submit">刷新任务列表</button>
-            <button class="ghost-button" id="reset-task-filters" type="button">重置筛选</button>
+          <div class="${TW.btnRow}">
+            <button class="${TW.primaryBtn}" type="submit">刷新任务列表</button>
+            <button class="${TW.ghostBtn}" id="reset-task-filters" type="button">重置筛选</button>
           </div>
         </form>
       </article>
     </section>
-    <section class="table-card">
-      <div class="table-wrapper">
-        <table class="data-table">
+    <section class="${TW.tableCard}">
+      <div class="${TW.tableWrapper}">
+        <table class="${TW.dataTable}">
           <thead>
             <tr>
-              <th>任务</th>
-              <th>状态</th>
-              <th>参数</th>
-              <th>统计</th>
-              <th>错误摘要</th>
-              <th>操作</th>
+              <th class="${TW.th}">任务</th>
+              <th class="${TW.th}">状态</th>
+              <th class="${TW.th}">参数</th>
+              <th class="${TW.th}">统计</th>
+              <th class="${TW.th}">错误摘要</th>
+              <th class="${TW.th}">操作</th>
             </tr>
           </thead>
           <tbody id="task-table-body"></tbody>
         </table>
       </div>
     </section>
-    <nav class="button-row" id="task-pagination" aria-label="后台任务分页"></nav>
+    <nav class="${TW.btnRow}" id="task-pagination" aria-label="后台任务分页"></nav>
   `;
 
   const createForm = document.querySelector("#task-create-form");
@@ -943,8 +1052,8 @@ function renderTaskListView(session, payload, state) {
   if (items.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6">
-          <div class="notice-card">
+        <td colspan="6" class="${TW.td}">
+          <div class="${TW.notice}">
             <h3>当前没有匹配任务</h3>
             <p>可以先创建手动采集任务，或调整筛选条件。</p>
           </div>
@@ -1033,21 +1142,21 @@ function renderTaskDetailView(session, detail) {
   const allowRetry = detail.task_status === "failed" || detail.task_status === "partially_failed";
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>任务 #${escapeHtml(String(detail.id))}</h2>
-        <p class="muted-copy">任务详情通过 <code>/api/admin/collection-tasks/${escapeHtml(String(detail.id))}</code> 读取。</p>
+        <p class="${TW.mutedCopy}">任务详情通过 <code>/api/admin/collection-tasks/${escapeHtml(String(detail.id))}</code> 读取。</p>
       </div>
-      <div class="button-row">
-        <a class="ghost-button" href="/admin/tasks">返回任务列表</a>
-        <a class="ghost-button" href="/admin/logs?task_id=${escapeHtml(String(detail.id))}">查看结构化日志</a>
+      <div class="${TW.btnRow}">
+        <a class="${TW.ghostBtn}" href="/admin/tasks">返回任务列表</a>
+        <a class="${TW.ghostBtn}" href="/admin/logs?task_id=${escapeHtml(String(detail.id))}">查看结构化日志</a>
       </div>
     </div>
     <div id="task-detail-feedback"></div>
-    <section class="detail-grid">
-      <article class="detail-card">
+    <section class="${TW.detailGrid}">
+      <article class="${TW.card}">
         <h3>当前状态</h3>
-        <dl class="detail-list">
+        <dl class="grid gap-0">
           ${renderDetailRow("任务类型", detail.task_type)}
           ${renderDetailRow("来源类型", detail.source_type)}
           ${renderDetailRow("触发方式", detail.trigger_type)}
@@ -1057,56 +1166,56 @@ function renderTaskDetailView(session, detail) {
           ${renderDetailRow("开始时间", detail.started_at_utc || "未开始")}
           ${renderDetailRow("结束时间", detail.finished_at_utc || "未结束")}
         </dl>
-        <div class="button-row">
-          ${allowConsume ? `<button class="primary-button" type="button" data-task-consume="${escapeHtml(String(detail.id))}">立即执行该任务</button>` : ""}
-          ${allowRetry ? `<button class="primary-button" type="button" data-task-retry="${escapeHtml(String(detail.id))}">重试该任务</button>` : ""}
+        <div class="${TW.btnRow}">
+          ${allowConsume ? `<button class="${TW.primaryBtn}" type="button" data-task-consume="${escapeHtml(String(detail.id))}">立即执行该任务</button>` : ""}
+          ${allowRetry ? `<button class="${TW.primaryBtn}" type="button" data-task-retry="${escapeHtml(String(detail.id))}">重试该任务</button>` : ""}
         </div>
       </article>
-      <article class="detail-card">
+      <article class="${TW.card}">
         <h3>请求参数快照</h3>
-        <dl class="detail-list">
+        <dl class="grid gap-0">
           ${renderDetailRow("地区", snapshot.market_code || "无")}
           ${renderDetailRow("开始日期", snapshot.date_from || "无")}
           ${renderDetailRow("结束日期", snapshot.date_to || "无")}
           ${renderDetailRow("force_refresh", formatBoolean(snapshot.force_refresh))}
         </dl>
       </article>
-      <article class="detail-card detail-card-wide">
+      <article class="${TW.card} ${TW.cardWide}">
         <h3>执行统计</h3>
-        <div class="stats-grid">
-          <div class="stats-card">
+        <div class="${TW.statsGrid}">
+          <div class="${TW.statsCard}">
             <strong>${escapeHtml(String(detail.success_count))}</strong>
             <span>成功</span>
           </div>
-          <div class="stats-card">
+          <div class="${TW.statsCard}">
             <strong>${escapeHtml(String(detail.duplicate_count))}</strong>
             <span>重复</span>
           </div>
-          <div class="stats-card">
+          <div class="${TW.statsCard}">
             <strong>${escapeHtml(String(detail.failure_count))}</strong>
             <span>失败</span>
           </div>
         </div>
-        <div class="notice-card">
+        <div class="${TW.notice}">
           <h4>错误摘要</h4>
           <p>${escapeHtml(detail.error_summary || "当前没有错误摘要。")}</p>
         </div>
       </article>
-      <article class="detail-card detail-card-wide">
+      <article class="${TW.card} ${TW.cardWide}">
         <h3>逐条处理明细</h3>
         ${
           items.length === 0
-            ? `<div class="notice-card"><h4>暂无处理明细</h4><p>任务尚未执行，或当前没有结构化明细。</p></div>`
+            ? `<div class="${TW.notice}"><h4>暂无处理明细</h4><p>任务尚未执行，或当前没有结构化明细。</p></div>`
             : `
-              <div class="table-wrapper">
-                <table class="data-table">
+              <div class="${TW.tableWrapper}">
+                <table class="${TW.dataTable}">
                   <thead>
                     <tr>
-                      <th>时间</th>
-                      <th>来源项</th>
-                      <th>动作</th>
-                      <th>结果</th>
-                      <th>定位信息</th>
+                      <th class="${TW.th}">时间</th>
+                      <th class="${TW.th}">来源项</th>
+                      <th class="${TW.th}">动作</th>
+                      <th class="${TW.th}">结果</th>
+                      <th class="${TW.th}">定位信息</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1148,63 +1257,63 @@ function renderLogView(payload, state) {
   const pagination = payload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>结构化日志查询</h2>
-        <p class="muted-copy">当前读取 <code>collection_task_items</code> 结构化日志，不直接暴露服务器原始日志文件。</p>
+        <p class="${TW.mutedCopy}">当前读取 <code>collection_task_items</code> 结构化日志，不直接暴露服务器原始日志文件。</p>
       </div>
-      <p class="meta-pill">共 ${pagination.total} 条</p>
+      <p class="${TW.metaPill}">共 ${pagination.total} 条</p>
     </div>
-    <form class="admin-form" id="log-filter-form">
-      <div class="filter-grid">
-        <div class="field-group">
-          <label for="log-task-id">任务 ID</label>
-          <input id="log-task-id" name="task_id" type="number" min="1" />
+    <form class="${TW.form}" id="log-filter-form">
+      <div class="${TW.filterGrid}">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="log-task-id">任务 ID</label>
+          <input class="${TW.input}" id="log-task-id" name="task_id" type="number" min="1" />
         </div>
-        <div class="field-group">
-          <label for="log-error-type">错误类型 / 结果</label>
-          <input id="log-error-type" name="error_type" type="text" placeholder="例如 failed" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="log-error-type">错误类型 / 结果</label>
+          <input class="${TW.input}" id="log-error-type" name="error_type" type="text" placeholder="例如 failed" />
         </div>
-        <div class="field-group">
-          <label for="log-started-from">开始时间</label>
-          <input id="log-started-from" name="started_from_utc" type="datetime-local" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="log-started-from">开始时间</label>
+          <input class="${TW.input}" id="log-started-from" name="started_from_utc" type="datetime-local" />
         </div>
-        <div class="field-group">
-          <label for="log-started-to">结束时间</label>
-          <input id="log-started-to" name="started_to_utc" type="datetime-local" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="log-started-to">结束时间</label>
+          <input class="${TW.input}" id="log-started-to" name="started_to_utc" type="datetime-local" />
         </div>
-        <div class="field-group">
-          <label for="log-page-size">每页数量</label>
-          <select id="log-page-size" name="page_size">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="log-page-size">每页数量</label>
+          <select class="${TW.input}" id="log-page-size" name="page_size">
             <option value="10">10</option>
             <option value="20">20</option>
             <option value="50">50</option>
           </select>
         </div>
       </div>
-      <div class="button-row">
-        <button class="primary-button" type="submit">刷新日志</button>
-        <button class="ghost-button" id="reset-log-filters" type="button">重置筛选</button>
+      <div class="${TW.btnRow}">
+        <button class="${TW.primaryBtn}" type="submit">刷新日志</button>
+        <button class="${TW.ghostBtn}" id="reset-log-filters" type="button">重置筛选</button>
       </div>
     </form>
-    <section class="table-card">
-      <div class="table-wrapper">
-        <table class="data-table">
+    <section class="${TW.tableCard}">
+      <div class="${TW.tableWrapper}">
+        <table class="${TW.dataTable}">
           <thead>
             <tr>
-              <th>时间</th>
-              <th>任务</th>
-              <th>动作</th>
-              <th>结果</th>
-              <th>失败原因</th>
-              <th>定位</th>
+              <th class="${TW.th}">时间</th>
+              <th class="${TW.th}">任务</th>
+              <th class="${TW.th}">动作</th>
+              <th class="${TW.th}">结果</th>
+              <th class="${TW.th}">失败原因</th>
+              <th class="${TW.th}">定位</th>
             </tr>
           </thead>
           <tbody id="log-table-body"></tbody>
         </table>
       </div>
     </section>
-    <nav class="button-row" id="log-pagination" aria-label="后台日志分页"></nav>
+    <nav class="${TW.btnRow}" id="log-pagination" aria-label="后台日志分页"></nav>
   `;
 
   const filterForm = document.querySelector("#log-filter-form");
@@ -1228,8 +1337,8 @@ function renderLogView(payload, state) {
   if (items.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6">
-          <div class="notice-card">
+        <td colspan="6" class="${TW.td}">
+          <div class="${TW.notice}">
             <h3>当前没有匹配日志</h3>
             <p>可以按任务 ID、错误类型或时间范围继续筛选。</p>
           </div>
@@ -1303,90 +1412,90 @@ function renderDownloadStatsView(payload, state) {
     : [];
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>后台下载统计</h2>
-        <p class="muted-copy">只统计下载登记事件，真实文件仍由静态资源链路提供，不经过应用服务传大文件。</p>
+        <p class="${TW.mutedCopy}">只统计下载登记事件，真实文件仍由静态资源链路提供，不经过应用服务传大文件。</p>
       </div>
-      <p class="meta-pill">最近 ${escapeHtml(state.days || "7")} 天</p>
+      <p class="${TW.metaPill}">最近 ${escapeHtml(state.days || "7")} 天</p>
     </div>
-    <form class="admin-form" id="download-stats-form">
-      <div class="filter-grid">
-        <div class="field-group">
-          <label for="download-days">统计窗口</label>
-          <select id="download-days" name="days">
+    <form class="${TW.form}" id="download-stats-form">
+      <div class="${TW.filterGrid}">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="download-days">统计窗口</label>
+          <select class="${TW.input}" id="download-days" name="days">
             <option value="7">最近 7 天</option>
             <option value="30">最近 30 天</option>
             <option value="90">最近 90 天</option>
           </select>
         </div>
-        <div class="field-group">
-          <label for="download-top-limit">热门内容数量</label>
-          <select id="download-top-limit" name="top_limit">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="download-top-limit">热门内容数量</label>
+          <select class="${TW.input}" id="download-top-limit" name="top_limit">
             <option value="5">5</option>
             <option value="10">10</option>
             <option value="20">20</option>
           </select>
         </div>
       </div>
-      <div class="button-row">
-        <button class="primary-button" type="submit">刷新统计</button>
-        <button class="ghost-button" id="reset-download-stats" type="button">恢复默认</button>
+      <div class="${TW.btnRow}">
+        <button class="${TW.primaryBtn}" type="submit">刷新统计</button>
+        <button class="${TW.ghostBtn}" id="reset-download-stats" type="button">恢复默认</button>
       </div>
     </form>
-    <section class="stats-grid">
-      <article class="stats-card">
-        <span class="muted-inline">下载事件总数</span>
+    <section class="${TW.statsGrid}">
+      <article class="${TW.statsCard}">
+        <span class="${TW.mutedInline}">下载事件总数</span>
         <strong>${escapeHtml(summary.total_events || 0)}</strong>
       </article>
-      <article class="stats-card">
-        <span class="muted-inline">成功跳转</span>
+      <article class="${TW.statsCard}">
+        <span class="${TW.mutedInline}">成功跳转</span>
         <strong>${escapeHtml(summary.redirected_events || 0)}</strong>
       </article>
-      <article class="stats-card">
-        <span class="muted-inline">已拦截</span>
+      <article class="${TW.statsCard}">
+        <span class="${TW.mutedInline}">已拦截</span>
         <strong>${escapeHtml(summary.blocked_events || 0)}</strong>
       </article>
-      <article class="stats-card">
-        <span class="muted-inline">登记降级</span>
+      <article class="${TW.statsCard}">
+        <span class="${TW.mutedInline}">登记降级</span>
         <strong>${escapeHtml(summary.degraded_events || 0)}</strong>
       </article>
-      <article class="stats-card">
-        <span class="muted-inline">涉及内容数</span>
+      <article class="${TW.statsCard}">
+        <span class="${TW.mutedInline}">涉及内容数</span>
         <strong>${escapeHtml(summary.unique_wallpapers || 0)}</strong>
       </article>
-      <article class="stats-card">
-        <span class="muted-inline">最近一次事件</span>
+      <article class="${TW.statsCard}">
+        <span class="${TW.mutedInline}">最近一次事件</span>
         <strong>${escapeHtml(summary.latest_occurred_at_utc || "暂无记录")}</strong>
       </article>
     </section>
-    <div class="detail-grid">
-      <section class="table-card detail-card-wide">
-        <div class="table-wrapper">
-          <table class="data-table">
+    <div class="${TW.detailGrid}">
+      <section class="${TW.tableCard} ${TW.cardWide}">
+        <div class="${TW.tableWrapper}">
+          <table class="${TW.dataTable}">
             <thead>
               <tr>
-                <th>热门内容</th>
-                <th>地区</th>
-                <th>日期</th>
-                <th>成功下载数</th>
-                <th>操作</th>
+                <th class="${TW.th}">热门内容</th>
+                <th class="${TW.th}">地区</th>
+                <th class="${TW.th}">日期</th>
+                <th class="${TW.th}">成功下载数</th>
+                <th class="${TW.th}">操作</th>
               </tr>
             </thead>
             <tbody id="download-top-table-body"></tbody>
           </table>
         </div>
       </section>
-      <section class="table-card detail-card-wide">
-        <div class="table-wrapper">
-          <table class="data-table">
+      <section class="${TW.tableCard} ${TW.cardWide}">
+        <div class="${TW.tableWrapper}">
+          <table class="${TW.dataTable}">
             <thead>
               <tr>
-                <th>日期</th>
-                <th>总事件</th>
-                <th>成功跳转</th>
-                <th>已拦截</th>
-                <th>登记降级</th>
+                <th class="${TW.th}">日期</th>
+                <th class="${TW.th}">总事件</th>
+                <th class="${TW.th}">成功跳转</th>
+                <th class="${TW.th}">已拦截</th>
+                <th class="${TW.th}">登记降级</th>
               </tr>
             </thead>
             <tbody id="download-trend-table-body"></tbody>
@@ -1413,8 +1522,8 @@ function renderDownloadStatsView(payload, state) {
   if (topWallpapers.length === 0) {
     topTableBody.innerHTML = `
       <tr>
-        <td colspan="5">
-          <div class="notice-card">
+        <td colspan="5" class="${TW.td}">
+          <div class="${TW.notice}">
             <h3>当前时间窗口内没有成功下载记录</h3>
             <p>可以先通过公开详情页触发下载登记，再回来查看热门内容。</p>
           </div>
@@ -1426,11 +1535,11 @@ function renderDownloadStatsView(payload, state) {
       .map(
         (item) => `
           <tr>
-            <td>${escapeHtml(item.title)}</td>
-            <td>${escapeHtml(item.market_code)}</td>
-            <td>${escapeHtml(item.wallpaper_date)}</td>
-            <td>${escapeHtml(item.download_count)}</td>
-            <td><a class="mini-button" href="/admin/wallpapers/${encodeURIComponent(String(item.wallpaper_id))}">查看详情</a></td>
+            <td class="${TW.td}">${escapeHtml(item.title)}</td>
+            <td class="${TW.td}">${escapeHtml(item.market_code)}</td>
+            <td class="${TW.td}">${escapeHtml(item.wallpaper_date)}</td>
+            <td class="${TW.td}">${escapeHtml(item.download_count)}</td>
+            <td class="${TW.td}"><a class="${TW.miniBtn}" href="/admin/wallpapers/${encodeURIComponent(String(item.wallpaper_id))}">查看详情</a></td>
           </tr>
         `,
       )
@@ -1440,8 +1549,8 @@ function renderDownloadStatsView(payload, state) {
   if (dailyTrends.length === 0) {
     trendTableBody.innerHTML = `
       <tr>
-        <td colspan="5">
-          <div class="notice-card">
+        <td colspan="5" class="${TW.td}">
+          <div class="${TW.notice}">
             <h3>当前没有趋势数据</h3>
             <p>下载登记事件产生后，这里会按天展示成功、拦截和降级趋势。</p>
           </div>
@@ -1453,11 +1562,11 @@ function renderDownloadStatsView(payload, state) {
       .map(
         (item) => `
           <tr>
-            <td>${escapeHtml(item.trend_date)}</td>
-            <td>${escapeHtml(item.total_events)}</td>
-            <td>${escapeHtml(item.redirected_events)}</td>
-            <td>${escapeHtml(item.blocked_events)}</td>
-            <td>${escapeHtml(item.degraded_events)}</td>
+            <td class="${TW.td}">${escapeHtml(item.trend_date)}</td>
+            <td class="${TW.td}">${escapeHtml(item.total_events)}</td>
+            <td class="${TW.td}">${escapeHtml(item.redirected_events)}</td>
+            <td class="${TW.td}">${escapeHtml(item.blocked_events)}</td>
+            <td class="${TW.td}">${escapeHtml(item.degraded_events)}</td>
           </tr>
         `,
       )
@@ -1488,22 +1597,22 @@ function renderAuditView(payload, state) {
   const pagination = payload.pagination || { page: 1, page_size: 20, total: 0, total_pages: 0 };
 
   adminRoot.innerHTML = `
-    <div class="panel-head">
+    <div class="${TW.panelHead}">
       <div>
         <h2>后台审计记录</h2>
-        <p class="muted-copy">支持按操作者、目标对象和时间范围查询。</p>
+        <p class="${TW.mutedCopy}">支持按操作者、目标对象和时间范围查询。</p>
       </div>
-      <p class="meta-pill">共 ${pagination.total} 条</p>
+      <p class="${TW.metaPill}">共 ${pagination.total} 条</p>
     </div>
-    <form class="admin-form" id="audit-filter-form">
-      <div class="filter-grid">
-        <div class="field-group">
-          <label for="admin-user-id">管理员 ID</label>
-          <input id="admin-user-id" name="admin_user_id" type="number" min="1" />
+    <form class="${TW.form}" id="audit-filter-form">
+      <div class="${TW.filterGrid}">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="admin-user-id">管理员 ID</label>
+          <input class="${TW.input}" id="admin-user-id" name="admin_user_id" type="number" min="1" />
         </div>
-        <div class="field-group">
-          <label for="target-type">目标类型</label>
-          <select id="target-type" name="target_type">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="target-type">目标类型</label>
+          <select class="${TW.input}" id="target-type" name="target_type">
             <option value="">全部</option>
             <option value="wallpaper">wallpaper</option>
             <option value="tag">tag</option>
@@ -1511,50 +1620,50 @@ function renderAuditView(payload, state) {
             <option value="admin_session">admin_session</option>
           </select>
         </div>
-        <div class="field-group">
-          <label for="target-id">目标 ID</label>
-          <input id="target-id" name="target_id" type="text" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="target-id">目标 ID</label>
+          <input class="${TW.input}" id="target-id" name="target_id" type="text" />
         </div>
-        <div class="field-group">
-          <label for="started-from">开始时间</label>
-          <input id="started-from" name="started_from_utc" type="datetime-local" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="started-from">开始时间</label>
+          <input class="${TW.input}" id="started-from" name="started_from_utc" type="datetime-local" />
         </div>
-        <div class="field-group">
-          <label for="started-to">结束时间</label>
-          <input id="started-to" name="started_to_utc" type="datetime-local" />
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="started-to">结束时间</label>
+          <input class="${TW.input}" id="started-to" name="started_to_utc" type="datetime-local" />
         </div>
-        <div class="field-group">
-          <label for="audit-page-size">每页数量</label>
-          <select id="audit-page-size" name="page_size">
+        <div class="${TW.field}">
+          <label class="${TW.label}" for="audit-page-size">每页数量</label>
+          <select class="${TW.input}" id="audit-page-size" name="page_size">
             <option value="10">10</option>
             <option value="20">20</option>
             <option value="50">50</option>
           </select>
         </div>
       </div>
-      <div class="button-row">
-        <button class="primary-button" type="submit">刷新审计记录</button>
-        <button class="ghost-button" id="reset-audit-filters" type="button">重置筛选</button>
+      <div class="${TW.btnRow}">
+        <button class="${TW.primaryBtn}" type="submit">刷新审计记录</button>
+        <button class="${TW.ghostBtn}" id="reset-audit-filters" type="button">重置筛选</button>
       </div>
     </form>
-    <section class="table-card">
-      <div class="table-wrapper">
-        <table class="data-table">
+    <section class="${TW.tableCard}">
+      <div class="${TW.tableWrapper}">
+        <table class="${TW.dataTable}">
           <thead>
             <tr>
-              <th>时间</th>
-              <th>操作者</th>
-              <th>动作</th>
-              <th>目标</th>
-              <th>trace_id</th>
-              <th>状态快照</th>
+              <th class="${TW.th}">时间</th>
+              <th class="${TW.th}">操作者</th>
+              <th class="${TW.th}">动作</th>
+              <th class="${TW.th}">目标</th>
+              <th class="${TW.th}">trace_id</th>
+              <th class="${TW.th}">状态快照</th>
             </tr>
           </thead>
           <tbody id="audit-table-body"></tbody>
         </table>
       </div>
     </section>
-    <nav class="button-row" id="audit-pagination" aria-label="后台审计分页"></nav>
+    <nav class="${TW.btnRow}" id="audit-pagination" aria-label="后台审计分页"></nav>
   `;
 
   const filterForm = document.querySelector("#audit-filter-form");
@@ -1579,8 +1688,8 @@ function renderAuditView(payload, state) {
   if (items.length === 0) {
     tableBody.innerHTML = `
       <tr>
-        <td colspan="6">
-          <div class="notice-card">
+        <td colspan="6" class="${TW.td}">
+          <div class="${TW.notice}">
             <h3>当前没有匹配审计记录</h3>
             <p>可以调整对象 ID 或时间范围后再试。</p>
           </div>
@@ -1792,28 +1901,28 @@ function bindTagEditActions(items) {
 function renderWallpaperRow(item) {
   return `
     <tr>
-      <td>
-        <div class="table-title">
+      <td class="${TW.td}">
+        <div class="${TW.tableTitle}">
           <strong>${escapeHtml(item.title)}</strong>
           <span>${escapeHtml(item.market_code)} / ${escapeHtml(item.wallpaper_date)}</span>
         </div>
       </td>
-      <td>
-        <div class="stacked-copy">
-          <span class="status-badge">${escapeHtml(item.content_status)}</span>
-          <span class="muted-inline">公开：${item.is_public ? "是" : "否"}</span>
+      <td class="${TW.td}">
+        <div class="${TW.stackedCopy}">
+          <span class="${statusBadgeClasses(item.content_status)}">${escapeHtml(item.content_status)}</span>
+          <span class="${TW.mutedInline}">公开：${item.is_public ? "是" : "否"}</span>
         </div>
       </td>
-      <td>
-        <div class="stacked-copy">
+      <td class="${TW.td}">
+        <div class="${TW.stackedCopy}">
           <span>${escapeHtml(item.resource_status)}</span>
-          <span class="muted-inline">${escapeHtml(item.image_status || "unknown")}</span>
+          <span class="${TW.mutedInline}">${escapeHtml(item.image_status || "unknown")}</span>
         </div>
       </td>
-      <td>${escapeHtml(item.failure_reason || "无")}</td>
-      <td>
-        <div class="button-row">
-          <a class="inline-link" href="/admin/wallpapers/${escapeHtml(String(item.id))}">详情</a>
+      <td class="${TW.td}">${escapeHtml(item.failure_reason || "无")}</td>
+      <td class="${TW.td}">
+        <div class="${TW.btnRow}">
+          <a class="${TW.inlineLink}" href="/admin/wallpapers/${escapeHtml(String(item.id))}">详情</a>
           ${renderStatusButton(item.id, "enabled", "启用")}
           ${renderStatusButton(item.id, "disabled", "禁用")}
           ${renderStatusButton(item.id, "deleted", "删除")}
@@ -1824,41 +1933,41 @@ function renderWallpaperRow(item) {
 }
 
 function renderStatusButton(wallpaperIdValue, targetStatus, label) {
-  return `<button class="mini-button" type="button" data-wallpaper-id="${escapeHtml(String(wallpaperIdValue))}" data-status-action="${escapeHtml(targetStatus)}">${escapeHtml(label)}</button>`;
+  return `<button class="${TW.miniBtn}" type="button" data-wallpaper-id="${escapeHtml(String(wallpaperIdValue))}" data-status-action="${escapeHtml(targetStatus)}">${escapeHtml(label)}</button>`;
 }
 
 function renderTaskRow(item) {
   return `
     <tr>
-      <td>
-        <div class="table-title">
+      <td class="${TW.td}">
+        <div class="${TW.tableTitle}">
           <strong>#${escapeHtml(String(item.id))}</strong>
           <span>${escapeHtml(item.task_type)} / ${escapeHtml(item.trigger_type)}</span>
         </div>
       </td>
-      <td>
-        <div class="stacked-copy">
-          <span class="status-badge">${escapeHtml(item.task_status)}</span>
-          <span class="muted-inline">${escapeHtml(item.started_at_utc || "未开始")}</span>
+      <td class="${TW.td}">
+        <div class="${TW.stackedCopy}">
+          <span class="${statusBadgeClasses(item.task_status)}">${escapeHtml(item.task_status)}</span>
+          <span class="${TW.mutedInline}">${escapeHtml(item.started_at_utc || "未开始")}</span>
         </div>
       </td>
-      <td>
-        <div class="stacked-copy">
+      <td class="${TW.td}">
+        <div class="${TW.stackedCopy}">
           <span>${escapeHtml(item.source_type)} / ${escapeHtml(item.market_code || "无地区")}</span>
-          <span class="muted-inline">${escapeHtml(item.date_from || "无")} ~ ${escapeHtml(item.date_to || "无")}</span>
+          <span class="${TW.mutedInline}">${escapeHtml(item.date_from || "无")} ~ ${escapeHtml(item.date_to || "无")}</span>
         </div>
       </td>
-      <td>
-        <div class="stacked-copy">
+      <td class="${TW.td}">
+        <div class="${TW.stackedCopy}">
           <span>成功 ${escapeHtml(String(item.success_count))}</span>
-          <span class="muted-inline">重复 ${escapeHtml(String(item.duplicate_count))} / 失败 ${escapeHtml(String(item.failure_count))}</span>
+          <span class="${TW.mutedInline}">重复 ${escapeHtml(String(item.duplicate_count))} / 失败 ${escapeHtml(String(item.failure_count))}</span>
         </div>
       </td>
-      <td>${escapeHtml(item.error_summary || "无")}</td>
-      <td>
-        <div class="button-row">
-          <a class="inline-link" href="/admin/tasks/${escapeHtml(String(item.id))}">详情</a>
-          <a class="inline-link" href="/admin/logs?task_id=${escapeHtml(String(item.id))}">日志</a>
+      <td class="${TW.td}">${escapeHtml(item.error_summary || "无")}</td>
+      <td class="${TW.td}">
+        <div class="${TW.btnRow}">
+          <a class="${TW.inlineLink}" href="/admin/tasks/${escapeHtml(String(item.id))}">详情</a>
+          <a class="${TW.inlineLink}" href="/admin/logs?task_id=${escapeHtml(String(item.id))}">日志</a>
           ${renderConsumeButton(item)}
           ${renderRetryButton(item)}
         </div>
@@ -1870,20 +1979,20 @@ function renderTaskRow(item) {
 function renderTagRow(item) {
   return `
     <tr>
-      <td>
-        <div class="table-title">
+      <td class="${TW.td}">
+        <div class="${TW.tableTitle}">
           <strong>${escapeHtml(item.tag_name)}</strong>
           <span><code>${escapeHtml(item.tag_key)}</code></span>
         </div>
       </td>
-      <td><span class="status-badge">${escapeHtml(item.status)}</span></td>
-      <td>${escapeHtml(item.tag_category || "未分类")}</td>
-      <td>${escapeHtml(String(item.sort_weight))}</td>
-      <td>${escapeHtml(String(item.wallpaper_count))}</td>
-      <td>
-        <div class="button-row">
-          <button class="mini-button" type="button" data-tag-edit="${escapeHtml(String(item.id))}">编辑</button>
-          <a class="inline-link" href="/admin/audit-logs?target_type=tag&target_id=${escapeHtml(String(item.id))}">审计</a>
+      <td class="${TW.td}"><span class="${statusBadgeClasses(item.status)}">${escapeHtml(item.status)}</span></td>
+      <td class="${TW.td}">${escapeHtml(item.tag_category || "未分类")}</td>
+      <td class="${TW.td}">${escapeHtml(String(item.sort_weight))}</td>
+      <td class="${TW.td}">${escapeHtml(String(item.wallpaper_count))}</td>
+      <td class="${TW.td}">
+        <div class="${TW.btnRow}">
+          <button class="${TW.miniBtn}" type="button" data-tag-edit="${escapeHtml(String(item.id))}">编辑</button>
+          <a class="${TW.inlineLink}" href="/admin/audit-logs?target_type=tag&target_id=${escapeHtml(String(item.id))}">审计</a>
         </div>
       </td>
     </tr>
@@ -1894,24 +2003,24 @@ function renderRetryButton(item) {
   if (item.task_status !== "failed" && item.task_status !== "partially_failed") {
     return "";
   }
-  return `<button class="mini-button" type="button" data-task-retry="${escapeHtml(String(item.id))}">重试</button>`;
+  return `<button class="${TW.miniBtn}" type="button" data-task-retry="${escapeHtml(String(item.id))}">重试</button>`;
 }
 
 function renderConsumeButton(item) {
   if (item.task_status !== "queued") {
     return "";
   }
-  return `<button class="mini-button" type="button" data-task-consume="${escapeHtml(String(item.id))}">立即执行</button>`;
+  return `<button class="${TW.miniBtn}" type="button" data-task-consume="${escapeHtml(String(item.id))}">立即执行</button>`;
 }
 
 function renderTaskItemRow(item) {
   return `
     <tr>
-      <td>${escapeHtml(item.occurred_at_utc)}</td>
-      <td><code>${escapeHtml(item.source_item_key || "-")}</code></td>
-      <td>${escapeHtml(item.action_name)}</td>
-      <td>${escapeHtml(item.result_status)}</td>
-      <td><pre>${escapeHtml(JSON.stringify({
+      <td class="${TW.td}">${escapeHtml(item.occurred_at_utc)}</td>
+      <td class="${TW.td}"><code>${escapeHtml(item.source_item_key || "-")}</code></td>
+      <td class="${TW.td}">${escapeHtml(item.action_name)}</td>
+      <td class="${TW.td}">${escapeHtml(item.result_status)}</td>
+      <td class="${TW.td}"><pre>${escapeHtml(JSON.stringify({
         dedupe_hit_type: item.dedupe_hit_type,
         db_write_result: item.db_write_result,
         file_write_result: item.file_write_result,
@@ -1924,17 +2033,17 @@ function renderTaskItemRow(item) {
 function renderLogRow(item) {
   return `
     <tr>
-      <td>${escapeHtml(item.occurred_at_utc)}</td>
-      <td>
-        <div class="stacked-copy">
-          <span><a class="inline-link" href="/admin/tasks/${escapeHtml(String(item.task_id))}">#${escapeHtml(String(item.task_id))}</a></span>
-          <span class="muted-inline">${escapeHtml(item.task_status)} / ${escapeHtml(item.trigger_type)}</span>
+      <td class="${TW.td}">${escapeHtml(item.occurred_at_utc)}</td>
+      <td class="${TW.td}">
+        <div class="${TW.stackedCopy}">
+          <span><a class="${TW.inlineLink}" href="/admin/tasks/${escapeHtml(String(item.task_id))}">#${escapeHtml(String(item.task_id))}</a></span>
+          <span class="${TW.mutedInline}">${escapeHtml(item.task_status)} / ${escapeHtml(item.trigger_type)}</span>
         </div>
       </td>
-      <td>${escapeHtml(item.action_name)}</td>
-      <td>${escapeHtml(item.result_status)}</td>
-      <td>${escapeHtml(item.failure_reason || "无")}</td>
-      <td><pre>${escapeHtml(JSON.stringify({
+      <td class="${TW.td}">${escapeHtml(item.action_name)}</td>
+      <td class="${TW.td}">${escapeHtml(item.result_status)}</td>
+      <td class="${TW.td}">${escapeHtml(item.failure_reason || "无")}</td>
+      <td class="${TW.td}"><pre>${escapeHtml(JSON.stringify({
         source_item_key: item.source_item_key,
         dedupe_hit_type: item.dedupe_hit_type,
         db_write_result: item.db_write_result,
@@ -1947,26 +2056,26 @@ function renderLogRow(item) {
 function renderAuditRow(item) {
   return `
     <tr>
-      <td>${escapeHtml(item.created_at_utc)}</td>
-      <td>${escapeHtml(item.admin_username)} (#${escapeHtml(String(item.admin_user_id))})</td>
-      <td>${escapeHtml(item.action_type)}</td>
-      <td>${escapeHtml(item.target_type)} / ${escapeHtml(item.target_id)}</td>
-      <td><code>${escapeHtml(item.trace_id)}</code></td>
-      <td><pre>${escapeHtml(JSON.stringify({ before: item.before_state, after: item.after_state }, null, 2))}</pre></td>
+      <td class="${TW.td}">${escapeHtml(item.created_at_utc)}</td>
+      <td class="${TW.td}">${escapeHtml(item.admin_username)} (#${escapeHtml(String(item.admin_user_id))})</td>
+      <td class="${TW.td}">${escapeHtml(item.action_type)}</td>
+      <td class="${TW.td}">${escapeHtml(item.target_type)} / ${escapeHtml(item.target_id)}</td>
+      <td class="${TW.td}"><code>${escapeHtml(item.trace_id)}</code></td>
+      <td class="${TW.td}"><pre>${escapeHtml(JSON.stringify({ before: item.before_state, after: item.after_state }, null, 2))}</pre></td>
     </tr>
   `;
 }
 
 function renderRecentOperationList(items) {
   return `
-    <div class="table-wrapper">
-      <table class="data-table">
+    <div class="${TW.tableWrapper}">
+      <table class="${TW.dataTable}">
         <thead>
           <tr>
-            <th>时间</th>
-            <th>操作者</th>
-            <th>动作</th>
-            <th>trace_id</th>
+            <th class="${TW.th}">时间</th>
+            <th class="${TW.th}">操作者</th>
+            <th class="${TW.th}">动作</th>
+            <th class="${TW.th}">trace_id</th>
           </tr>
         </thead>
         <tbody>
@@ -1974,10 +2083,10 @@ function renderRecentOperationList(items) {
             .map(
               (item) => `
                 <tr>
-                  <td>${escapeHtml(item.created_at_utc)}</td>
-                  <td>${escapeHtml(item.admin_username)}</td>
-                  <td>${escapeHtml(item.action_type)}</td>
-                  <td><code>${escapeHtml(item.trace_id)}</code></td>
+                  <td class="${TW.td}">${escapeHtml(item.created_at_utc)}</td>
+                  <td class="${TW.td}">${escapeHtml(item.admin_username)}</td>
+                  <td class="${TW.td}">${escapeHtml(item.action_type)}</td>
+                  <td class="${TW.td}"><code>${escapeHtml(item.trace_id)}</code></td>
                 </tr>
               `,
             )
@@ -2005,10 +2114,10 @@ function renderPaginationLinks(basePath, state, totalPages) {
   const currentPage = Number(state.page || "1");
   const links = [];
   if (currentPage > 1) {
-    links.push(`<a class="ghost-button" href="${buildPageHref(basePath, state, currentPage - 1)}">上一页</a>`);
+    links.push(`<a class="${TW.ghostBtn}" href="${buildPageHref(basePath, state, currentPage - 1)}">上一页</a>`);
   }
   if (currentPage < totalPages) {
-    links.push(`<a class="ghost-button" href="${buildPageHref(basePath, state, currentPage + 1)}">下一页</a>`);
+    links.push(`<a class="${TW.ghostBtn}" href="${buildPageHref(basePath, state, currentPage + 1)}">下一页</a>`);
   }
   return links.join("");
 }
@@ -2173,7 +2282,7 @@ function assignFormValue(form, name, value) {
 
 function setLoadingState(message) {
   adminRoot.innerHTML = `
-    <div class="notice-card">
+    <div class="${TW.notice}">
       <h2>正在加载</h2>
       <p>${escapeHtml(message)}</p>
     </div>
@@ -2182,7 +2291,7 @@ function setLoadingState(message) {
 
 function setNotice(node, title, copy) {
   node.innerHTML = `
-    <div class="notice-card">
+    <div class="${TW.notice}">
       <h3>${escapeHtml(title)}</h3>
       <p>${escapeHtml(copy)}</p>
     </div>
@@ -2198,12 +2307,12 @@ function handleAdminError(error) {
   }
   const message = error instanceof ApiError ? error.message : "后台接口暂时不可用，请稍后重试。";
   adminRoot.innerHTML = `
-    <div class="notice-card notice-card-warning">
+    <div class="${TW.noticeWarn}">
       <h2>服务繁忙</h2>
       <p>${escapeHtml(message)}</p>
-      <div class="button-row">
-        <a class="ghost-button" href="/admin/tasks">返回采集任务</a>
-        <a class="ghost-button" href="/admin/wallpapers">返回内容管理</a>
+      <div class="${TW.btnRow}">
+        <a class="${TW.ghostBtn}" href="/admin/tasks">返回采集任务</a>
+        <a class="${TW.ghostBtn}" href="/admin/wallpapers">返回内容管理</a>
       </div>
     </div>
   `;

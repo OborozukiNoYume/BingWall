@@ -97,6 +97,9 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     assert "/api/admin/download-stats" in js_response.text
     assert "/api/admin/logs" in js_response.text
     assert "/api/admin/audit-logs" in js_response.text
+    assert "bindDetailPreviewFallback" in js_response.text
+    assert "默认资源加载失败" in js_response.text
+    assert "打开默认资源地址" in js_response.text
     assert "逻辑删除" in js_response.text
     assert "标签管理" in js_response.text
     assert "修改后台密码" in js_response.text
@@ -105,7 +108,8 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     assert "sqlite" not in js_response.text.lower()
 
     assert css_response.status_code == 200
-    assert ".admin-shell" in css_response.text
-    assert ".detail-grid" in css_response.text
-    assert ".stats-grid" in css_response.text
-    assert ".tag-chip-grid" in css_response.text
+    assert ".border-slate-200" in css_response.text
+    assert ".bg-slate-50" in css_response.text
+    assert ".lg\\:grid-cols-2" in css_response.text
+    assert ".rounded-full" in css_response.text
+    assert ".bg-emerald-50" in css_response.text
