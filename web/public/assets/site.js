@@ -204,112 +204,92 @@ function renderListView({ filters, listPayload, state }) {
   };
 
   appRoot.innerHTML = `
-    <section class="mb-6" aria-labelledby="market-spotlight-heading">
-      <div class="flex items-baseline justify-between gap-4 mb-3">
-        <div>
-          <h2 id="market-spotlight-heading" class="text-lg font-bold">按市场查看最新壁纸</h2>
-          <p class="text-sm text-stone-500">固定支持 ${MARKET_SPOTLIGHT_OPTIONS.map((option) => escapeHtml(option.code)).join(" / ")}，单独调用公开单条接口，不影响下方分页列表。</p>
-        </div>
-      </div>
-      <form class="grid gap-3" id="market-spotlight-form">
-        <div class="grid gap-1">
-          <label class="text-sm font-medium" for="market-spotlight-code">市场</label>
-          <select id="market-spotlight-code" name="market_spotlight_code" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
+    <form id="wallpaper-filter-form" class="bg-white border border-stone-200/60 rounded-2xl p-4 shadow-sm mb-4">
+      <div class="flex flex-wrap items-end gap-x-3 gap-y-2">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-stone-500" for="market-spotlight-code">市场</label>
+          <select id="market-spotlight-code" name="market_spotlight_code" class="border border-stone-200 rounded-lg bg-white px-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
             ${MARKET_SPOTLIGHT_OPTIONS.map(
-              (option) => `<option value="${escapeHtml(option.code)}" ${selectedMarketSpotlightCode === option.code ? "selected" : ""}>${escapeHtml(option.code)} | ${escapeHtml(option.label)}</option>`,
+              (option) => `<option value="${escapeHtml(option.code)}" ${selectedMarketSpotlightCode === option.code ? "selected" : ""}>${escapeHtml(option.code)}</option>`,
             ).join("")}
           </select>
         </div>
-      </form>
-      <div id="market-spotlight-result" aria-live="polite" class="mt-3"></div>
-    </section>
-    <section class="mb-6" aria-labelledby="date-lookup-heading">
-      <div class="flex items-baseline justify-between gap-4 mb-3">
-        <div>
-          <h2 id="date-lookup-heading" class="text-lg font-bold">按日期查找壁纸</h2>
-          <p class="text-sm text-stone-500">选择一个 <code class="font-mono text-xs bg-stone-100 px-1 rounded">YYYY-MM-DD</code> 日期，单独调用公开单条接口查找当天对应的公开壁纸，不影响下方分页列表。</p>
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-stone-500" for="date-lookup-input">日期</label>
+          <input id="date-lookup-input" name="date_lookup" type="date" value="${escapeHtml(selectedLookupDate)}" class="border border-stone-200 rounded-lg bg-white px-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
         </div>
-      </div>
-      <form class="grid gap-3" id="date-lookup-form">
-        <div class="grid gap-1">
-          <label class="text-sm font-medium" for="date-lookup-input">日期</label>
-          <input id="date-lookup-input" name="date_lookup" type="date" value="${escapeHtml(selectedLookupDate)}" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
+        <div class="w-px h-7 bg-stone-200 hidden lg:block"></div>
+        <div class="flex flex-col gap-1 min-w-40 flex-1">
+          <label class="text-xs font-medium text-stone-500" for="keyword">关键词</label>
+          <div class="relative">
+            <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" class="w-full border border-stone-200 rounded-lg bg-white pl-8 pr-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
+          </div>
         </div>
-        <div class="flex flex-wrap gap-3">
-          <button class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer border-0" type="submit">查找壁纸</button>
-        </div>
-      </form>
-      <div id="date-lookup-result" aria-live="polite" class="mt-3"></div>
-    </section>
-    <div class="flex items-baseline justify-between gap-4 mb-4">
-      <div>
-        <h2 class="text-lg font-bold">筛选公开壁纸</h2>
-        <p class="text-sm text-stone-500">只显示已启用、允许公开、资源已就绪且处于发布时间窗口内的内容。</p>
-      </div>
-      <p class="text-sm text-stone-500">第 ${page} 页 / 共 ${totalPages || 1} 页</p>
-    </div>
-    <form class="grid gap-4 mb-5" id="wallpaper-filter-form">
-      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-        <div class="grid gap-1">
-          <label class="text-sm font-medium" for="keyword">关键词</label>
-          <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
-        </div>
-        <div class="grid gap-1">
-          <label class="text-sm font-medium" for="market-code">地区</label>
-          <select id="market-code" name="market_code" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-stone-500" for="market-code">地区</label>
+          <select id="market-code" name="market_code" class="border border-stone-200 rounded-lg bg-white px-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
             <option value="">全部地区</option>
             ${markets.map((market) => `<option value="${escapeHtml(market.code)}">${escapeHtml(market.label)}</option>`).join("")}
           </select>
         </div>
-        <div class="grid gap-1">
-          <label class="text-sm font-medium" for="resolution-min-width">最小宽度</label>
-          <input id="resolution-min-width" name="resolution_min_width" type="number" min="1" placeholder="例如 1920" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-stone-500">最小尺寸</label>
+          <div class="flex items-center gap-1">
+            <input id="resolution-min-width" name="resolution_min_width" type="number" min="1" placeholder="宽" class="w-18 border border-stone-200 rounded-lg bg-white px-2 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
+            <span class="text-stone-400 text-xs select-none">&times;</span>
+            <input id="resolution-min-height" name="resolution_min_height" type="number" min="1" placeholder="高" class="w-18 border border-stone-200 rounded-lg bg-white px-2 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
+          </div>
         </div>
-        <div class="grid gap-1">
-          <label class="text-sm font-medium" for="resolution-min-height">最小高度</label>
-          <input id="resolution-min-height" name="resolution_min_height" type="number" min="1" placeholder="例如 1080" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
-        </div>
-        <div class="grid gap-1">
-          <label class="text-sm font-medium" for="page-size">每页数量</label>
-          <select id="page-size" name="page_size" class="w-full border border-stone-200 rounded-xl bg-white px-3 py-2.5 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-stone-500" for="page-size">每页</label>
+          <select id="page-size" name="page_size" class="border border-stone-200 rounded-lg bg-white px-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
             <option value="12">12</option>
             <option value="20">20</option>
             <option value="40">40</option>
           </select>
         </div>
+        <div class="flex items-end gap-2">
+          <button type="submit" class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-amber-500 hover:bg-amber-600 active:scale-[0.96] text-white cursor-pointer border-0 transition-colors" title="搜索">
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          </button>
+          <button type="button" id="reset-filters" class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.96] cursor-pointer transition-colors" title="重置筛选">
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M3 12a9 9 0 1 1 3-6.9L3 9"/><path d="M3 3v6h6"/></svg>
+          </button>
+        </div>
       </div>
-      <div class="grid gap-1">
-        <label class="text-sm font-medium">标签</label>
-        ${
-          tags.length === 0
-            ? `<div class="border border-stone-200 rounded-xl bg-stone-50 p-4 text-sm text-stone-500">当前没有可公开筛选的标签。</div>`
-            : `<div class="flex flex-wrap gap-2">
-                ${tags
-                  .map(
-                    (tag) => `
-                      <label class="inline-flex items-center gap-2 border border-stone-200 rounded-full bg-white px-3 py-2 cursor-pointer text-sm hover:bg-stone-50 hover:border-stone-300 transition-colors duration-150">
-                        <input type="checkbox" name="tag_keys" value="${escapeHtml(tag.tag_key)}" ${selectedTagKeys.includes(tag.tag_key) ? "checked" : ""} />
-                        <span>${escapeHtml(tag.tag_name)}</span>
-                      </label>
-                    `,
-                  )
-                  .join("")}
-              </div>`
-        }
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <button class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer border-0" type="submit">刷新结果</button>
-        <button class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer text-stone-600 hover:bg-stone-50 hover:border-stone-300 active:scale-[0.98]" id="reset-filters" type="button">重置筛选</button>
-      </div>
+      ${
+        tags.length > 0
+          ? `<div class="flex flex-wrap gap-2 mt-3 pt-3 border-t border-stone-100">
+              ${tags
+                .map(
+                  (tag) => `
+                    <label class="inline-flex items-center gap-1.5 border border-stone-200 rounded-full bg-white px-3 py-1.5 cursor-pointer text-xs hover:bg-stone-50 hover:border-stone-300 transition-colors">
+                      <input type="checkbox" name="tag_keys" value="${escapeHtml(tag.tag_key)}" ${selectedTagKeys.includes(tag.tag_key) ? "checked" : ""} />
+                      <span>${escapeHtml(tag.tag_name)}</span>
+                    </label>
+                  `,
+                )
+                .join("")}
+            </div>`
+          : ""
+      }
     </form>
+    <div class="grid gap-4 mb-4">
+      <div id="market-spotlight-result" aria-live="polite"></div>
+      <div id="date-lookup-result" aria-live="polite"></div>
+    </div>
+    <div class="flex items-baseline justify-between gap-4 mb-3">
+      <p class="text-sm text-stone-500">第 ${page} 页 / 共 ${totalPages || 1} 页</p>
+    </div>
     <section id="wallpaper-list-results"></section>
     <nav class="flex flex-wrap gap-3 mt-4" id="wallpaper-pagination" aria-label="分页导航"></nav>
   `;
 
   const filterForm = document.querySelector("#wallpaper-filter-form");
-  const marketSpotlightForm = document.querySelector("#market-spotlight-form");
+  const marketSpotlightSelect = document.querySelector("#market-spotlight-code");
   const marketSpotlightResult = document.querySelector("#market-spotlight-result");
-  const dateLookupForm = document.querySelector("#date-lookup-form");
+  const dateLookupInput = document.querySelector("#date-lookup-input");
   const dateLookupResult = document.querySelector("#date-lookup-result");
   const resultsNode = document.querySelector("#wallpaper-list-results");
   const paginationNode = document.querySelector("#wallpaper-pagination");
@@ -318,37 +298,24 @@ function renderListView({ filters, listPayload, state }) {
     return;
   }
 
-  if (marketSpotlightForm instanceof HTMLFormElement && marketSpotlightResult instanceof HTMLElement) {
+  if (marketSpotlightSelect instanceof HTMLSelectElement && marketSpotlightResult instanceof HTMLElement) {
     void renderMarketSpotlight(marketSpotlightResult, selectedMarketSpotlightCode);
-    marketSpotlightForm.addEventListener("change", async () => {
-      const formData = new FormData(marketSpotlightForm);
-      const nextMarketSpotlightCode = normalizeMarketSpotlightCode(
-        stringOrNull(formData.get("market_spotlight_code")),
-      );
-      currentState = {
-        ...currentState,
-        market_spotlight_code: nextMarketSpotlightCode,
-      };
-      replaceListState({
-        ...currentState,
-      });
+    marketSpotlightSelect.addEventListener("change", async () => {
+      const nextMarketSpotlightCode = normalizeMarketSpotlightCode(stringOrNull(marketSpotlightSelect.value));
+      currentState = { ...currentState, market_spotlight_code: nextMarketSpotlightCode };
+      replaceListState({ ...currentState });
       await renderMarketSpotlight(marketSpotlightResult, nextMarketSpotlightCode);
     });
   }
 
-  if (dateLookupForm instanceof HTMLFormElement && dateLookupResult instanceof HTMLElement) {
-    void renderDateLookup(dateLookupResult, selectedLookupDate);
-    dateLookupForm.addEventListener("submit", async (event) => {
-      event.preventDefault();
-      const formData = new FormData(dateLookupForm);
-      const nextLookupDate = normalizeLookupDate(stringOrNull(formData.get("date_lookup")));
-      currentState = {
-        ...currentState,
-        date_lookup: nextLookupDate,
-      };
-      replaceListState({
-        ...currentState,
-      });
+  if (dateLookupInput instanceof HTMLInputElement && dateLookupResult instanceof HTMLElement) {
+    if (selectedLookupDate) {
+      void renderDateLookup(dateLookupResult, selectedLookupDate);
+    }
+    dateLookupInput.addEventListener("change", async () => {
+      const nextLookupDate = normalizeLookupDate(stringOrNull(dateLookupInput.value));
+      currentState = { ...currentState, date_lookup: nextLookupDate };
+      replaceListState({ ...currentState });
       await renderDateLookup(dateLookupResult, nextLookupDate);
     });
   }
@@ -371,10 +338,11 @@ function renderListView({ filters, listPayload, state }) {
   filterForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     const formData = new FormData(filterForm);
+    const checkedTags = Array.from(document.querySelectorAll('input[name="tag_keys"]:checked')).map((el) => el.value);
     const nextState = {
       keyword: stringOrNull(formData.get("keyword")),
       market_code: stringOrNull(formData.get("market_code")),
-      tag_keys: formData.getAll("tag_keys").map((value) => stringOrNull(value)).filter(Boolean).join(","),
+      tag_keys: checkedTags.filter(Boolean).join(","),
       resolution_min_width: stringOrNull(formData.get("resolution_min_width")),
       resolution_min_height: stringOrNull(formData.get("resolution_min_height")),
       page_size: stringOrNull(formData.get("page_size")) || "20",
@@ -417,6 +385,7 @@ function renderListView({ filters, listPayload, state }) {
       await refreshListState({ ...currentState, page: nextPage, sort: "date_desc" });
     });
   });
+
 }
 
 async function renderMarketSpotlight(container, marketCode) {
