@@ -2,12 +2,16 @@ const appRoot = document.querySelector("#app-root");
 const body = document.body;
 const pageName = body.dataset.page;
 const wallpaperId = body.dataset.wallpaperId;
-const MARKET_SPOTLIGHT_OPTIONS = [
+const REGION_FILTER_OPTIONS = [
   { code: "zh-CN", label: "中文（中国）" },
   { code: "en-US", label: "English (United States)" },
   { code: "ja-JP", label: "日本語（日本）" },
+  { code: "en-GB", label: "English (United Kingdom)" },
+  { code: "de-DE", label: "Deutsch (Deutschland)" },
+  { code: "fr-FR", label: "Français (France)" },
+  { code: "en-CA", label: "English (Canada)" },
+  { code: "en-AU", label: "English (Australia)" },
 ];
-const DEFAULT_MARKET_SPOTLIGHT_CODE = MARKET_SPOTLIGHT_OPTIONS[0].code;
 const LOOKUP_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -195,11 +199,9 @@ function renderListView({ filters, listPayload, state }) {
   const page = Number(pagination.page || 1);
   const totalPages = Number(pagination.total_pages || 0);
   const selectedTagKeys = parseTagKeys(state.tag_keys);
-  const selectedMarketSpotlightCode = normalizeMarketSpotlightCode(state.market_spotlight_code);
   const selectedLookupDate = normalizeLookupDate(state.date_lookup);
   let currentState = {
     ...state,
-    market_spotlight_code: selectedMarketSpotlightCode,
     date_lookup: selectedLookupDate,
   };
 
@@ -207,10 +209,11 @@ function renderListView({ filters, listPayload, state }) {
     <form id="wallpaper-filter-form" class="bg-white border border-stone-200/60 rounded-2xl p-4 shadow-sm mb-4">
       <div class="flex flex-wrap items-end gap-x-3 gap-y-2">
         <div class="flex flex-col gap-1">
-          <label class="text-xs font-medium text-stone-500" for="market-spotlight-code">市场</label>
-          <select id="market-spotlight-code" name="market_spotlight_code" class="border border-stone-200 rounded-lg bg-white px-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
-            ${MARKET_SPOTLIGHT_OPTIONS.map(
-              (option) => `<option value="${escapeHtml(option.code)}" ${selectedMarketSpotlightCode === option.code ? "selected" : ""}>${escapeHtml(option.code)}</option>`,
+          <label class="text-xs font-medium text-stone-500" for="market-code">地区</label>
+          <select id="market-code" name="market_code" class="border border-stone-200 rounded-lg bg-white px-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
+            <option value="">全部地区</option>
+            ${REGION_FILTER_OPTIONS.map(
+              (market) => `<option value="${escapeHtml(market.code)}">${escapeHtml(market.label)}</option>`,
             ).join("")}
           </select>
         </div>
@@ -225,13 +228,6 @@ function renderListView({ filters, listPayload, state }) {
             <svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-400 pointer-events-none" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
             <input id="keyword" name="keyword" type="search" placeholder="标题、说明、版权或标签" class="w-full border border-stone-200 rounded-lg bg-white pl-8 pr-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none" />
           </div>
-        </div>
-        <div class="flex flex-col gap-1">
-          <label class="text-xs font-medium text-stone-500" for="market-code">地区</label>
-          <select id="market-code" name="market_code" class="border border-stone-200 rounded-lg bg-white px-3 h-9 text-sm focus:border-amber-400 focus:ring-2 focus:ring-amber-100 focus:outline-none">
-            <option value="">全部地区</option>
-            ${markets.map((market) => `<option value="${escapeHtml(market.code)}">${escapeHtml(market.label)}</option>`).join("")}
-          </select>
         </div>
         <div class="flex flex-col gap-1">
           <label class="text-xs font-medium text-stone-500">最小尺寸</label>
@@ -276,7 +272,6 @@ function renderListView({ filters, listPayload, state }) {
       }
     </form>
     <div class="grid gap-4 mb-4">
-      <div id="market-spotlight-result" aria-live="polite"></div>
       <div id="date-lookup-result" aria-live="polite"></div>
     </div>
     <div class="flex items-baseline justify-between gap-4 mb-3">
@@ -287,8 +282,6 @@ function renderListView({ filters, listPayload, state }) {
   `;
 
   const filterForm = document.querySelector("#wallpaper-filter-form");
-  const marketSpotlightSelect = document.querySelector("#market-spotlight-code");
-  const marketSpotlightResult = document.querySelector("#market-spotlight-result");
   const dateLookupInput = document.querySelector("#date-lookup-input");
   const dateLookupResult = document.querySelector("#date-lookup-result");
   const resultsNode = document.querySelector("#wallpaper-list-results");
@@ -296,16 +289,6 @@ function renderListView({ filters, listPayload, state }) {
 
   if (!(filterForm instanceof HTMLFormElement) || !(resultsNode instanceof HTMLElement) || !(paginationNode instanceof HTMLElement)) {
     return;
-  }
-
-  if (marketSpotlightSelect instanceof HTMLSelectElement && marketSpotlightResult instanceof HTMLElement) {
-    void renderMarketSpotlight(marketSpotlightResult, selectedMarketSpotlightCode);
-    marketSpotlightSelect.addEventListener("change", async () => {
-      const nextMarketSpotlightCode = normalizeMarketSpotlightCode(stringOrNull(marketSpotlightSelect.value));
-      currentState = { ...currentState, market_spotlight_code: nextMarketSpotlightCode };
-      replaceListState({ ...currentState });
-      await renderMarketSpotlight(marketSpotlightResult, nextMarketSpotlightCode);
-    });
   }
 
   if (dateLookupInput instanceof HTMLInputElement && dateLookupResult instanceof HTMLElement) {
@@ -346,7 +329,6 @@ function renderListView({ filters, listPayload, state }) {
       resolution_min_width: stringOrNull(formData.get("resolution_min_width")),
       resolution_min_height: stringOrNull(formData.get("resolution_min_height")),
       page_size: stringOrNull(formData.get("page_size")) || "20",
-      market_spotlight_code: currentState.market_spotlight_code,
       date_lookup: currentState.date_lookup,
       page: "1",
       sort: "date_desc",
@@ -366,7 +348,6 @@ function renderListView({ filters, listPayload, state }) {
         resolution_min_height: "",
         sort: "date_desc",
         tag_keys: "",
-        market_spotlight_code: currentState.market_spotlight_code,
         date_lookup: currentState.date_lookup,
       });
     });
@@ -386,36 +367,6 @@ function renderListView({ filters, listPayload, state }) {
     });
   });
 
-}
-
-async function renderMarketSpotlight(container, marketCode) {
-  container.innerHTML = renderStatusMarkup({
-    title: "正在读取市场结果",
-    copy: `正在加载 ${marketCode} 的最新公开壁纸...`,
-  });
-
-  try {
-    const detail = await fetchEnvelope(`/api/public/wallpapers/by-market/${encodeURIComponent(marketCode)}`);
-    container.innerHTML = renderMarketSpotlightMarkup(detail);
-  } catch (error) {
-    if (error instanceof ApiError && error.status === 404) {
-      container.innerHTML = renderStatusMarkup({
-        title: "当前市场暂无公开壁纸",
-        copy: `${marketCode} 暂时没有可展示内容，可以切换其他市场后重试。`,
-      });
-      return;
-    }
-
-    console.error(error);
-    container.innerHTML = renderStatusMarkup({
-      title: "市场结果读取失败",
-      copy: "公开接口暂时不可用，请稍后重试。",
-    });
-  }
-}
-
-function renderMarketSpotlightMarkup(detail) {
-  return renderFeatureWallpaperMarkup(detail, "市场最新公开壁纸");
 }
 
 async function renderDateLookup(container, lookupDate) {
@@ -592,7 +543,6 @@ function readListState() {
     tag_keys: params.get("tag_keys") || "",
     resolution_min_width: params.get("resolution_min_width") || "",
     resolution_min_height: params.get("resolution_min_height") || "",
-    market_spotlight_code: normalizeMarketSpotlightCode(params.get("market_spotlight_code")),
     date_lookup: normalizeLookupDate(params.get("date_lookup")),
     page: params.get("page") || "1",
     page_size: params.get("page_size") || "20",
@@ -620,11 +570,6 @@ function setFieldValue(form, name, value) {
   if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
     field.value = value || "";
   }
-}
-
-function normalizeMarketSpotlightCode(value) {
-  const matchedOption = MARKET_SPOTLIGHT_OPTIONS.find((option) => option.code === value);
-  return matchedOption ? matchedOption.code : DEFAULT_MARKET_SPOTLIGHT_CODE;
 }
 
 function normalizeLookupDate(value) {

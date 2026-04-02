@@ -24,6 +24,8 @@ from app.services.resource_locator import ResourceLocator
 
 MARKET_LABELS: dict[str, str] = {
     "de-DE": "Deutsch (Deutschland)",
+    "en-AU": "English (Australia)",
+    "en-CA": "English (Canada)",
     "en-GB": "English (United Kingdom)",
     "en-US": "English (United States)",
     "fr-FR": "Français (France)",

@@ -50,14 +50,19 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert 'fetchEnvelope("/api/public/site-info")' in asset_response.text
     assert "/api/public/wallpaper-filters" in asset_response.text
     assert "/api/public/wallpapers?page=1&page_size=6&sort=date_desc" in asset_response.text
-    assert "/api/public/wallpapers/by-market/" in asset_response.text
     assert "/api/public/wallpapers/by-date/" in asset_response.text
     assert "/api/public/download-events" in asset_response.text
-    assert "market_spotlight_code" in asset_response.text
+    assert "market_spotlight_code" not in asset_response.text
     assert "date_lookup" in asset_response.text
+    assert "market_code" in asset_response.text
     assert '"zh-CN"' in asset_response.text
     assert '"en-US"' in asset_response.text
     assert '"ja-JP"' in asset_response.text
+    assert '"en-GB"' in asset_response.text
+    assert '"de-DE"' in asset_response.text
+    assert '"fr-FR"' in asset_response.text
+    assert '"en-CA"' in asset_response.text
+    assert '"en-AU"' in asset_response.text
     assert 'params.set("keyword", state.keyword)' in asset_response.text
     assert "tag_keys" in asset_response.text
     assert "内容不存在" in asset_response.text

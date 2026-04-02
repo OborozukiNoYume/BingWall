@@ -732,6 +732,18 @@ def test_public_wallpaper_filters_and_site_info_only_return_public_options(tmp_p
     seed_wallpaper(
         database_path=database_path,
         wallpaper_date="2026-03-22",
+        market_code="en-CA",
+        title="Visible Canada",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-21",
+        market_code="en-AU",
+        title="Visible Australia",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date="2026-03-22",
         market_code="ja-JP",
         title="Hidden deleted",
         content_status="deleted",
@@ -763,6 +775,8 @@ def test_public_wallpaper_filters_and_site_info_only_return_public_options(tmp_p
     site_info_payload = site_info_response.json()
     assert filters_response.status_code == 200
     assert filters_payload["data"]["markets"] == [
+        {"code": "en-AU", "label": "English (Australia)"},
+        {"code": "en-CA", "label": "English (Canada)"},
         {"code": "en-US", "label": "English (United States)"},
         {"code": "fr-FR", "label": "Français (France)"},
     ]
