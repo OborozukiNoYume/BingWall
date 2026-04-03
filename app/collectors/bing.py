@@ -126,6 +126,7 @@ class BingClient:
         )
         source_id = extract_source_id(str(payload.get("urlbase") or payload["url"]))
         source_key = f"bing:{market_code}:{wallpaper_date.isoformat()}:{source_id}"
+        canonical_key = f"bing:{wallpaper_date.isoformat()}:{source_id}"
         primary_variant = download_variants[0] if download_variants else None
         width, height = parse_dimensions_from_url(
             primary_variant.source_url if primary_variant is not None else origin_image_url
@@ -159,6 +160,8 @@ class BingClient:
             market_code=market_code,
             wallpaper_date=wallpaper_date,
             source_key=source_key,
+            canonical_key=canonical_key,
+            resource_path_key=source_id,
             title=normalize_optional_text(payload.get("title")),
             copyright_text=normalize_optional_text(payload.get("copyright")),
             origin_page_url=normalize_optional_text(payload.get("copyrightlink")),
@@ -462,6 +465,7 @@ def build_bing_relative_path(item: BingImageMetadata) -> str:
         market_code=item.market_code,
         wallpaper_date=item.wallpaper_date,
         source_key=item.source_key,
+        canonical_key=item.canonical_key,
         origin_image_url=item.origin_image_url,
     )
 

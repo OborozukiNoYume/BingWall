@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T06:32:02Z
+- 更新时间：2026-04-03T03:14:30Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：公开接口与后台接口的统一契约说明
 
@@ -601,6 +601,26 @@
 - 错误摘要
 - 逐条处理明细
 - 请求参数快照
+
+### 13.1 后台任务人工执行
+
+- 方法：`POST`
+- 路径：`/api/admin/collection-tasks/{task_id}/consume`
+
+响应数据结构（`data` 字段）至少包含：
+
+- `task_id`
+- `task_status`
+- `success_count`
+- `duplicate_count`
+- `failure_count`
+- `error_summary`
+
+约束：
+
+- 只能执行明确指定的一条任务
+- 当前实现仅允许人工执行处于 `queued` 状态的任务
+- 执行过程会复用与队列消费相同的采集主链路，并写入对应审计日志
 
 ### 14. 后台任务重试
 

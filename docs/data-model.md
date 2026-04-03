@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T03:19:48Z
+- 更新时间：2026-04-03T08:00:00Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期实施前的数据实体、字段分组、状态模型、约束和索引说明
 
@@ -19,6 +19,7 @@
 | 实体 | 说明 | 关系 |
 |---|---|---|
 | `wallpapers` | 壁纸主体内容 | 一对多关联 `image_resources` |
+| `wallpaper_localizations` | 壁纸地区文案 | 多对一关联 `wallpapers` |
 | `image_resources` | 资源文件记录 | 多对一关联 `wallpapers` |
 | `collection_tasks` | 一次自动或手动采集任务 | 一对多关联 `collection_task_items` |
 | `collection_task_items` | 任务内逐条处理记录 | 多对一关联 `collection_tasks` |
@@ -33,7 +34,7 @@
 
 ### 作用
 
-表示一条可管理的壁纸内容，是公开展示和后台管理的核心实体。
+表示一条可管理的壁纸主体，是公开展示和后台管理的核心实体。对于 Bing，同一张图跨地区只保留一条主体记录，地区差异文案下沉到 `wallpaper_localizations`。
 
 ### 建议字段
 
@@ -42,6 +43,7 @@
 | `id` | integer / uuid | 是 | 主键 |
 | `source_type` | string | 是 | 来源类型，当前已支持 `bing`、`nasa_apod` |
 | `source_key` | string | 是 | 来源唯一键，用于追踪和去重 |
+| `canonical_key` | string | 是 | 主体级去重键；Bing 用于跨地区归并同一张图 |
 | `market_code` | string | 是 | 地区代码，例如 `en-US` |
 | `wallpaper_date` | date | 是 | 壁纸所属日期 |
 | `title` | string | 否 | 标题 |
@@ -71,12 +73,44 @@
 
 ### 约束建议
 
-- 唯一约束：`source_type + wallpaper_date + market_code`
+- 唯一约束：`source_type + canonical_key`
 - 非删除内容才能参与公开查询
 - 当 `content_status = enabled` 时，`resource_status` 必须为 `ready`
 - `resource_status` 由领域服务或巡检任务根据当前对外可用的资源记录同步刷新，不允许由公开接口直接写入
-- Bing 来源当前还会补充 `subtitle`、`description`、`location_text`、`published_at_utc` 与 `portrait_image_url`，用于公开检索、后台展示和移动端竖版图适配
+- Bing 的地区文案字段由 `wallpaper_localizations` 承载；`wallpapers` 上保留的同名字段仅作为兼容性兜底，不再代表完整地区文案视图
 - 当前关键词搜索基于 `title`、`subtitle`、`copyright_text`、`description` 与已绑定标签实现，不单独新增搜索索引表
+
+## 1.1 壁纸地区文案 `wallpaper_localizations`
+
+### 作用
+
+为同一张 Bing 图片保存多地区文案与上游元信息，支持“同图多地区自动匹配展示”。
+
+### 建议字段
+
+| 字段 | 类型建议 | 必填 | 说明 |
+|---|---|---|---|
+| `id` | integer / uuid | 是 | 主键 |
+| `wallpaper_id` | integer / uuid | 是 | 所属壁纸主体 ID |
+| `market_code` | string | 是 | 地区代码，例如 `en-US` |
+| `source_key` | string | 是 | 地区级来源唯一键 |
+| `title` | string | 否 | 标题 |
+| `subtitle` | string | 否 | 简述 |
+| `description` | text | 否 | 详情描述 |
+| `copyright_text` | string | 否 | 版权说明 |
+| `published_at_utc` | datetime | 否 | 上游发布时间 |
+| `location_text` | string | 否 | 拍摄地或主题说明 |
+| `origin_page_url` | string | 否 | 地区对应的原始页面地址 |
+| `portrait_image_url` | string | 否 | 竖版下载图地址 |
+| `raw_extra_json` | text | 否 | 地区级扩展信息 |
+| `created_at_utc` | datetime | 是 | 创建时间 |
+| `updated_at_utc` | datetime | 是 | 更新时间 |
+
+### 约束建议
+
+- 唯一约束：`wallpaper_id + market_code`
+- Bing 公开列表、详情和后台详情应优先从该表解析地区文案
+- 当请求未显式指定市场时，按请求上下文或默认市场回退到某一条可用地区文案
 
 ## 2. 图片资源 `image_resources`
 
@@ -393,7 +427,7 @@
 ### `tags`
 
 - `(tag_key)` 唯一索引
-- `(status, sort_weight)` 公开筛选索引
+- `(status, sort_weight DESC, tag_name ASC)` 公开筛选与稳定排序索引
 
 ### `wallpaper_tags`
 

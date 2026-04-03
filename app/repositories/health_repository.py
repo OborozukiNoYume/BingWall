@@ -114,6 +114,8 @@ class HealthRepository:
                 r.height,
                 r.image_status,
                 w.source_type,
+                w.source_key,
+                w.canonical_key,
                 w.market_code,
                 w.wallpaper_date
             FROM image_resources AS r

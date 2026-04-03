@@ -26,6 +26,8 @@ class CollectedImageMetadata:
     origin_width: int | None
     origin_height: int | None
     raw_extra_json: str
+    canonical_key: str | None = None
+    resource_path_key: str | None = None
     subtitle: str | None = None
     description: str | None = None
     location_text: str | None = None

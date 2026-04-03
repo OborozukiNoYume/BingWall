@@ -57,6 +57,7 @@ class PublicWallpaperSummary(BaseModel):
     title: str
     subtitle: str | None
     market_code: str
+    resolved_market_code: str
     wallpaper_date: str
     thumbnail_url: str
     detail_url: str
@@ -81,6 +82,7 @@ class PublicWallpaperDetailData(BaseModel):
     description: str | None
     copyright_text: str | None
     market_code: str
+    resolved_market_code: str
     wallpaper_date: str
     preview_url: str
     download_url: str | None

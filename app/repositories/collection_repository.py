@@ -15,6 +15,7 @@ from app.repositories.sqlite import connect_sqlite
 class WallpaperCreateInput:
     source_type: str
     source_key: str
+    canonical_key: str
     market_code: str
     wallpaper_date: str
     title: str | None
@@ -29,6 +30,23 @@ class WallpaperCreateInput:
     origin_width: int | None
     origin_height: int | None
     is_downloadable: bool
+    portrait_image_url: str | None
+    raw_extra_json: str
+    created_at_utc: str
+
+
+@dataclass(frozen=True, slots=True)
+class WallpaperLocalizationUpsertInput:
+    wallpaper_id: int
+    market_code: str
+    source_key: str
+    title: str | None
+    subtitle: str | None
+    description: str | None
+    copyright_text: str | None
+    published_at_utc: str | None
+    location_text: str | None
+    origin_page_url: str | None
     portrait_image_url: str | None
     raw_extra_json: str
     created_at_utc: str
@@ -419,6 +437,42 @@ class CollectionRepository:
         ).fetchone()
         return cast(sqlite3.Row | None, row)
 
+    def find_wallpaper_by_canonical_key(
+        self,
+        *,
+        source_type: str,
+        canonical_key: str,
+    ) -> sqlite3.Row | None:
+        row = self.connection.execute(
+            """
+            SELECT *
+            FROM wallpapers
+            WHERE source_type = ?
+              AND canonical_key = ?
+            LIMIT 1;
+            """,
+            (source_type, canonical_key),
+        ).fetchone()
+        return cast(sqlite3.Row | None, row)
+
+    def get_wallpaper_localization(
+        self,
+        *,
+        wallpaper_id: int,
+        market_code: str,
+    ) -> sqlite3.Row | None:
+        row = self.connection.execute(
+            """
+            SELECT *
+            FROM wallpaper_localizations
+            WHERE wallpaper_id = ?
+              AND market_code = ?
+            LIMIT 1;
+            """,
+            (wallpaper_id, market_code),
+        ).fetchone()
+        return cast(sqlite3.Row | None, row)
+
     def find_image_resource_by_source_url_hash(self, source_url_hash: str) -> sqlite3.Row | None:
         row = self.connection.execute(
             """
@@ -500,6 +554,7 @@ class CollectionRepository:
             INSERT INTO wallpapers (
                 source_type,
                 source_key,
+                canonical_key,
                 market_code,
                 wallpaper_date,
                 title,
@@ -521,11 +576,12 @@ class CollectionRepository:
                 created_at_utc,
                 updated_at_utc
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?);
             """,
             (
                 item.source_type,
                 item.source_key,
+                item.canonical_key,
                 item.market_code,
                 item.wallpaper_date,
                 item.title,
@@ -628,6 +684,7 @@ class CollectionRepository:
             """
             UPDATE wallpapers
             SET source_key = ?,
+                canonical_key = ?,
                 market_code = ?,
                 wallpaper_date = ?,
                 title = ?,
@@ -649,6 +706,7 @@ class CollectionRepository:
             """,
             (
                 item.source_key,
+                item.canonical_key,
                 item.market_code,
                 item.wallpaper_date,
                 item.title,
@@ -669,6 +727,85 @@ class CollectionRepository:
                 wallpaper_id,
             ),
         )
+        self.connection.commit()
+
+    def upsert_wallpaper_localization(self, item: WallpaperLocalizationUpsertInput) -> None:
+        existing_row = self.get_wallpaper_localization(
+            wallpaper_id=item.wallpaper_id,
+            market_code=item.market_code,
+        )
+        if existing_row is None:
+            self.connection.execute(
+                """
+                INSERT INTO wallpaper_localizations (
+                    wallpaper_id,
+                    market_code,
+                    source_key,
+                    title,
+                    subtitle,
+                    description,
+                    copyright_text,
+                    published_at_utc,
+                    location_text,
+                    origin_page_url,
+                    portrait_image_url,
+                    raw_extra_json,
+                    created_at_utc,
+                    updated_at_utc
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                """,
+                (
+                    item.wallpaper_id,
+                    item.market_code,
+                    item.source_key,
+                    item.title,
+                    item.subtitle,
+                    item.description,
+                    item.copyright_text,
+                    item.published_at_utc,
+                    item.location_text,
+                    item.origin_page_url,
+                    item.portrait_image_url,
+                    item.raw_extra_json,
+                    item.created_at_utc,
+                    item.created_at_utc,
+                ),
+            )
+        else:
+            self.connection.execute(
+                """
+                UPDATE wallpaper_localizations
+                SET source_key = ?,
+                    title = ?,
+                    subtitle = ?,
+                    description = ?,
+                    copyright_text = ?,
+                    published_at_utc = ?,
+                    location_text = ?,
+                    origin_page_url = ?,
+                    portrait_image_url = ?,
+                    raw_extra_json = ?,
+                    updated_at_utc = ?
+                WHERE wallpaper_id = ?
+                  AND market_code = ?;
+                """,
+                (
+                    item.source_key,
+                    item.title,
+                    item.subtitle,
+                    item.description,
+                    item.copyright_text,
+                    item.published_at_utc,
+                    item.location_text,
+                    item.origin_page_url,
+                    item.portrait_image_url,
+                    item.raw_extra_json,
+                    item.created_at_utc,
+                    item.wallpaper_id,
+                    item.market_code,
+                ),
+            )
         self.connection.commit()
 
     def update_image_resource_source(

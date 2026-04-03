@@ -2,13 +2,13 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T15:07:34Z
+- 更新时间：2026-04-03T06:25:00Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
 ## 当前状态说明
 
-当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查、资源巡检与本地资源归档清理闭环、阶段二 `T2.5` 的备份恢复脚本与恢复演练入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
+当前仓库已包含阶段一 `T1.1` 的最小可执行后端骨架、阶段一 `T1.2` 的 SQLite 迁移基线、阶段一 `T1.3` 的 Bing 采集与资源入库主链路、阶段一 `T1.4` 的公开 API、阶段一 `T1.5` 的基础公开前端、阶段一 `T1.6` 的单机部署模板与自动化部署验收入口，以及阶段二 `T2.3` 的手动采集任务消费入口与后台观测页面、阶段二 `T2.4` 的健康检查、资源巡检与本地资源归档清理闭环、阶段二 `T2.5` 的备份恢复脚本与恢复演练入口；当前手动 Bing 采集默认会按 `BINGWALL_COLLECT_BING_MARKETS` 批量覆盖固定 8 个地区，并已补齐基于 Playwright 的浏览器冒烟测试入口。本文件继续记录一期实施时必须遵循的部署与运行要求，并补充可直接复用的部署模板位置。
 
 ## 1. 部署目标
 
@@ -88,9 +88,9 @@
 | 数据库配置 | SQLite 文件路径 |
 | 存储配置 | 临时目录、正式目录、备份目录 |
 | 采集配置 | 来源开关、默认市场、市场列表、定时回溯天数、超时、重试次数 |
-| 安全配置 | 会话密钥、登录过期时间、密码策略 |
-| 日志配置 | 级别、目录、保留天数 |
-| 告警配置 | 邮件或 Webhook 地址 |
+| 安全配置 | 会话密钥、登录过期时间、初始化管理员密码约束 |
+| 日志配置 | 当前已实现 `BINGWALL_LOG_LEVEL`；日志目录依赖部署目录约定 |
+| 告警配置 | 当前未提供邮件 / Webhook 等内建告警配置项 |
 
 ### 关键配置基线
 
@@ -108,17 +108,20 @@
 
 #### 密码策略
 
-- 管理员密码最少 `12` 位
-- 必须同时包含大写字母、小写字母、数字和特殊字符
-- 密码摘要算法在实施时必须固定并记录；一期推荐 `argon2id`
+- 当前配置层会对 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 强制执行“至少 `12` 位”校验
+- 当前后台改密接口会校验“当前密码正确”“两次新密码一致”“新旧密码不能相同”，但不会额外强制大小写 / 数字 / 特殊字符复杂度
+- 当前密码摘要算法已固定为 `pbkdf2_sha256`，迭代次数为 `600000`
+- 如需升级到更严格复杂度或 `argon2id`，应视为后续安全增强，不应写成当前已落地能力
 
-#### 告警阈值
+#### 建议监控 / 告警阈值（当前未配置化）
 
-- 连续 `3` 次自动采集失败触发告警
-- 最近 `50` 次下载中失败率超过 `20%` 触发告警
-- 磁盘使用率超过 `85%` 触发告警
-- 最近 `5` 分钟 API `5xx` 比例超过 `5%` 触发告警
-- 超过 `24` 小时未产生成功备份触发告警
+- 以下阈值目前仅可作为运维侧监控建议，仓库内尚未提供邮件、Webhook 或其他主动告警发送能力
+- 当前代码里唯一直接使用的阈值是深度健康检查中的磁盘使用率 `85%`
+- 连续 `3` 次自动采集失败
+- 最近 `50` 次下载中失败率超过 `20%`
+- 磁盘使用率超过 `85%`
+- 最近 `5` 分钟 API `5xx` 比例超过 `5%`
+- 超过 `24` 小时未产生成功备份
 
 ### 配置原则
 
@@ -127,12 +130,35 @@
 - 任何敏感值都不能写入仓库
 - 所有时间相关配置内部按 UTC 处理
 
+### 当前环境变量补充
+
+以下变量已在当前代码中定义；其中 `.env.example` 覆盖了本地开发默认值，`deploy/systemd/bingwall.env.example` 覆盖了当前生产模板默认值。部署文档需要按代码真实键名记录，避免只写抽象类别而遗漏实际配置入口：
+
+| 变量名 | 默认示例 | 说明 |
+|---|---|---|
+| `BINGWALL_APP_ENV` | `development` | 应用运行环境标识；生产模板中通常使用 `production` |
+| `BINGWALL_APP_HOST` | `127.0.0.1` | FastAPI 监听地址 |
+| `BINGWALL_APP_PORT` | `30003` | FastAPI 监听端口；生产模板默认可改为 `8000` |
+| `BINGWALL_APP_BASE_URL` | `http://127.0.0.1:30003` | 对外基础 URL，用于生成站点级链接与回调语义 |
+| `BINGWALL_LOG_LEVEL` | `INFO` | 当前唯一已实现的日志级别配置项 |
+| `BINGWALL_COLLECT_NASA_APOD_ENABLED` | `true` | 是否启用 `nasa_apod` 来源采集 |
+| `BINGWALL_COLLECT_NASA_APOD_DEFAULT_MARKET` | `global` | `nasa_apod` 默认市场代码，当前固定使用 `global` |
+| `BINGWALL_COLLECT_NASA_APOD_API_KEY` | `DEMO_KEY` | NASA APOD API 密钥；生产环境应替换为真实密钥 |
+| `BINGWALL_COLLECT_NASA_APOD_TIMEOUT_SECONDS` | `10` | NASA APOD HTTP 请求超时时间 |
+| `BINGWALL_COLLECT_NASA_APOD_MAX_DOWNLOAD_RETRIES` | `3` | NASA APOD 图片下载最大重试次数 |
+
+补充说明：
+
+- `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT` 当前会被应用配置模型和 `make run` 使用，但仓库内现有 `deploy/systemd/bingwall-api.service` 仍把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`；若生产环境需要改监听地址或端口，必须同步修改 `systemd` 与 `nginx` 模板，不能只改环境变量
+- `BINGWALL_COLLECT_NASA_APOD_*` 变量当前已在 `.env.example` 中给出本地开发示例，但 `deploy/systemd/bingwall.env.example` 仍未预填这些键；如目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，需在 `/etc/bingwall/bingwall.env` 中手工补充
+
 ### Bing 采集配置补充
 
 - `BINGWALL_COLLECT_BING_DEFAULT_MARKET` 仍表示公开站点默认使用的 Bing 市场代码；手动单市场采集时也可显式使用该值，必须使用 `en-US` 这类带连字符的 Bing 市场格式
 - `BINGWALL_COLLECT_BING_MARKETS` 用于手动采集默认市场集合和 cron 定时建任务；值为逗号分隔的市场列表，例如 `zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU`，系统会自动去重并忽略空白项
 - `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 用于 Bing 定时任务快照中的回溯窗口，当前只允许 `3`、`5`、`7`
 - 如果未单独配置 `BINGWALL_COLLECT_BING_MARKETS`，环境示例默认使用 `zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU` 八个地区
+- 当前 `nasa_apod` 来源的环境变量命名统一使用 `BINGWALL_COLLECT_NASA_APOD_*` 前缀，不与 Bing 采集配置混用
 
 ## 5. 服务拓扑
 
@@ -249,8 +275,10 @@
 1. 把仓库代码部署到 `/opt/bingwall/app`
 2. 使用 `uv python install 3.14` 与 `uv sync --python 3.14 --frozen --no-dev` 准备生产虚拟环境
 3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
+   当前若需要显式配置 NASA APOD 采集参数，还需手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `uv run --no-sync python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
+   当前若需修改 FastAPI 监听地址或端口，必须同步修改 `deploy/systemd/bingwall-api.service` 中固定的 `--host/--port`，并同步调整 `deploy/nginx/bingwall.conf` 的 upstream
 6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`、`nginx -t`、`systemctl reload nginx`
 7. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
 
@@ -261,6 +289,7 @@
 - 通过 `/etc/bingwall/bingwall.env` 注入受控环境变量
 - 使用 `bingwall` 账号运行应用
 - 通过 `/usr/bin/env uv run --no-sync python ...` 统一走 `uv` 运行入口，并固定 `PATH=/usr/local/bin:/usr/bin:/bin`
+- 当前模板把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`，不会直接读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`
 - 通过 `SupplementaryGroups=www-data` 配合正式资源目录权限，保证应用写入、Nginx 读取
 - 采用 `Restart=on-failure`，在进程异常退出后自动重启
 
@@ -273,6 +302,7 @@
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
 - 如需调整 Bing 手动/定时采集覆盖的地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU`
 - 如需调整 Bing 定时采集回溯窗口，可把 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 设为 `3`、`5` 或 `7`
+- 如需显式配置 NASA APOD 采集开关、API Key、超时或重试参数，需要在生产环境文件中手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
 - 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
 - 如需保留“采集后先人工审核再发布”的旧策略，可在环境文件中把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`
 

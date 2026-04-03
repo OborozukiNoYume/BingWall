@@ -19,6 +19,7 @@ from app.schemas.admin_content import AdminTagCreateRequest
 from app.schemas.admin_content import AdminTagData
 from app.schemas.admin_content import AdminTagListData
 from app.schemas.admin_content import AdminTagListQuery
+from app.schemas.admin_content import AdminWallpaperLocalizationSummary
 from app.schemas.admin_content import AdminTagSummary
 from app.schemas.admin_content import AdminTagUpdateRequest
 from app.schemas.admin_content import ContentStatus
@@ -85,25 +86,55 @@ class AdminContentService:
             target_id=str(wallpaper_id),
             limit=10,
         )
+        localization_rows = self.repository.list_wallpaper_localizations(wallpaper_id=wallpaper_id)
+        resolved_localization = _select_admin_localization(
+            localization_rows=localization_rows,
+            preferred_market_code=str(row["market_code"]),
+        )
         tag_rows = self.repository.list_wallpaper_tags(wallpaper_id=wallpaper_id)
         relative_path = optional_text(row["relative_path"])
         storage_backend = optional_text(row["storage_backend"])
         return AdminWallpaperDetailData(
             id=int(row["id"]),
-            title=present_title(row),
-            subtitle=optional_text(row["subtitle"]),
-            description=optional_text(row["description"]),
-            location_text=optional_text(row["location_text"]),
-            copyright_text=optional_text(row["copyright_text"]),
+            title=present_title(row, localization_row=resolved_localization),
+            subtitle=present_detail_text(row, localization_row=resolved_localization, key="subtitle"),
+            description=present_detail_text(
+                row,
+                localization_row=resolved_localization,
+                key="description",
+            ),
+            location_text=present_detail_text(
+                row,
+                localization_row=resolved_localization,
+                key="location_text",
+            ),
+            copyright_text=present_detail_text(
+                row,
+                localization_row=resolved_localization,
+                key="copyright_text",
+            ),
             source_type=str(row["source_type"]),
             source_name=str(row["source_name"]),
             source_key=str(row["source_key"]),
             market_code=str(row["market_code"]),
+            resolved_market_code=(
+                str(resolved_localization["market_code"])
+                if resolved_localization is not None
+                else str(row["market_code"])
+            ),
             wallpaper_date=str(row["wallpaper_date"]),
-            published_at_utc=optional_text(row["published_at_utc"]),
+            published_at_utc=present_detail_text(
+                row,
+                localization_row=resolved_localization,
+                key="published_at_utc",
+            ),
             publish_start_at_utc=optional_text(row["publish_start_at_utc"]),
             publish_end_at_utc=optional_text(row["publish_end_at_utc"]),
-            origin_page_url=optional_text(row["origin_page_url"]),
+            origin_page_url=present_detail_text(
+                row,
+                localization_row=resolved_localization,
+                key="origin_page_url",
+            ),
             origin_image_url=optional_text(row["origin_image_url"]),
             origin_width=optional_int(row["origin_width"]),
             origin_height=optional_int(row["origin_height"]),
@@ -127,6 +158,22 @@ class AdminContentService:
             deleted_at_utc=optional_text(row["deleted_at_utc"]),
             created_at_utc=str(row["created_at_utc"]),
             updated_at_utc=str(row["updated_at_utc"]),
+            localizations=[
+                AdminWallpaperLocalizationSummary(
+                    market_code=str(localization_row["market_code"]),
+                    source_key=str(localization_row["source_key"]),
+                    title=optional_text(localization_row["title"]),
+                    subtitle=optional_text(localization_row["subtitle"]),
+                    description=optional_text(localization_row["description"]),
+                    copyright_text=optional_text(localization_row["copyright_text"]),
+                    published_at_utc=optional_text(localization_row["published_at_utc"]),
+                    location_text=optional_text(localization_row["location_text"]),
+                    origin_page_url=optional_text(localization_row["origin_page_url"]),
+                    portrait_image_url=optional_text(localization_row["portrait_image_url"]),
+                    updated_at_utc=str(localization_row["updated_at_utc"]),
+                )
+                for localization_row in localization_rows
+            ],
             tags=[self._build_wallpaper_tag_summary(tag_row) for tag_row in tag_rows],
             recent_operations=[self._build_audit_log_summary(log_row) for log_row in recent_logs],
         )
@@ -542,14 +589,51 @@ class AdminContentService:
         return payload
 
 
-def present_title(row: Row) -> str:
+def present_title(row: Row, *, localization_row: Row | None = None) -> str:
+    title = (
+        optional_text(localization_row["title"])
+        if localization_row is not None and "title" in localization_row.keys()
+        else None
+    )
+    if title:
+        return title
     title = optional_text(row["title"])
     if title:
         return title
-    copyright_text = optional_text(row["copyright_text"])
+    copyright_text = present_detail_text(
+        row,
+        localization_row=localization_row,
+        key="copyright_text",
+    )
     if copyright_text:
         return copyright_text
     return f"{row['source_name']} {row['wallpaper_date']}"
+
+
+def present_detail_text(
+    row: Row,
+    *,
+    localization_row: Row | None,
+    key: str,
+) -> str | None:
+    if localization_row is not None and key in localization_row.keys():
+        localized_value = optional_text(localization_row[key])
+        if localized_value:
+            return localized_value
+    return optional_text(row[key])
+
+
+def _select_admin_localization(
+    *,
+    localization_rows: list[Row],
+    preferred_market_code: str,
+) -> Row | None:
+    if not localization_rows:
+        return None
+    for row in localization_rows:
+        if str(row["market_code"]) == preferred_market_code:
+            return row
+    return localization_rows[0]
 
 
 def optional_text(value: object) -> str | None:

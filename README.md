@@ -101,6 +101,8 @@ make run
 
 - 现在本地开发、`systemd` 服务模板和 `cron` 模板都统一通过 `uv` 执行 Python 命令
 - 运行时统一采用 `uv run --no-sync python ...`，避免服务启动或计划任务执行时再去改动虚拟环境
+- `make run` 会跟随 `.env` / 环境变量中的 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；但当前仓库内 `deploy/systemd/bingwall-api.service` 仍把生产 `uvicorn` 监听地址固定为 `127.0.0.1:8000`，如需修改生产监听地址或端口，必须同步调整 `systemd` 与 `nginx` 模板
+- `.env.example` 已包含 `BINGWALL_COLLECT_NASA_APOD_*` 本地示例；`deploy/systemd/bingwall.env.example` 当前未预填这些键，若目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，应在 `/etc/bingwall/bingwall.env` 中手工补充
 
 健康检查：
 
@@ -207,7 +209,7 @@ bash scripts/dev/playwright_smoke_with_admin.example.sh
 - `/api/admin/wallpapers`、`/api/admin/wallpapers/{wallpaper_id}`、`/api/admin/wallpapers/{wallpaper_id}/status`、`/api/admin/audit-logs` 后台接口
 - 后台内容列表、详情、状态切换和审计查询 schema / repository / service；内容列表支持 `keyword + 状态` 联合检索
 - 启用、禁用和逻辑删除的状态流转校验，以及每次状态变更的审计日志写入
-- `/admin/login`、`/admin`、`/admin/wallpapers/{id}`、`/admin/change-password`、`/admin/audit-logs` 后台页面
+- `/admin/login`、`/admin`、`/admin/wallpapers`、`/admin/wallpapers/{id}`、`/admin/change-password`、`/admin/audit-logs` 后台页面
 - `web/admin/assets/admin.js` 与 `web/admin/assets/admin.css` 后台静态资源，页面仅通过后台 API 工作
 - 后台内容管理、后台页面与公开可见性联动的集成测试
 

@@ -27,6 +27,7 @@ from app.domain.resource_variants import ResourceType
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.collection_repository import ResourceCreateInput
 from app.repositories.collection_repository import TaskItemCreateInput
+from app.repositories.collection_repository import WallpaperLocalizationUpsertInput
 from app.repositories.collection_repository import WallpaperCreateInput
 from app.repositories.file_storage import FileStorage
 from app.services.image_variants import LoadedImage
@@ -34,6 +35,7 @@ from app.services.image_variants import calculate_variant_dimensions
 from app.services.image_variants import generate_variant_image
 from app.services.image_variants import load_image_bytes
 from app.services.resource_paths import build_resource_relative_path
+from app.services.resource_paths import resolve_resource_path_key
 
 logger = logging.getLogger(__name__)
 
@@ -302,17 +304,28 @@ class SourceCollectionService:
             wallpaper_date=wallpaper_date,
             created_at_utc=created_at_utc,
         )
-        existing_wallpaper = self.repository.find_wallpaper_by_business_key(
+        canonical_key = item.canonical_key or item.source_key
+        existing_wallpaper = self.repository.find_wallpaper_by_canonical_key(
             source_type=self.adapter.source_type,
-            wallpaper_date=wallpaper_date,
-            market_code=item.market_code,
+            canonical_key=canonical_key,
         )
         if existing_wallpaper is not None:
             existing_wallpaper_id = int(existing_wallpaper["id"])
+            existing_localization = self.repository.get_wallpaper_localization(
+                wallpaper_id=existing_wallpaper_id,
+                market_code=item.market_code,
+            )
             self.repository.update_wallpaper_metadata(
                 wallpaper_id=existing_wallpaper_id,
                 item=wallpaper_input,
                 updated_at_utc=created_at_utc,
+            )
+            self.repository.upsert_wallpaper_localization(
+                self._build_wallpaper_localization_input(
+                    wallpaper_id=existing_wallpaper_id,
+                    item=item,
+                    created_at_utc=created_at_utc,
+                )
             )
             needs_resume, resume_reason = self._wallpaper_needs_resume(
                 wallpaper_id=existing_wallpaper_id
@@ -322,16 +335,24 @@ class SourceCollectionService:
                     TaskItemCreateInput(
                         task_id=task_id,
                         source_item_key=item.source_key,
-                        action_name="dedupe_check",
-                        result_status="duplicated",
-                        dedupe_hit_type="business_key",
-                        db_write_result="skipped_existing_wallpaper",
+                        action_name=(
+                            "attach_localization"
+                            if existing_localization is None
+                            else "dedupe_check"
+                        ),
+                        result_status="succeeded" if existing_localization is None else "duplicated",
+                        dedupe_hit_type="canonical_key",
+                        db_write_result=(
+                            "created_wallpaper_localization"
+                            if existing_localization is None
+                            else "updated_existing_localization"
+                        ),
                         file_write_result=None,
                         failure_reason=None,
                         occurred_at_utc=utc_now_isoformat(),
                     )
                 )
-                return "duplicated"
+                return "succeeded" if existing_localization is None else "duplicated"
 
             self._prepare_wallpaper_resume(
                 wallpaper_id=existing_wallpaper_id,
@@ -374,6 +395,13 @@ class SourceCollectionService:
                 return "duplicated"
 
             wallpaper_id = self.repository.create_wallpaper(wallpaper_input)
+            self.repository.upsert_wallpaper_localization(
+                self._build_wallpaper_localization_input(
+                    wallpaper_id=wallpaper_id,
+                    item=item,
+                    created_at_utc=created_at_utc,
+                )
+            )
         relative_path = self.adapter.build_relative_path(item)
         filename = Path(relative_path).name
         file_ext = Path(relative_path).suffix.lstrip(".").lower() or "jpg"
@@ -424,6 +452,7 @@ class SourceCollectionService:
         return WallpaperCreateInput(
             source_type=self.adapter.source_type,
             source_key=item.source_key,
+            canonical_key=item.canonical_key or item.source_key,
             market_code=item.market_code,
             wallpaper_date=wallpaper_date,
             title=item.title,
@@ -438,6 +467,29 @@ class SourceCollectionService:
             origin_width=item.origin_width,
             origin_height=item.origin_height,
             is_downloadable=item.is_downloadable,
+            portrait_image_url=item.portrait_image_url,
+            raw_extra_json=item.raw_extra_json,
+            created_at_utc=created_at_utc,
+        )
+
+    def _build_wallpaper_localization_input(
+        self,
+        *,
+        wallpaper_id: int,
+        item: CollectedImageMetadata,
+        created_at_utc: str,
+    ) -> WallpaperLocalizationUpsertInput:
+        return WallpaperLocalizationUpsertInput(
+            wallpaper_id=wallpaper_id,
+            market_code=item.market_code,
+            source_key=item.source_key,
+            title=item.title,
+            subtitle=item.subtitle,
+            description=item.description,
+            copyright_text=item.copyright_text,
+            published_at_utc=item.published_at_utc,
+            location_text=item.location_text,
+            origin_page_url=item.origin_page_url,
             portrait_image_url=item.portrait_image_url,
             raw_extra_json=item.raw_extra_json,
             created_at_utc=created_at_utc,
@@ -532,6 +584,12 @@ class SourceCollectionService:
             source_type=self.adapter.source_type,
             wallpaper_date=item.wallpaper_date,
             market_code=item.market_code,
+            path_key=resolve_resource_path_key(
+                source_type=self.adapter.source_type,
+                market_code=item.market_code,
+                source_key=item.source_key,
+                canonical_key=item.canonical_key,
+            ),
             resource_type=RESOURCE_TYPE_ORIGINAL,
             file_ext=original_file_ext,
             width=loaded_image.width,
@@ -699,6 +757,12 @@ class SourceCollectionService:
                     source_type=self.adapter.source_type,
                     wallpaper_date=item.wallpaper_date,
                     market_code=item.market_code,
+                    path_key=resolve_resource_path_key(
+                        source_type=self.adapter.source_type,
+                        market_code=item.market_code,
+                        source_key=item.source_key,
+                        canonical_key=item.canonical_key,
+                    ),
                     resource_type=RESOURCE_TYPE_DOWNLOAD,
                     file_ext=variant_file_ext,
                     width=variant.width,
@@ -797,6 +861,12 @@ class SourceCollectionService:
                 source_type=self.adapter.source_type,
                 wallpaper_date=item.wallpaper_date,
                 market_code=item.market_code,
+                path_key=resolve_resource_path_key(
+                    source_type=self.adapter.source_type,
+                    market_code=item.market_code,
+                    source_key=item.source_key,
+                    canonical_key=item.canonical_key,
+                ),
                 resource_type=resource_type,
                 file_ext=thumbnail_preview_ext,
                 width=variant_width,
@@ -848,6 +918,12 @@ class SourceCollectionService:
                     source_type=self.adapter.source_type,
                     wallpaper_date=item.wallpaper_date,
                     market_code=item.market_code,
+                    path_key=resolve_resource_path_key(
+                        source_type=self.adapter.source_type,
+                        market_code=item.market_code,
+                        source_key=item.source_key,
+                        canonical_key=item.canonical_key,
+                    ),
                     resource_type=RESOURCE_TYPE_DOWNLOAD,
                     file_ext=file_ext,
                     width=variant.loaded_image.width,
@@ -888,6 +964,12 @@ class SourceCollectionService:
             source_type=self.adapter.source_type,
             wallpaper_date=item.wallpaper_date,
             market_code=item.market_code,
+            path_key=resolve_resource_path_key(
+                source_type=self.adapter.source_type,
+                market_code=item.market_code,
+                source_key=item.source_key,
+                canonical_key=item.canonical_key,
+            ),
             resource_type=RESOURCE_TYPE_DOWNLOAD,
             file_ext=Path(original_relative_path).suffix.lstrip(".").lower() or "jpg",
             width=original_loaded_image.width,
@@ -1060,6 +1142,7 @@ def build_source_relative_path(
     market_code: str,
     wallpaper_date: date,
     source_key: str,
+    canonical_key: str | None,
     origin_image_url: str,
 ) -> str:
     file_ext = extract_file_ext_from_source_url(origin_image_url)
@@ -1067,6 +1150,12 @@ def build_source_relative_path(
         source_type=source_type,
         wallpaper_date=wallpaper_date,
         market_code=market_code,
+        path_key=resolve_resource_path_key(
+            source_type=source_type,
+            market_code=market_code,
+            source_key=source_key,
+            canonical_key=canonical_key,
+        ),
         resource_type=RESOURCE_TYPE_ORIGINAL,
         file_ext=file_ext,
         width=None,

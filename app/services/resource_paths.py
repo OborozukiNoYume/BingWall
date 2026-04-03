@@ -14,6 +14,7 @@ def build_resource_relative_path(
     source_type: str,
     wallpaper_date: date,
     market_code: str,
+    path_key: str | None = None,
     resource_type: ResourceType,
     file_ext: str,
     width: int | None,
@@ -21,7 +22,7 @@ def build_resource_relative_path(
     variant_key: str = "",
 ) -> str:
     safe_source_type = _sanitize_name(source_type, fallback="unknown-source")
-    safe_market_code = _sanitize_name(market_code, fallback="unknown-market")
+    safe_path_key = _sanitize_name(path_key or market_code, fallback="unknown-market")
     safe_file_ext = _sanitize_name(file_ext.lower(), fallback="jpg")
     resolution_label = build_resolution_label(
         width=width,
@@ -30,7 +31,7 @@ def build_resource_relative_path(
     )
     filename = build_resource_filename(
         wallpaper_date=wallpaper_date,
-        market_code=safe_market_code,
+        path_key=safe_path_key,
         resource_type=resource_type,
         resolution_label=resolution_label,
     )
@@ -56,14 +57,30 @@ def build_resolution_label(
 def build_resource_filename(
     *,
     wallpaper_date: date,
-    market_code: str,
+    path_key: str,
     resource_type: ResourceType,
     resolution_label: str,
 ) -> str:
-    prefix = f"{wallpaper_date.day:02d}_{market_code}"
+    prefix = f"{wallpaper_date.day:02d}_{path_key}"
     if resource_type == RESOURCE_TYPE_ORIGINAL:
         return f"{prefix}_{resolution_label}"
     return f"{prefix}_{resource_type}_{resolution_label}"
+
+
+def resolve_resource_path_key(
+    *,
+    source_type: str,
+    market_code: str,
+    source_key: str | None = None,
+    canonical_key: str | None = None,
+) -> str:
+    if source_type == "bing":
+        candidate = canonical_key or source_key or ""
+        if candidate:
+            tail = candidate.rsplit(":", 1)[-1].strip()
+            if tail:
+                return tail
+    return market_code
 
 
 def _sanitize_name(value: str, *, fallback: str) -> str:

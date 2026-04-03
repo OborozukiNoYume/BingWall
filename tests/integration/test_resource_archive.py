@@ -59,10 +59,10 @@ def test_resource_archive_rewrites_historical_resources_to_structured_paths(
         connection.close()
 
     assert [(str(row["resource_type"]), str(row["relative_path"])) for row in resource_rows] == [
-        ("original", "bing/2026/03/24_en-US_1920x1080.jpg"),
-        ("thumbnail", "bing/2026/03/24_en-US_thumbnail_480x270.jpg"),
-        ("preview", "bing/2026/03/24_en-US_preview_1600x900.jpg"),
-        ("download", "bing/2026/03/24_en-US_download_1920x1080.jpg"),
+        ("original", "bing/2026/03/24_archive-migration_1920x1080.jpg"),
+        ("thumbnail", "bing/2026/03/24_archive-migration_thumbnail_480x270.jpg"),
+        ("preview", "bing/2026/03/24_archive-migration_preview_1600x900.jpg"),
+        ("download", "bing/2026/03/24_archive-migration_download_1920x1080.jpg"),
     ]
     for _resource_type, relative_path in resource_rows:
         assert (tmp_path / "images" / "public" / str(relative_path)).is_file()

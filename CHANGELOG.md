@@ -1,5 +1,159 @@
 # CHANGELOG
 
+## 2026-04-03T06:25:00Z
+
+### 变更内容
+
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，明确区分“代码已支持的配置项”和“当前生产模板实际会生效的配置项”，补充 `systemd` 固定监听 `127.0.0.1:8000` 与生产环境示例未预填 `BINGWALL_COLLECT_NASA_APOD_*` 的说明
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)，同步补充生产监听地址 / 端口的真实生效范围，并补齐后台页面清单中的 `/admin/wallpapers`
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，同步补齐后台页面清单，并记录生产部署模板当前对 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT` 与 `BINGWALL_COLLECT_NASA_APOD_*` 的实际覆盖情况
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档修正范围与验证方式
+
+### 变更原因
+
+- 你要求继续修正文档
+- 按代码核对后发现，部署文档把部分“配置模型支持”的能力写成了“当前生产模板已直接生效”的能力，容易让运维误判
+- 主 README 与项目状态摘要遗漏了实际存在且被后台登录流程直接使用的 `/admin/wallpapers` 页面入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-03T06:25:00Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的文档修正
+- 仓库业务代码、数据库迁移、接口行为、前端逻辑、部署模板与测试逻辑均保持不变
+- 更新后，文档已能反映“`make run` 会读取 `BINGWALL_APP_HOST/PORT`，但当前生产 `systemd` 模板不会直接读取”“NASA APOD 配置已在本地示例中存在，但生产模板需手工补充”的真实状态
+
+### 验证步骤
+
+- 执行 `uv run -m pytest`
+- 执行 `rg -n "BINGWALL_APP_HOST|BINGWALL_APP_PORT|BINGWALL_COLLECT_NASA_APOD_|/admin/wallpapers" README.md PROJECT_STATE.md docs/deployment-runbook.md deploy/systemd/bingwall-api.service deploy/systemd/bingwall.env.example .env.example`
+- 人工复核 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example)、[app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py) 与 [web/admin/assets/admin.js](/home/ops/Projects/BingWall/web/admin/assets/admin.js)，确认文档口径与现有实现一致
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，文档会重新回到“生产模板实际生效范围描述不清、后台页面摘要遗漏 `/admin/wallpapers`”的状态
+
+## 2026-04-03T05:38:48Z
+
+### 变更内容
+
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，补齐当前实际使用的环境变量键名，明确 `BINGWALL_APP_*`、`BINGWALL_LOG_LEVEL` 与 `BINGWALL_COLLECT_NASA_APOD_*` 配置入口
+- 更新 [docs/data-model.md](/home/ops/Projects/BingWall/docs/data-model.md)，把 `tags` 表索引描述同步为当前迁移真实定义 `(status, sort_weight DESC, tag_name ASC)`
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档修正范围与验证方式
+
+### 变更原因
+
+- 你要求继续修复文档，使其与仓库内实际实现保持一致
+- 部署文档此前只写了配置类别，没有把部分已存在的真实环境变量键名落到文档中
+- 数据模型文档中的 `tags` 索引描述比实际迁移更粗略，缺少排序方向和次级排序字段
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-03T05:38:48Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/data-model.md](/home/ops/Projects/BingWall/docs/data-model.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的文档修正
+- 仓库业务代码、数据库迁移、接口行为、前端逻辑和部署模板均保持不变
+- 更新后，部署文档已能直接对应到当前 `.env.example` 中的实际变量名，数据模型文档的 `tags` 索引描述也已与迁移一致
+
+### 验证步骤
+
+- 执行 `rg -n "BINGWALL_APP_ENV|BINGWALL_APP_HOST|BINGWALL_APP_PORT|BINGWALL_APP_BASE_URL|BINGWALL_LOG_LEVEL|BINGWALL_COLLECT_NASA_APOD_" docs/deployment-runbook.md .env.example deploy/systemd/bingwall.env.example`
+- 执行 `rg -n "sort_weight DESC, tag_name ASC" docs/data-model.md app/repositories/migrations/versions/V0003__tags.sql`
+- 人工复核 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/data-model.md](/home/ops/Projects/BingWall/docs/data-model.md) 与 [app/repositories/migrations/versions/V0003__tags.sql](/home/ops/Projects/BingWall/app/repositories/migrations/versions/V0003__tags.sql)，确认文档口径与现有实现一致
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/data-model.md](/home/ops/Projects/BingWall/docs/data-model.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，部署文档会重新回到“部分真实环境变量键名缺失”的状态，数据模型文档中的 `tags` 索引描述也会重新落后于当前迁移实现
+
+## 2026-04-03T03:14:30Z
+
+### 变更内容
+
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，把安全配置、密码策略与告警阈值的描述收敛到当前代码真实行为，移除把规划项写成“已实现配置”的表述
+- 更新 [docs/system-design.md](/home/ops/Projects/BingWall/docs/system-design.md)，把安全基线中的密码复杂度与摘要算法说明同步为当前实现口径
+- 更新 [docs/api-conventions.md](/home/ops/Projects/BingWall/docs/api-conventions.md)，补充已存在的 `POST /api/admin/collection-tasks/{task_id}/consume` 后台人工执行接口
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档修正范围、原因与验证方式
+
+### 变更原因
+
+- 你要求按“以代码为准”的原则修复文档与实现不一致的问题
+- 之前部署文档和系统设计文档把更严格的密码复杂度、`argon2id` 与内建告警配置写成了当前已落地口径，但仓库实现并未提供对应行为
+- API 文档遗漏了代码中已存在的后台任务人工执行接口，影响联调和运维使用
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-03T03:14:30Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/system-design.md](/home/ops/Projects/BingWall/docs/system-design.md)、[docs/api-conventions.md](/home/ops/Projects/BingWall/docs/api-conventions.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的文档修正
+- 仓库业务代码、数据库结构、接口行为、部署模板与测试逻辑均保持不变
+- 更新后，文档中的密码策略、摘要算法、告警能力和后台任务接口说明已与当前实现保持一致
+
+### 验证步骤
+
+- 执行 `rg -n "argon2id|特殊字符|Webhook|consume" docs/deployment-runbook.md docs/system-design.md docs/api-conventions.md`
+- 执行 `uv run -m pytest tests/unit/test_security.py tests/unit/test_config.py tests/integration/test_admin_auth.py tests/integration/test_admin_collection.py -q`
+- 人工复核 [app/core/security.py](/home/ops/Projects/BingWall/app/core/security.py)、[app/core/config.py](/home/ops/Projects/BingWall/app/core/config.py) 与 [app/api/admin/routes.py](/home/ops/Projects/BingWall/app/api/admin/routes.py)，确认文档描述与代码实现一致
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/system-design.md](/home/ops/Projects/BingWall/docs/system-design.md)、[docs/api-conventions.md](/home/ops/Projects/BingWall/docs/api-conventions.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，文档会重新回到“安全与告警口径写得比代码更严格、且 API 文档缺少 `consume` 接口”的不一致状态
+
+## 2026-04-03T02:52:18Z
+
+### 变更内容
+
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，补齐当前状态、运行入口和已完成内容中关于 Bing 默认八地区手动采集与 Playwright 浏览器冒烟入口的说明
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，刷新文档元信息时间，并在当前状态说明中同步记录默认多地区 Bing 手动采集和浏览器冒烟测试入口
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档同步范围、原因与验证口径
+
+### 变更原因
+
+- 你要求把本轮功能调整对应的文档全部同步到位
+- 当前主 README 和部署文档主体内容已经补到新口径，但 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 仍未反映“未传 `MARKET` 时默认抓取固定 8 个地区”和新增浏览器冒烟入口，项目级状态记录与变更记录存在滞后
+- 本次按最小范围补齐受影响文档，不扩展到未发生语义变化的设计总纲、数据模型和接口约定
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-03T02:52:18Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的文档同步
+- 仓库业务代码、数据库结构、接口行为、部署模板、`cron`、`systemd` 和公开 / 后台功能逻辑均保持不变
+- 更新后，项目状态、部署说明与变更记录对“默认八地区 Bing 手动采集”和“Playwright 浏览器冒烟入口”的描述已保持一致
+
+### 验证步骤
+
+- 执行 `rg -n --fixed-strings 'make browser-smoke' README.md PROJECT_STATE.md docs/deployment-runbook.md`
+- 执行 `rg -n --fixed-strings 'BINGWALL_COLLECT_BING_MARKETS' README.md PROJECT_STATE.md docs/deployment-runbook.md .env.example deploy/systemd/bingwall.env.example`
+- 人工复核 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，确认运行入口、默认市场口径和浏览器冒烟说明一致
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“主 README 已更新，但项目状态与变更记录仍滞后”的状态
+
 ## 2026-03-29T19:47:19Z
 
 ### 变更内容

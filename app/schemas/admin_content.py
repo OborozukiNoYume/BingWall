@@ -77,6 +77,20 @@ class AdminWallpaperTagSummary(BaseModel):
     sort_weight: int
 
 
+class AdminWallpaperLocalizationSummary(BaseModel):
+    market_code: str
+    source_key: str
+    title: str | None
+    subtitle: str | None
+    description: str | None
+    copyright_text: str | None
+    published_at_utc: str | None
+    location_text: str | None
+    origin_page_url: str | None
+    portrait_image_url: str | None
+    updated_at_utc: str
+
+
 class AdminAuditLogSummary(BaseModel):
     id: int
     admin_user_id: int
@@ -102,6 +116,7 @@ class AdminWallpaperDetailData(BaseModel):
     source_name: str
     source_key: str
     market_code: str
+    resolved_market_code: str
     wallpaper_date: str
     published_at_utc: str | None
     publish_start_at_utc: str | None
@@ -127,6 +142,7 @@ class AdminWallpaperDetailData(BaseModel):
     deleted_at_utc: str | None
     created_at_utc: str
     updated_at_utc: str
+    localizations: list[AdminWallpaperLocalizationSummary]
     tags: list[AdminWallpaperTagSummary]
     recent_operations: list[AdminAuditLogSummary]
 
