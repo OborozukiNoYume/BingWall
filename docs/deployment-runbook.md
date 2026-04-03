@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-03T05:38:48Z
+- 更新时间：2026-04-03T06:25:00Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -132,7 +132,7 @@
 
 ### 当前环境变量补充
 
-以下变量已在环境示例中存在，部署文档需要按代码真实键名记录，避免只写抽象类别而遗漏实际配置入口：
+以下变量已在当前代码中定义；其中 `.env.example` 覆盖了本地开发默认值，`deploy/systemd/bingwall.env.example` 覆盖了当前生产模板默认值。部署文档需要按代码真实键名记录，避免只写抽象类别而遗漏实际配置入口：
 
 | 变量名 | 默认示例 | 说明 |
 |---|---|---|
@@ -146,6 +146,11 @@
 | `BINGWALL_COLLECT_NASA_APOD_API_KEY` | `DEMO_KEY` | NASA APOD API 密钥；生产环境应替换为真实密钥 |
 | `BINGWALL_COLLECT_NASA_APOD_TIMEOUT_SECONDS` | `10` | NASA APOD HTTP 请求超时时间 |
 | `BINGWALL_COLLECT_NASA_APOD_MAX_DOWNLOAD_RETRIES` | `3` | NASA APOD 图片下载最大重试次数 |
+
+补充说明：
+
+- `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT` 当前会被应用配置模型和 `make run` 使用，但仓库内现有 `deploy/systemd/bingwall-api.service` 仍把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`；若生产环境需要改监听地址或端口，必须同步修改 `systemd` 与 `nginx` 模板，不能只改环境变量
+- `BINGWALL_COLLECT_NASA_APOD_*` 变量当前已在 `.env.example` 中给出本地开发示例，但 `deploy/systemd/bingwall.env.example` 仍未预填这些键；如目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，需在 `/etc/bingwall/bingwall.env` 中手工补充
 
 ### Bing 采集配置补充
 
@@ -270,8 +275,10 @@
 1. 把仓库代码部署到 `/opt/bingwall/app`
 2. 使用 `uv python install 3.14` 与 `uv sync --python 3.14 --frozen --no-dev` 准备生产虚拟环境
 3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
+   当前若需要显式配置 NASA APOD 采集参数，还需手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `uv run --no-sync python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
+   当前若需修改 FastAPI 监听地址或端口，必须同步修改 `deploy/systemd/bingwall-api.service` 中固定的 `--host/--port`，并同步调整 `deploy/nginx/bingwall.conf` 的 upstream
 6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`、`nginx -t`、`systemctl reload nginx`
 7. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
 
@@ -282,6 +289,7 @@
 - 通过 `/etc/bingwall/bingwall.env` 注入受控环境变量
 - 使用 `bingwall` 账号运行应用
 - 通过 `/usr/bin/env uv run --no-sync python ...` 统一走 `uv` 运行入口，并固定 `PATH=/usr/local/bin:/usr/bin:/bin`
+- 当前模板把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`，不会直接读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`
 - 通过 `SupplementaryGroups=www-data` 配合正式资源目录权限，保证应用写入、Nginx 读取
 - 采用 `Restart=on-failure`，在进程异常退出后自动重启
 
@@ -294,6 +302,7 @@
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
 - 如需调整 Bing 手动/定时采集覆盖的地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU`
 - 如需调整 Bing 定时采集回溯窗口，可把 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 设为 `3`、`5` 或 `7`
+- 如需显式配置 NASA APOD 采集开关、API Key、超时或重试参数，需要在生产环境文件中手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
 - 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
 - 如需保留“采集后先人工审核再发布”的旧策略，可在环境文件中把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`
 

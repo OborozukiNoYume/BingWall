@@ -1,5 +1,44 @@
 # CHANGELOG
 
+## 2026-04-03T06:25:00Z
+
+### 变更内容
+
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，明确区分“代码已支持的配置项”和“当前生产模板实际会生效的配置项”，补充 `systemd` 固定监听 `127.0.0.1:8000` 与生产环境示例未预填 `BINGWALL_COLLECT_NASA_APOD_*` 的说明
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)，同步补充生产监听地址 / 端口的真实生效范围，并补齐后台页面清单中的 `/admin/wallpapers`
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，同步补齐后台页面清单，并记录生产部署模板当前对 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT` 与 `BINGWALL_COLLECT_NASA_APOD_*` 的实际覆盖情况
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档修正范围与验证方式
+
+### 变更原因
+
+- 你要求继续修正文档
+- 按代码核对后发现，部署文档把部分“配置模型支持”的能力写成了“当前生产模板已直接生效”的能力，容易让运维误判
+- 主 README 与项目状态摘要遗漏了实际存在且被后台登录流程直接使用的 `/admin/wallpapers` 页面入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-03T06:25:00Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的文档修正
+- 仓库业务代码、数据库迁移、接口行为、前端逻辑、部署模板与测试逻辑均保持不变
+- 更新后，文档已能反映“`make run` 会读取 `BINGWALL_APP_HOST/PORT`，但当前生产 `systemd` 模板不会直接读取”“NASA APOD 配置已在本地示例中存在，但生产模板需手工补充”的真实状态
+
+### 验证步骤
+
+- 执行 `uv run -m pytest`
+- 执行 `rg -n "BINGWALL_APP_HOST|BINGWALL_APP_PORT|BINGWALL_COLLECT_NASA_APOD_|/admin/wallpapers" README.md PROJECT_STATE.md docs/deployment-runbook.md deploy/systemd/bingwall-api.service deploy/systemd/bingwall.env.example .env.example`
+- 人工复核 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example)、[app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py) 与 [web/admin/assets/admin.js](/home/ops/Projects/BingWall/web/admin/assets/admin.js)，确认文档口径与现有实现一致
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，文档会重新回到“生产模板实际生效范围描述不清、后台页面摘要遗漏 `/admin/wallpapers`”的状态
+
 ## 2026-04-03T05:38:48Z
 
 ### 变更内容
