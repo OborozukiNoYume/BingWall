@@ -112,10 +112,10 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
         "download",
     }
     assert {str(resource["relative_path"]) for resource in resources} == {
-        "bing/2026/03/24_en-US_1920x1080.jpg",
-        "bing/2026/03/24_en-US_thumbnail_480x270.jpg",
-        "bing/2026/03/24_en-US_preview_1600x900.jpg",
-        "bing/2026/03/24_en-US_download_1920x1080.jpg",
+        "bing/2026/03/24_OHR.Success_1920x1080.jpg",
+        "bing/2026/03/24_OHR.Success_thumbnail_480x270.jpg",
+        "bing/2026/03/24_OHR.Success_preview_1600x900.jpg",
+        "bing/2026/03/24_OHR.Success_download_1920x1080.jpg",
     }
     assert all(str(resource["image_status"]) == "ready" for resource in resources)
     original_resource = next(
@@ -263,9 +263,9 @@ def test_bing_collection_service_persists_all_available_bing_download_resolution
         ("480x800", 480, 800, mobile_url),
     ]
     assert [str(row["relative_path"]) for row in stored_download_paths] == [
-        "bing/2026/03/24_en-US_download_3840x2160.jpg",
-        "bing/2026/03/24_en-US_download_1920x1080.jpg",
-        "bing/2026/03/24_en-US_download_480x800.jpg",
+        "bing/2026/03/24_OHR.SuccessAll_download_3840x2160.jpg",
+        "bing/2026/03/24_OHR.SuccessAll_download_1920x1080.jpg",
+        "bing/2026/03/24_OHR.SuccessAll_download_480x800.jpg",
     ]
 
 
@@ -330,7 +330,7 @@ def test_bing_collection_service_skips_missing_download_resolution_without_faili
     assert download_count == 1
 
 
-def test_bing_collection_service_skips_business_key_duplicates(tmp_path: Path) -> None:
+def test_bing_collection_service_skips_canonical_key_duplicates(tmp_path: Path) -> None:
     service, database_path, _storage = build_service(
         tmp_path=tmp_path,
         metadata=[
@@ -373,7 +373,7 @@ def test_bing_collection_service_skips_business_key_duplicates(tmp_path: Path) -
     assert second_summary.success_count == 0
     assert wallpaper_count == 1
     assert latest_task["duplicate_count"] == 1
-    assert latest_item["dedupe_hit_type"] == "business_key"
+    assert latest_item["dedupe_hit_type"] == "canonical_key"
 
 
 def test_bing_collection_service_repairs_existing_wallpaper_without_resources(
@@ -399,6 +399,7 @@ def test_bing_collection_service_repairs_existing_wallpaper_without_resources(
             INSERT INTO wallpapers (
                 source_type,
                 source_key,
+                canonical_key,
                 market_code,
                 wallpaper_date,
                 title,
@@ -415,11 +416,12 @@ def test_bing_collection_service_repairs_existing_wallpaper_without_resources(
                 created_at_utc,
                 updated_at_utc
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?, ?, 'pending', ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, 1, ?, ?, ?, ?, 'pending', ?, ?, ?);
             """,
             (
                 "bing",
                 "bing:en-US:2026-03-24:OHR.Resume",
+                "bing:2026-03-24:OHR.Resume",
                 "en-US",
                 "2026-03-24",
                 "Test title",
@@ -822,10 +824,13 @@ def make_metadata(
     import hashlib
     import json
 
+    source_id = source_key.rsplit(":", 1)[-1]
     return BingImageMetadata(
         market_code=market_code,
         wallpaper_date=date.fromisoformat(wallpaper_date),
         source_key=source_key,
+        canonical_key=f"bing:{wallpaper_date}:{source_id}",
+        resource_path_key=source_id,
         title="Test title",
         copyright_text="Test copyright",
         origin_page_url="https://www.bing.com/example",

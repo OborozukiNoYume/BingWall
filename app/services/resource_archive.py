@@ -12,6 +12,7 @@ from typing import TypedDict
 from app.repositories.health_repository import HealthRepository
 from app.services.image_variants import load_image_bytes
 from app.services.resource_paths import build_resource_relative_path
+from app.services.resource_paths import resolve_resource_path_key
 from app.domain.resource_variants import ResourceType
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,12 @@ class ResourceArchiveService:
                 source_type=str(row["source_type"]),
                 wallpaper_date=datetime.strptime(str(row["wallpaper_date"]), "%Y-%m-%d").date(),
                 market_code=str(row["market_code"]),
+                path_key=resolve_resource_path_key(
+                    source_type=str(row["source_type"]),
+                    market_code=str(row["market_code"]),
+                    source_key=str(row["source_key"]),
+                    canonical_key=str(row["canonical_key"]) if row["canonical_key"] else None,
+                ),
                 resource_type=cast(ResourceType, str(row["resource_type"])),
                 file_ext=str(row["file_ext"]),
                 width=_optional_int(row["width"]),

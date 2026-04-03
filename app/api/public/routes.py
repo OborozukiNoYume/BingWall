@@ -76,7 +76,11 @@ def list_public_wallpapers(
         repository,
         resource_locator=ResourceLocator.from_settings(settings),
     )
-    data, pagination = service.list_wallpapers(query=query)
+    data, pagination = service.list_wallpapers(
+        query=query,
+        default_market_code=settings.collect_bing_default_market,
+        accept_language=request.headers.get("accept-language"),
+    )
     logger.info(
         (
             "Public wallpaper list served: market=%s keyword=%s date_from=%s date_to=%s "
@@ -111,7 +115,10 @@ def get_public_today_wallpaper(
         repository,
         resource_locator=ResourceLocator.from_settings(settings),
     )
-    data = service.get_today_wallpaper(default_market_code=settings.collect_bing_default_market)
+    data = service.get_today_wallpaper(
+        default_market_code=settings.collect_bing_default_market,
+        accept_language=request.headers.get("accept-language"),
+    )
     logger.info(
         "Public today wallpaper served: default_market=%s",
         settings.collect_bing_default_market,
@@ -133,7 +140,10 @@ def get_public_random_wallpaper(
         repository,
         resource_locator=ResourceLocator.from_settings(settings),
     )
-    data = service.get_random_wallpaper()
+    data = service.get_random_wallpaper(
+        default_market_code=settings.collect_bing_default_market,
+        accept_language=request.headers.get("accept-language"),
+    )
     logger.info("Public random wallpaper served.")
     return build_success_response(request=request, data=data.model_dump())
 
@@ -153,7 +163,11 @@ def get_public_wallpaper_by_market(
         repository,
         resource_locator=ResourceLocator.from_settings(settings),
     )
-    data = service.get_latest_wallpaper_by_market(market_code=market_code)
+    data = service.get_latest_wallpaper_by_market(
+        market_code=market_code,
+        default_market_code=settings.collect_bing_default_market,
+        accept_language=request.headers.get("accept-language"),
+    )
     logger.info("Public wallpaper by market served: market=%s", market_code)
     return build_success_response(request=request, data=data.model_dump())
 
@@ -176,6 +190,7 @@ def get_public_wallpaper_by_date(
     data = service.get_wallpaper_by_date(
         wallpaper_date=wallpaper_date,
         default_market_code=settings.collect_bing_default_market,
+        accept_language=request.headers.get("accept-language"),
     )
     logger.info(
         "Public wallpaper by date served: wallpaper_date=%s default_market=%s",
@@ -200,7 +215,11 @@ def get_public_wallpaper_detail(
         repository,
         resource_locator=ResourceLocator.from_settings(settings),
     )
-    data = service.get_wallpaper_detail(wallpaper_id=wallpaper_id)
+    data = service.get_wallpaper_detail(
+        wallpaper_id=wallpaper_id,
+        default_market_code=settings.collect_bing_default_market,
+        accept_language=request.headers.get("accept-language"),
+    )
     logger.info("Public wallpaper detail served: wallpaper_id=%s", wallpaper_id)
     return build_success_response(request=request, data=data.model_dump())
 

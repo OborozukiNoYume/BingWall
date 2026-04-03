@@ -39,6 +39,7 @@ class AdminContentRepository:
                 w.id,
                 w.title,
                 w.copyright_text,
+                w.source_key,
                 w.market_code,
                 w.wallpaper_date,
                 w.source_type,
@@ -78,6 +79,7 @@ class AdminContentRepository:
                 w.source_type,
                 w.source_name,
                 w.source_key,
+                w.canonical_key,
                 w.market_code,
                 w.wallpaper_date,
                 w.published_at_utc,
@@ -111,6 +113,29 @@ class AdminContentRepository:
             (wallpaper_id,),
         ).fetchone()
         return cast(sqlite3.Row | None, row)
+
+    def list_wallpaper_localizations(self, *, wallpaper_id: int) -> list[sqlite3.Row]:
+        rows = self.connection.execute(
+            """
+            SELECT
+                market_code,
+                source_key,
+                title,
+                subtitle,
+                description,
+                copyright_text,
+                published_at_utc,
+                location_text,
+                origin_page_url,
+                portrait_image_url,
+                updated_at_utc
+            FROM wallpaper_localizations
+            WHERE wallpaper_id = ?
+            ORDER BY market_code ASC, id ASC;
+            """,
+            (wallpaper_id,),
+        ).fetchall()
+        return list(rows)
 
     def get_wallpaper_for_tag_binding(self, *, wallpaper_id: int) -> sqlite3.Row | None:
         row = self.connection.execute(
@@ -527,8 +552,20 @@ class AdminContentRepository:
             clauses.append("r.image_status = ?")
             parameters.append(query.image_status)
         if query.market_code is not None:
-            clauses.append("w.market_code = ?")
-            parameters.append(query.market_code)
+            clauses.append(
+                """
+                (
+                    w.market_code = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM wallpaper_localizations AS wl_market
+                        WHERE wl_market.wallpaper_id = w.id
+                          AND wl_market.market_code = ?
+                    )
+                )
+                """
+            )
+            parameters.extend([query.market_code, query.market_code])
         if query.keyword is not None:
             keyword = build_like_pattern(query.keyword)
             clauses.append(
@@ -538,6 +575,17 @@ class AdminContentRepository:
                     OR w.subtitle LIKE ? ESCAPE '\\' COLLATE NOCASE
                     OR w.description LIKE ? ESCAPE '\\' COLLATE NOCASE
                     OR w.copyright_text LIKE ? ESCAPE '\\' COLLATE NOCASE
+                    OR EXISTS (
+                        SELECT 1
+                        FROM wallpaper_localizations AS wl_search
+                        WHERE wl_search.wallpaper_id = w.id
+                          AND (
+                              wl_search.title LIKE ? ESCAPE '\\' COLLATE NOCASE
+                              OR wl_search.subtitle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                              OR wl_search.description LIKE ? ESCAPE '\\' COLLATE NOCASE
+                              OR wl_search.copyright_text LIKE ? ESCAPE '\\' COLLATE NOCASE
+                          )
+                    )
                     OR EXISTS (
                         SELECT 1
                         FROM wallpaper_tags AS wt_search
@@ -551,7 +599,20 @@ class AdminContentRepository:
                 )
                 """
             )
-            parameters.extend([keyword, keyword, keyword, keyword, keyword, keyword])
+            parameters.extend(
+                [
+                    keyword,
+                    keyword,
+                    keyword,
+                    keyword,
+                    keyword,
+                    keyword,
+                    keyword,
+                    keyword,
+                    keyword,
+                    keyword,
+                ]
+            )
         if query.created_from_utc is not None:
             clauses.append("w.created_at_utc >= ?")
             parameters.append(datetime_to_utc_string(query.created_from_utc))

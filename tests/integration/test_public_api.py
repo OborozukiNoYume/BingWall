@@ -1103,6 +1103,7 @@ def seed_wallpaper(
             INSERT INTO wallpapers (
                 source_type,
                 source_key,
+                canonical_key,
                 market_code,
                 wallpaper_date,
                 title,
@@ -1123,11 +1124,12 @@ def seed_wallpaper(
                 created_at_utc,
                 updated_at_utc
             )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
             """,
             (
                 "bing",
                 f"bing:{market_code}:{wallpaper_date}:{slugify(title)}",
+                f"bing:{wallpaper_date}:{slugify(title)}",
                 market_code,
                 wallpaper_date,
                 title,
@@ -1153,6 +1155,43 @@ def seed_wallpaper(
         if wallpaper_lastrowid is None:
             raise RuntimeError("Failed to create wallpaper test record.")
         wallpaper_id = int(wallpaper_lastrowid)
+        connection.execute(
+            """
+            INSERT INTO wallpaper_localizations (
+                wallpaper_id,
+                market_code,
+                source_key,
+                title,
+                subtitle,
+                description,
+                copyright_text,
+                published_at_utc,
+                location_text,
+                origin_page_url,
+                portrait_image_url,
+                raw_extra_json,
+                created_at_utc,
+                updated_at_utc
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+            """,
+            (
+                wallpaper_id,
+                market_code,
+                f"bing:{market_code}:{wallpaper_date}:{slugify(title)}",
+                title,
+                subtitle or f"{title} subtitle",
+                description or f"{title} description",
+                copyright_text or f"{title} copyright",
+                now_utc,
+                f"{title} location",
+                "https://www.bing.com/example",
+                f"https://www.bing.com/{slugify(title)}-portrait.jpg",
+                "{}",
+                now_utc,
+                now_utc,
+            ),
+        )
         slug = slugify(title)
         original_relative_path = f"bing/2026/03/{market_code}/{slug}.jpg"
         resource_cursor = connection.execute(

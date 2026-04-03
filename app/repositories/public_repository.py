@@ -106,8 +106,20 @@ class PublicRepository:
     ) -> sqlite3.Row | None:
         return self._get_visible_wallpaper_detail(
             current_time_utc=current_time_utc,
-            extra_clauses=["w.market_code = ?"],
-            extra_parameters=(market_code,),
+            extra_clauses=[
+                """
+                (
+                    w.market_code = ?
+                    OR EXISTS (
+                        SELECT 1
+                        FROM wallpaper_localizations AS wl_market
+                        WHERE wl_market.wallpaper_id = w.id
+                          AND wl_market.market_code = ?
+                    )
+                )
+                """
+            ],
+            extra_parameters=(market_code, market_code),
             order_by="w.wallpaper_date DESC, w.id DESC",
         )
 
@@ -121,8 +133,16 @@ class PublicRepository:
         return self._get_visible_wallpaper_detail(
             current_time_utc=current_time_utc,
             extra_clauses=["w.wallpaper_date = ?"],
-            extra_parameters=(wallpaper_date, default_market_code),
-            order_by="CASE WHEN w.market_code = ? THEN 0 ELSE 1 END ASC, w.id DESC",
+            extra_parameters=(wallpaper_date, default_market_code, default_market_code),
+            order_by=(
+                "CASE "
+                "WHEN EXISTS ("
+                "    SELECT 1 FROM wallpaper_localizations AS wl_default "
+                "    WHERE wl_default.wallpaper_id = w.id AND wl_default.market_code = ?"
+                ") THEN 0 "
+                "WHEN w.market_code = ? THEN 0 "
+                "ELSE 1 END ASC, w.id DESC"
+            ),
         )
 
     def get_random_visible_wallpaper(self, *, current_time_utc: str) -> sqlite3.Row | None:
@@ -258,18 +278,70 @@ class PublicRepository:
         )
         rows = self.connection.execute(
             f"""
-            SELECT DISTINCT w.market_code
-            FROM wallpapers AS w
-            INNER JOIN image_resources AS original_resource
-                ON original_resource.wallpaper_id = w.id
-               AND original_resource.resource_type = ?
-               AND original_resource.image_status = 'ready'
-            WHERE {filters}
-            ORDER BY w.market_code ASC;
+            SELECT market_code
+            FROM (
+                SELECT DISTINCT wl.market_code AS market_code
+                FROM wallpapers AS w
+                INNER JOIN image_resources AS original_resource
+                    ON original_resource.wallpaper_id = w.id
+                   AND original_resource.resource_type = ?
+                   AND original_resource.image_status = 'ready'
+                INNER JOIN wallpaper_localizations AS wl
+                    ON wl.wallpaper_id = w.id
+                WHERE {filters}
+                UNION
+                SELECT DISTINCT w.market_code AS market_code
+                FROM wallpapers AS w
+                INNER JOIN image_resources AS original_resource
+                    ON original_resource.wallpaper_id = w.id
+                   AND original_resource.resource_type = ?
+                   AND original_resource.image_status = 'ready'
+                WHERE {filters}
+                  AND w.source_type != 'bing'
+            )
+            ORDER BY market_code ASC;
             """,
-            (RESOURCE_TYPE_ORIGINAL, *parameters),
+            (
+                RESOURCE_TYPE_ORIGINAL,
+                *parameters,
+                RESOURCE_TYPE_ORIGINAL,
+                *parameters,
+            ),
         ).fetchall()
         return [str(row["market_code"]) for row in rows]
+
+    def list_wallpaper_localizations(
+        self,
+        *,
+        wallpaper_ids: tuple[int, ...],
+    ) -> list[sqlite3.Row]:
+        if not wallpaper_ids:
+            return []
+        placeholders = ", ".join("?" for _ in wallpaper_ids)
+        rows = self.connection.execute(
+            f"""
+            SELECT
+                wallpaper_id,
+                market_code,
+                source_key,
+                title,
+                subtitle,
+                description,
+                copyright_text,
+                published_at_utc,
+                location_text,
+                origin_page_url,
+                portrait_image_url,
+                raw_extra_json,
+                created_at_utc,
+                updated_at_utc
+            FROM wallpaper_localizations
+            WHERE wallpaper_id IN ({placeholders})
+            ORDER BY market_code ASC, id ASC;
+            """,
+            wallpaper_ids,
+        ).fetchall()
+        return list(rows)
 
     def list_visible_tags(self, *, current_time_utc: str) -> list[sqlite3.Row]:
         filters, parameters = self._build_visibility_filters(
@@ -310,9 +382,6 @@ class PublicRepository:
             "(w.publish_end_at_utc IS NULL OR w.publish_end_at_utc >= ?)",
         ]
         parameters: list[str | int] = [current_time_utc, current_time_utc]
-        if query.market_code is not None:
-            clauses.append("w.market_code = ?")
-            parameters.append(query.market_code)
         if query.date_from is not None:
             clauses.append("w.wallpaper_date >= ?")
             parameters.append(query.date_from.isoformat())
@@ -348,6 +417,17 @@ class PublicRepository:
                 OR w.copyright_text LIKE ? ESCAPE '\\' COLLATE NOCASE
                 OR EXISTS (
                     SELECT 1
+                    FROM wallpaper_localizations AS wl_search
+                    WHERE wl_search.wallpaper_id = w.id
+                      AND (
+                          wl_search.title LIKE ? ESCAPE '\\' COLLATE NOCASE
+                          OR wl_search.subtitle LIKE ? ESCAPE '\\' COLLATE NOCASE
+                          OR wl_search.description LIKE ? ESCAPE '\\' COLLATE NOCASE
+                          OR wl_search.copyright_text LIKE ? ESCAPE '\\' COLLATE NOCASE
+                      )
+                )
+                OR EXISTS (
+                    SELECT 1
                     FROM wallpaper_tags AS wt_search
                     INNER JOIN tags AS t_search ON t_search.id = wt_search.tag_id
                     WHERE wt_search.wallpaper_id = w.id
@@ -360,7 +440,18 @@ class PublicRepository:
             )
             """
         ]
-        return clauses, [keyword, keyword, keyword, keyword, keyword, keyword]
+        return clauses, [
+            keyword,
+            keyword,
+            keyword,
+            keyword,
+            keyword,
+            keyword,
+            keyword,
+            keyword,
+            keyword,
+            keyword,
+        ]
 
     def _build_tag_filter(self, *, query: PublicWallpaperListQuery) -> tuple[list[str], list[str]]:
         tag_keys = _parse_tag_keys(query.tag_keys)

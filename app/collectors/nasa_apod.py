@@ -135,6 +135,7 @@ class NasaApodSourceAdapter:
             market_code=item.market_code,
             wallpaper_date=item.wallpaper_date,
             source_key=item.source_key,
+            canonical_key=item.canonical_key,
             origin_image_url=item.origin_image_url,
         )
 

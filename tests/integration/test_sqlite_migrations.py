@@ -13,7 +13,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
 
     applied = migrate_database(database_path)
 
-    assert [migration.version for migration in applied] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [migration.version for migration in applied] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
 
     connection = sqlite3.connect(database_path)
     try:
@@ -62,6 +62,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "image_resources",
         "schema_migrations",
         "tags",
+        "wallpaper_localizations",
         "wallpaper_tags",
         "wallpapers",
     ]
@@ -81,11 +82,14 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "idx_image_resources_status_processed",
         "idx_image_resources_wallpaper_resource_type",
         "idx_tags_status_sort",
+        "idx_wallpaper_localizations_market",
+        "idx_wallpaper_localizations_wallpaper",
         "idx_wallpaper_tags_tag_wallpaper",
         "idx_wallpapers_created_at_utc",
         "idx_wallpapers_market_date",
         "idx_wallpapers_public_listing",
         "uq_image_resources_wallpaper_resource_variant",
+        "uq_wallpapers_source_canonical_key",
     ]
     assert triggers == [
         "tr_admin_users_status_insert",
@@ -95,6 +99,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
     assert "updated_at_utc" in wallpaper_columns
     assert "published_at_utc" in wallpaper_columns
     assert "portrait_image_url" in wallpaper_columns
+    assert "canonical_key" in wallpaper_columns
     assert "variant_key" in image_resource_columns
     assert any(key[2] == "admin_users" and key[3] == "admin_user_id" for key in audit_foreign_keys)
 
@@ -105,7 +110,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
     first_run = migrate_database(database_path)
     second_run = migrate_database(database_path)
 
-    assert [migration.version for migration in first_run] == [1, 2, 3, 4, 5, 6, 7, 8]
+    assert [migration.version for migration in first_run] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
     assert second_run == []
 
     connection = sqlite3.connect(database_path)
@@ -129,6 +134,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
         (6, "admin_user_status_constraint"),
         (7, "image_resource_download_resolution_variants"),
         (8, "wallpapers_bing_portrait_image_url"),
+        (9, "bing_wallpaper_localizations"),
     ]
 
 
@@ -162,7 +168,7 @@ def test_admin_user_status_constraint_migration_cleans_legacy_values_and_blocks_
         connection.close()
 
     applied = migrate_database(database_path)
-    assert [migration.version for migration in applied] == [6, 7, 8]
+    assert [migration.version for migration in applied] == [6, 7, 8, 9]
 
     connection = sqlite3.connect(database_path)
     try:
