@@ -78,6 +78,8 @@ cp .env.example .env
 # 编辑 .env，为首次初始化填写管理员账号与密码
 # 仅在启用 OSS / CDN 公网访问时设置 BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL
 make db-migrate
+make collect-bing COUNT=1
+# 如需只抓单个地区，可显式指定 MARKET
 make collect-bing MARKET=en-US COUNT=1
 # 或按日期范围精确抓取，例如只抓 UTC 昨天
 make collect-bing MARKET=en-US DATE_FROM=2026-04-02 DATE_TO=2026-04-02
@@ -123,13 +125,45 @@ make verify-deploy
 - 新采集内容当前默认会在资源全部就绪后自动公开；如需改回“采集后待审核”，可把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`。
 - 仅本地文件存储场景下，不要把 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 留空写入 `.env`；应保持该变量未设置。只有资源使用 `storage_backend = oss` 时，才填写真实公网地址。
 
+浏览器模拟测试（Playwright）：
+
+```bash
+make run
+make browser-smoke
+```
+
+等价命令：
+
+```bash
+node scripts/dev/playwright_smoke.js
+npm run browser-smoke
+```
+
+带后台登录账号的完整模板：
+
+```bash
+bash scripts/dev/playwright_smoke_with_admin.example.sh
+```
+
+说明：
+
+- 脚本位置：`scripts/dev/playwright_smoke.js`
+- 带后台登录账号的示例模板：`scripts/dev/playwright_smoke_with_admin.example.sh`
+- 默认访问地址：`http://127.0.0.1:30003`；如需改地址，可在命令前设置 `BINGWALL_BROWSER_BASE_URL=http://127.0.0.1:18080`
+- 默认以无头 Chromium 运行；如需切到非无头模式，可设置 `BINGWALL_BROWSER_HEADLESS=false`
+- 冒烟步骤默认覆盖公开首页、公开列表筛选、壁纸详情页和后台登录页壳；若同时设置 `BINGWALL_ADMIN_USERNAME` 与 `BINGWALL_ADMIN_PASSWORD`，脚本会继续执行一次真实后台登录并进入 `/admin/wallpapers`
+- 若不想把管理员密码直接留在命令行历史里，可复制 `scripts/dev/playwright_smoke_with_admin.example.sh` 到临时目录后再编辑
+- 当前脚本依赖本地 `node_modules` 中可用的 `playwright` 模块；如模块缺失，可先执行 `npm install --no-save playwright`
+- 如目标机器还没下载 Chromium，可执行 `npx playwright install chromium`
+- Ubuntu 24.04 上如果浏览器启动时报 GTK 相关依赖缺失，优先安装 `libgtk-3-0t64`；旧版发行版对应包名可能是 `libgtk-3-0`
+
 当前 `T1.1` 到 `T1.6` 已补齐内容：
 
 - 后端目录骨架
 - `.python-version` 与 `.nvmrc` 运行时版本锁定
 - `.env.example` 配置示例与启动期必填校验
 - `uv python install 3.14`、`uv sync --python 3.14 --frozen` 开发环境准备入口，以及等价的 `make setup` 便捷入口；本地与部署侧 Python 执行入口现已统一为 `uv run`
-- `make collect-bing MARKET=en-US COUNT=1` Bing 手动采集入口；也支持通过 `DATE_FROM` / `DATE_TO` 精确抓取最近 8 天内的指定 UTC 日期范围
+- `make collect-bing COUNT=1` Bing 手动采集入口；默认会按 `BINGWALL_COLLECT_BING_MARKETS` 依次抓取固定 8 个地区，也支持通过 `MARKET=en-US` 指定单个地区，或结合 `DATE_FROM` / `DATE_TO` 精确抓取最近 8 天内的指定 UTC 日期范围
 - `make collect-nasa-apod MARKET=global` NASA APOD 手动采集入口
 - `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口，会按当天 UTC 日期为已启用来源生成 `queued` 的 `cron` 任务；Bing 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场各建一条任务，并把窗口起点按 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 回溯
 - `make scheduled-collect` 本地联调便捷入口，会先创建当天固定日期采集任务，再立即消费最多 `5` 个任务

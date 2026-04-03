@@ -88,6 +88,28 @@ def test_settings_allow_missing_oss_public_base_url() -> None:
     clear_bingwall_env()
 
 
+def test_settings_use_fixed_eight_bing_markets_by_default() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ.pop("BINGWALL_COLLECT_BING_MARKETS", None)
+    reset_settings_cache()
+
+    settings = load_settings()
+
+    assert settings.collect_bing_markets == (
+        "zh-CN",
+        "en-US",
+        "ja-JP",
+        "en-GB",
+        "de-DE",
+        "fr-FR",
+        "en-CA",
+        "en-AU",
+    )
+
+    clear_bingwall_env()
+
+
 def test_settings_reject_empty_oss_public_base_url() -> None:
     clear_bingwall_env()
     set_valid_env()

@@ -15,6 +15,17 @@ SETTINGS_MODEL_CONFIG = SettingsConfigDict(
     extra="ignore",
 )
 
+DEFAULT_BING_MARKETS: tuple[str, ...] = (
+    "zh-CN",
+    "en-US",
+    "ja-JP",
+    "en-GB",
+    "de-DE",
+    "fr-FR",
+    "en-CA",
+    "en-AU",
+)
+
 
 class Settings(BaseSettings):
     model_config = SETTINGS_MODEL_CONFIG
@@ -33,7 +44,7 @@ class Settings(BaseSettings):
     backup_dir: Path
     collect_bing_enabled: bool = True
     collect_bing_default_market: str = Field(default="en-US", min_length=2)
-    collect_bing_markets: Annotated[tuple[str, ...], NoDecode] = ("en-US",)
+    collect_bing_markets: Annotated[tuple[str, ...], NoDecode] = DEFAULT_BING_MARKETS
     collect_bing_scheduled_backtrack_days: int = Field(default=3)
     collect_bing_timeout_seconds: int = Field(default=10, gt=0, le=120)
     collect_bing_max_download_retries: int = Field(default=3, ge=1, le=10)
@@ -68,7 +79,7 @@ class Settings(BaseSettings):
     @classmethod
     def parse_collect_bing_markets(cls, value: Any) -> tuple[str, ...]:
         if value is None:
-            return ("en-US",)
+            return DEFAULT_BING_MARKETS
         if isinstance(value, str):
             raw_items = value.split(",")
         elif isinstance(value, (list, tuple, set)):
