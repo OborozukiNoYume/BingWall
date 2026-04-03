@@ -55,6 +55,10 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert "market_spotlight_code" not in asset_response.text
     assert "date_lookup" in asset_response.text
     assert "market_code" in asset_response.text
+    assert "startWallpaperDownload(response.redirect_url)" in asset_response.text
+    assert 'link.download = buildDownloadFilename(resolvedUrl.pathname)' in asset_response.text
+    assert "window.open(" not in asset_response.text
+    assert 'target="_blank" rel="noreferrer" data-download-wallpaper-id=' not in asset_response.text
     assert '"zh-CN"' in asset_response.text
     assert '"en-US"' in asset_response.text
     assert '"ja-JP"' in asset_response.text
