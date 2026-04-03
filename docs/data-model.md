@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-03-29T03:19:48Z
+- 更新时间：2026-04-03T05:38:48Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期实施前的数据实体、字段分组、状态模型、约束和索引说明
 
@@ -393,7 +393,7 @@
 ### `tags`
 
 - `(tag_key)` 唯一索引
-- `(status, sort_weight)` 公开筛选索引
+- `(status, sort_weight DESC, tag_name ASC)` 公开筛选与稳定排序索引
 
 ### `wallpaper_tags`
 
