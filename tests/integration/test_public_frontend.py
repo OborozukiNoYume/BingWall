@@ -50,14 +50,19 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert 'fetchEnvelope("/api/public/site-info")' in asset_response.text
     assert "/api/public/wallpaper-filters" in asset_response.text
     assert "/api/public/wallpapers?page=1&page_size=6&sort=date_desc" in asset_response.text
-    assert "/api/public/wallpapers/by-market/" in asset_response.text
     assert "/api/public/wallpapers/by-date/" in asset_response.text
     assert "/api/public/download-events" in asset_response.text
-    assert "market_spotlight_code" in asset_response.text
+    assert "market_spotlight_code" not in asset_response.text
     assert "date_lookup" in asset_response.text
+    assert "market_code" in asset_response.text
     assert '"zh-CN"' in asset_response.text
     assert '"en-US"' in asset_response.text
     assert '"ja-JP"' in asset_response.text
+    assert '"en-GB"' in asset_response.text
+    assert '"de-DE"' in asset_response.text
+    assert '"fr-FR"' in asset_response.text
+    assert '"en-CA"' in asset_response.text
+    assert '"en-AU"' in asset_response.text
     assert 'params.set("keyword", state.keyword)' in asset_response.text
     assert "tag_keys" in asset_response.text
     assert "内容不存在" in asset_response.text
@@ -65,13 +70,12 @@ def test_public_frontend_assets_only_reference_public_api_contract(tmp_path: Pat
     assert "sqlite" not in asset_response.text.lower()
 
     assert css_response.status_code == 200
-    assert ".api-shortcuts" in css_response.text
-    assert ".card-grid" in css_response.text
-    assert ".detail-layout" in css_response.text
-    assert ".market-spotlight-panel" in css_response.text
-    assert ".date-lookup-panel" in css_response.text
-    assert ".market-spotlight-card" in css_response.text
-    assert ".tag-filter-grid" in css_response.text
+    assert ".border-stone-200" in css_response.text
+    assert ".sm\\:grid-cols-2" in css_response.text
+    assert ".lg\\:grid-cols-3" in css_response.text
+    assert ".rounded-2xl" in css_response.text
+    assert ".bg-white" in css_response.text
+    assert ".text-amber-600" in css_response.text
 
 
 def test_public_frontend_can_serve_public_images_from_storage_directory(tmp_path: Path) -> None:

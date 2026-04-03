@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import dataclass
+from datetime import UTC
 from datetime import date
 from datetime import datetime
 import hashlib
@@ -22,17 +24,20 @@ from urllib.request import urlopen
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.domain.collection import BingImageMetadata
+from app.domain.collection import CollectionRunSummary
 from app.domain.collection import CollectedDownloadVariant
 from app.domain.collection import DownloadedImage
 from app.repositories.collection_repository import CollectionRepository
 from app.repositories.file_storage import FileStorage
 from app.services.bing_collection import BingCollectionService
 from app.services.source_collection import build_source_relative_path
+from app.services.source_collection import task_status_from_counts
 
 logger = logging.getLogger(__name__)
 
 BING_BASE_URL = "https://www.bing.com"
 BING_METADATA_PATH = "/HPImageArchive.aspx"
+BING_MAX_METADATA_DAYS = 8
 IMAGE_ID_PATTERN = re.compile(r"(?:^|[?&])id=([^&]+)")
 DIMENSION_PATTERN = re.compile(r"_(\d+)x(\d+)\.(?:jpg|jpeg|png|webp)$", re.IGNORECASE)
 UHD_PATTERN = re.compile(r"_UHD\.(?:jpg|jpeg|png|webp)$", re.IGNORECASE)
@@ -52,12 +57,32 @@ class BingImageDownloadError(RuntimeError):
         self.status_code = status_code
 
 
+@dataclass(frozen=True, slots=True)
+class BingMetadataQuery:
+    idx: int
+    n: int
+
+
 class BingClient:
     def __init__(self, *, timeout_seconds: int) -> None:
         self.timeout_seconds = timeout_seconds
 
-    def fetch_metadata(self, market_code: str, count: int) -> list[BingImageMetadata]:
-        query = urlencode({"format": "js", "idx": 0, "n": count, "mkt": market_code})
+    def fetch_metadata(
+        self,
+        *,
+        market_code: str,
+        count: int,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> list[BingImageMetadata]:
+        metadata_query = resolve_bing_metadata_query(
+            count=count,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        query = urlencode(
+            {"format": "js", "idx": metadata_query.idx, "n": metadata_query.n, "mkt": market_code}
+        )
         request = Request(
             url=f"{BING_BASE_URL}{BING_METADATA_PATH}?{query}",
             headers={"User-Agent": "BingWall/0.1"},
@@ -161,12 +186,13 @@ class BingClient:
 
 
 def parse_args() -> argparse.Namespace:
-    settings = get_settings()
     parser = argparse.ArgumentParser(
         description="Collect Bing wallpapers into the BingWall database."
     )
-    parser.add_argument("--market", default=settings.collect_bing_default_market)
+    parser.add_argument("--market")
     parser.add_argument("--count", type=int, default=1)
+    parser.add_argument("--date-from")
+    parser.add_argument("--date-to")
     parser.add_argument("--trigger-type", default="manual", choices=["manual", "cron"])
     parser.add_argument("--triggered-by")
     return parser.parse_args()
@@ -181,6 +207,24 @@ def main() -> None:
     args = parse_args()
     configure_logging(settings.log_level)
 
+    if (args.date_from is None) != (args.date_to is None):
+        raise RuntimeError("--date-from and --date-to must be provided together.")
+
+    date_from: date | None = None
+    date_to: date | None = None
+    count = args.count
+    if args.date_from is not None and args.date_to is not None:
+        date_from = date.fromisoformat(str(args.date_from))
+        date_to = date.fromisoformat(str(args.date_to))
+        if date_to < date_from:
+            raise RuntimeError("--date-to must be greater than or equal to --date-from.")
+        count = (date_to - date_from).days + 1
+
+    market_codes = resolve_collect_market_codes(
+        requested_market=args.market,
+        configured_markets=settings.collect_bing_markets,
+    )
+
     repository = CollectionRepository(str(settings.database_path))
     storage = FileStorage(
         tmp_dir=settings.storage_tmp_dir,
@@ -194,26 +238,28 @@ def main() -> None:
         max_download_retries=settings.collect_bing_max_download_retries,
         auto_publish_enabled=settings.collect_auto_publish_enabled,
     )
+    market_summaries: list[tuple[str, CollectionRunSummary]] = []
     try:
-        summary = service.collect(
-            market_code=args.market,
-            count=args.count,
-            trigger_type=args.trigger_type,
-            triggered_by=args.triggered_by,
-        )
+        for market_code in market_codes:
+            market_summaries.append(
+                (
+                    market_code,
+                    service.collect(
+                        market_code=market_code,
+                        count=count,
+                        trigger_type=args.trigger_type,
+                        triggered_by=args.triggered_by,
+                        date_from=date_from,
+                        date_to=date_to,
+                    ),
+                )
+            )
     finally:
         repository.close()
 
     print(
         json.dumps(
-            {
-                "task_id": summary.task_id,
-                "task_status": summary.task_status,
-                "success_count": summary.success_count,
-                "duplicate_count": summary.duplicate_count,
-                "failure_count": summary.failure_count,
-                "error_summary": summary.error_summary,
-            },
+            build_collection_summary_payload(market_summaries=market_summaries),
             ensure_ascii=False,
             sort_keys=True,
         )
@@ -222,6 +268,108 @@ def main() -> None:
 
 def parse_bing_date(value: str) -> date:
     return datetime.strptime(value, "%Y%m%d").date()
+
+
+def resolve_collect_market_codes(
+    *,
+    requested_market: str | None,
+    configured_markets: tuple[str, ...],
+) -> tuple[str, ...]:
+    if requested_market is None:
+        return configured_markets
+
+    normalized_market = str(requested_market).strip()
+    if not normalized_market:
+        raise ValueError("--market must not be blank.")
+    return (normalized_market,)
+
+
+def build_collection_summary_payload(
+    *,
+    market_summaries: list[tuple[str, CollectionRunSummary]],
+) -> dict[str, object]:
+    if len(market_summaries) == 1:
+        market_code, summary = market_summaries[0]
+        return {
+            "market_code": market_code,
+            "task_id": summary.task_id,
+            "task_status": summary.task_status,
+            "success_count": summary.success_count,
+            "duplicate_count": summary.duplicate_count,
+            "failure_count": summary.failure_count,
+            "error_summary": summary.error_summary,
+        }
+
+    success_count = sum(summary.success_count for _market_code, summary in market_summaries)
+    duplicate_count = sum(summary.duplicate_count for _market_code, summary in market_summaries)
+    failure_count = sum(summary.failure_count for _market_code, summary in market_summaries)
+    error_summaries = [
+        summary.error_summary
+        for _market_code, summary in market_summaries
+        if summary.error_summary is not None
+    ]
+    return {
+        "task_ids": [summary.task_id for _market_code, summary in market_summaries],
+        "task_status": task_status_from_counts(
+            success_count=success_count,
+            duplicate_count=duplicate_count,
+            failure_count=failure_count,
+        ),
+        "success_count": success_count,
+        "duplicate_count": duplicate_count,
+        "failure_count": failure_count,
+        "error_summary": "; ".join(error_summaries[:5]) if error_summaries else None,
+        "market_count": len(market_summaries),
+        "markets": [
+            {
+                "market_code": market_code,
+                "task_id": summary.task_id,
+                "task_status": summary.task_status,
+                "success_count": summary.success_count,
+                "duplicate_count": summary.duplicate_count,
+                "failure_count": summary.failure_count,
+                "error_summary": summary.error_summary,
+            }
+            for market_code, summary in market_summaries
+        ],
+    }
+
+
+def resolve_bing_metadata_query(
+    *,
+    count: int,
+    date_from: date | None,
+    date_to: date | None,
+    today_utc: date | None = None,
+) -> BingMetadataQuery:
+    if not 1 <= count <= BING_MAX_METADATA_DAYS:
+        raise ValueError(
+            f"Bing metadata count must be between 1 and {BING_MAX_METADATA_DAYS}."
+        )
+
+    if date_from is None and date_to is None:
+        return BingMetadataQuery(idx=0, n=count)
+
+    if date_from is None or date_to is None:
+        raise ValueError("Bing metadata query requires both date_from and date_to.")
+    if date_to < date_from:
+        raise ValueError("Bing metadata query date_to must not be earlier than date_from.")
+
+    today = today_utc or datetime.now(tz=UTC).date()
+    idx = (today - date_to).days
+    if idx < 0:
+        raise ValueError("Bing metadata query does not support future dates.")
+
+    requested_days = (date_to - date_from).days + 1
+    if requested_days > BING_MAX_METADATA_DAYS:
+        raise ValueError(
+            f"Bing metadata query only supports the most recent {BING_MAX_METADATA_DAYS} days."
+        )
+    if idx + requested_days > BING_MAX_METADATA_DAYS:
+        raise ValueError(
+            f"Bing metadata query exceeds the most recent {BING_MAX_METADATA_DAYS}-day window."
+        )
+    return BingMetadataQuery(idx=idx, n=requested_days)
 
 
 def parse_bing_fullstartdate(value: str | None) -> str | None:

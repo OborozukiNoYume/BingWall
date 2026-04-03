@@ -1,0 +1,30 @@
+{
+  "name": "bingwall",
+  "version": "1.0.0",
+  "description": "BingWall 是一个围绕 Bing 壁纸构建的图片服务系统。一期目标不是做单一下载脚本，而是建设一个可持续采集、可管理、可对外服务、可扩展演进的内容系统。",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "browser-smoke": "node scripts/dev/playwright_smoke.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OborozukiNoYume/BingWall.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/OborozukiNoYume/BingWall/issues"
+  },
+  "homepage": "https://github.com/OborozukiNoYume/BingWall#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.2",
+    "tailwindcss": "^4.2.2"
+  }
+}

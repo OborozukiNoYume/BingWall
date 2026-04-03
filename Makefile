@@ -3,10 +3,12 @@ PYTHON_VERSION ?= 3.14
 VENV ?= .venv
 UV_RUN := $(UV_BIN) run python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources archive-wallpapers backup restore install-cron verify-backup-restore run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources archive-wallpapers backup restore install-cron verify-backup-restore browser-smoke css css-watch run clean
 
-MARKET ?= en-US
+MARKET ?=
 COUNT ?= 1
+DATE_FROM ?=
+DATE_TO ?=
 CRON_APP_DIR ?= /opt/bingwall/app
 CRON_UV_BIN ?= $(UV_BIN)
 CRON_LOG_DIR ?= /var/log/bingwall
@@ -39,7 +41,7 @@ db-migrate:
 	$(UV_RUN) -m app.repositories.migrations
 
 collect-bing:
-	$(UV_RUN) -m app.collectors.bing --market $(MARKET) --count $(COUNT)
+	$(UV_RUN) -m app.collectors.bing $(if $(MARKET),--market $(MARKET),) --count $(COUNT) $(if $(DATE_FROM),--date-from $(DATE_FROM),) $(if $(DATE_TO),--date-to $(DATE_TO),)
 
 collect-nasa-apod:
 	$(UV_RUN) -m app.collectors.nasa_apod --market $(MARKET)
@@ -72,6 +74,17 @@ install-cron:
 
 verify-backup-restore:
 	$(UV_RUN) scripts/verify_t2_5.py
+
+browser-smoke:
+	node scripts/dev/playwright_smoke.js
+
+css:
+	npx @tailwindcss/cli -i web/src/input-public.css -o web/public/assets/site.css --minify
+	npx @tailwindcss/cli -i web/src/input-admin.css -o web/admin/assets/admin.css --minify
+
+css-watch:
+	npx @tailwindcss/cli -i web/src/input-public.css -o web/public/assets/site.css --watch &
+	npx @tailwindcss/cli -i web/src/input-admin.css -o web/admin/assets/admin.css --watch
 
 run:
 	$(UV_RUN) -c 'from app.core.config import get_settings; import uvicorn; settings = get_settings(); uvicorn.run("app.main:create_app", factory=True, host=settings.app_host, port=settings.app_port)'

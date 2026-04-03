@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@source "../../app/web/routes.py";
+@source "../public/assets/site.js";
+
+@theme {
+  --color-accent: #d97706;
+  --color-accent-light: #fef3c7;
+}
+
+@layer base {
+  html {
+    @apply bg-stone-50 text-stone-800;
+  }
+  a, button, input, select, textarea {
+    @apply transition-all duration-200 ease-out;
+  }
+}

@@ -129,10 +129,10 @@
 
 ### Bing 采集配置补充
 
-- `BINGWALL_COLLECT_BING_DEFAULT_MARKET` 仍表示公开站点和手动采集默认使用的 Bing 市场代码，必须使用 `en-US` 这类带连字符的 Bing 市场格式
-- `BINGWALL_COLLECT_BING_MARKETS` 用于 cron 定时建任务；值为逗号分隔的市场列表，例如 `en-US,zh-CN,ja-JP`，系统会自动去重并忽略空白项
+- `BINGWALL_COLLECT_BING_DEFAULT_MARKET` 仍表示公开站点默认使用的 Bing 市场代码；手动单市场采集时也可显式使用该值，必须使用 `en-US` 这类带连字符的 Bing 市场格式
+- `BINGWALL_COLLECT_BING_MARKETS` 用于手动采集默认市场集合和 cron 定时建任务；值为逗号分隔的市场列表，例如 `zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU`，系统会自动去重并忽略空白项
 - `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 用于 Bing 定时任务快照中的回溯窗口，当前只允许 `3`、`5`、`7`
-- 如果未单独配置 `BINGWALL_COLLECT_BING_MARKETS`，环境示例默认只创建 `en-US` 一个 Bing 定时任务
+- 如果未单独配置 `BINGWALL_COLLECT_BING_MARKETS`，环境示例默认使用 `zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU` 八个地区
 
 ## 5. 服务拓扑
 
@@ -184,7 +184,7 @@
 - 数据库初始化命令：`make db-migrate`
 - 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 自动公开开关：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`，默认 `true`；开启时，新采集内容会在资源全部就绪后自动公开
-- 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
+- 手动采集命令：`make collect-bing COUNT=1`；默认会按 `BINGWALL_COLLECT_BING_MARKETS` 批量抓取配置中的 8 个地区，如需单独抓某个地区可用 `make collect-bing MARKET=en-US COUNT=1`；如需精确抓取最近 8 天内的指定 UTC 日期范围，可改用 `make collect-bing MARKET=en-US DATE_FROM=2026-04-02 DATE_TO=2026-04-02`
 - 定时固定日期建任务命令：`make create-scheduled-collection-tasks`
 - 本地联调便捷命令：`make scheduled-collect`
 - 手动采集任务消费命令：`make consume-collection-tasks`
@@ -197,12 +197,30 @@
 - 仓库内自动化部署验收命令：`make verify-deploy`
 - 仓库内恢复演练命令：`make verify-backup-restore`
 - 本地开发启动命令：`make run`
+- 浏览器冒烟测试命令：`make browser-smoke` 或 `npm run browser-smoke`
 - 健康检查接口：`GET /api/health/live`、`GET /api/health/ready`、`GET /api/health/deep`
 - 生产环境变量示例：`deploy/systemd/bingwall.env.example`
 - `systemd` 服务模板：`deploy/systemd/bingwall-api.service`
 - 目录权限模板：`deploy/systemd/bingwall.tmpfiles.conf`
 - Nginx 路由模板：`deploy/nginx/bingwall.conf`
 - `cron` 示例模板：`deploy/cron/bingwall-cron`
+
+### Playwright 浏览器冒烟测试
+
+- 脚本位置：`scripts/dev/playwright_smoke.js`
+- 带后台登录账号的示例模板：`scripts/dev/playwright_smoke_with_admin.example.sh`
+- 默认前提：先执行 `make run`，确保本地服务已监听在 `127.0.0.1:30003`
+- 统一入口：`make browser-smoke`
+- 等价入口：`node scripts/dev/playwright_smoke.js`、`npm run browser-smoke`
+- 带后台登录账号的模板入口：`bash scripts/dev/playwright_smoke_with_admin.example.sh`
+- 可选环境变量：
+  - `BINGWALL_BROWSER_BASE_URL`：改写默认访问地址
+  - `BINGWALL_BROWSER_HEADLESS=false`：切换到非无头模式
+  - `BINGWALL_ADMIN_USERNAME`、`BINGWALL_ADMIN_PASSWORD`：启用真实后台登录验证
+- 当前脚本默认覆盖公开首页、公开列表筛选、壁纸详情页和后台登录页壳；若提供后台账号，还会继续验证后台登录跳转
+- 若本机缺少 Playwright Node 模块，可先执行 `npm install --no-save playwright`
+- 若本机尚未下载 Chromium，可执行 `npx playwright install chromium`
+- Ubuntu 24.04 若浏览器启动缺 GTK 运行库，优先安装 `libgtk-3-0t64`；旧版发行版对应包名通常为 `libgtk-3-0`
 - `cron` 安装脚本：`scripts/install_cron.py`
 
 ### 仓库内自动化部署验收
@@ -253,7 +271,7 @@
 - 临时目录、失败目录、数据库目录不对 Nginx 开放
 - 仅本地文件存储时，应保持 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 未设置，不要写成空字符串
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
-- 如需让 Bing 定时采集覆盖多个地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=en-US,zh-CN,ja-JP`
+- 如需调整 Bing 手动/定时采集覆盖的地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU`
 - 如需调整 Bing 定时采集回溯窗口，可把 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 设为 `3`、`5` 或 `7`
 - 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
 - 如需保留“采集后先人工审核再发布”的旧策略，可在环境文件中把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`

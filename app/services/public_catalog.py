@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC
 from datetime import date
 from datetime import datetime
+from datetime import timedelta
 import math
 from sqlite3 import Row
 
@@ -24,6 +25,8 @@ from app.services.resource_locator import ResourceLocator
 
 MARKET_LABELS: dict[str, str] = {
     "de-DE": "Deutsch (Deutschland)",
+    "en-AU": "English (Australia)",
+    "en-CA": "English (Canada)",
     "en-GB": "English (United Kingdom)",
     "en-US": "English (United States)",
     "fr-FR": "Français (France)",
@@ -72,11 +75,15 @@ class PublicCatalogService:
 
     def get_today_wallpaper(self, *, default_market_code: str) -> PublicWallpaperDetailData:
         current_time_utc = utc_now_isoformat()
-        row = self.repository.get_visible_wallpaper_for_today(
-            current_time_utc=current_time_utc,
-            current_date=utc_today_isoformat(),
-            default_market_code=default_market_code,
-        )
+        row = None
+        for candidate_date in (utc_today(), utc_yesterday()):
+            row = self.repository.get_visible_wallpaper_for_date(
+                current_time_utc=current_time_utc,
+                wallpaper_date=candidate_date.isoformat(),
+                default_market_code=default_market_code,
+            )
+            if row is not None:
+                break
         wallpaper_row = self._require_visible_wallpaper(row)
         return self._build_wallpaper_detail(
             wallpaper_row,
@@ -263,8 +270,12 @@ def utc_now_isoformat() -> str:
     return datetime.now(tz=UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
-def utc_today_isoformat() -> str:
-    return datetime.now(tz=UTC).date().isoformat()
+def utc_today() -> date:
+    return datetime.now(tz=UTC).date()
+
+
+def utc_yesterday() -> date:
+    return utc_today() - timedelta(days=1)
 
 
 def _optional_text(value: object) -> str | None:

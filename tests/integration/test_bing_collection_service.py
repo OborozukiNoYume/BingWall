@@ -1,5 +1,6 @@
 from pathlib import Path
 import sqlite3
+from datetime import date
 from typing import Sequence
 
 from _pytest.monkeypatch import MonkeyPatch
@@ -26,9 +27,26 @@ class FakeBingClient:
         self.downloads = list(downloads)
         self.download_calls = 0
         self.requested_urls: list[str] = []
+        self.last_date_from: date | None = None
+        self.last_date_to: date | None = None
 
-    def fetch_metadata(self, market_code: str, count: int) -> list[BingImageMetadata]:
-        return self.metadata[:count]
+    def fetch_metadata(
+        self,
+        *,
+        market_code: str,
+        count: int,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> list[BingImageMetadata]:
+        del market_code
+        self.last_date_from = date_from
+        self.last_date_to = date_to
+        items = self.metadata
+        if date_from is not None and date_to is not None:
+            items = [
+                item for item in items if date_from <= item.wallpaper_date <= date_to
+            ]
+        return items[:count]
 
     def download_image(self, image_url: str) -> DownloadedImage:
         self.requested_urls.append(image_url)
@@ -116,6 +134,39 @@ def test_bing_collection_service_persists_successful_collection(tmp_path: Path) 
         '"portrait_image_url": "https://www.bing.com/th?id=OHR.Success_720x1280.jpg&pid=hp"'
         in str(wallpapers[0]["raw_extra_json"])
     )
+
+
+def test_bing_collection_service_passes_date_window_to_bing_client(tmp_path: Path) -> None:
+    service, _database_path, _storage = build_service(
+        tmp_path=tmp_path,
+        metadata=[
+            make_metadata(
+                market_code="en-US",
+                wallpaper_date="2026-03-24",
+                source_key="bing:en-US:2026-03-24:OHR.Window",
+                source_url="https://www.bing.com/th?id=OHR.Window_1920x1080.jpg&pid=hp",
+            )
+        ],
+        downloads=[DownloadedImage(content=JPEG_BYTES, mime_type="image/jpeg")],
+    )
+
+    fake_client = getattr(service.delegate.adapter, "client")
+
+    try:
+        summary = service.collect(
+            market_code="en-US",
+            count=1,
+            trigger_type="manual",
+            triggered_by="test",
+            date_from=date(2026, 3, 24),
+            date_to=date(2026, 3, 24),
+        )
+    finally:
+        service.repository.close()
+
+    assert summary.task_status == "succeeded"
+    assert fake_client.last_date_from == date(2026, 3, 24)
+    assert fake_client.last_date_to == date(2026, 3, 24)
 
 
 def test_bing_collection_service_persists_all_available_bing_download_resolutions(
