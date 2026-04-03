@@ -79,6 +79,8 @@ cp .env.example .env
 # 仅在启用 OSS / CDN 公网访问时设置 BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL
 make db-migrate
 make collect-bing MARKET=en-US COUNT=1
+# 或按日期范围精确抓取，例如只抓 UTC 昨天
+make collect-bing MARKET=en-US DATE_FROM=2026-04-02 DATE_TO=2026-04-02
 make collect-nasa-apod MARKET=global
 make create-scheduled-collection-tasks
 make scheduled-collect
@@ -127,7 +129,7 @@ make verify-deploy
 - `.python-version` 与 `.nvmrc` 运行时版本锁定
 - `.env.example` 配置示例与启动期必填校验
 - `uv python install 3.14`、`uv sync --python 3.14 --frozen` 开发环境准备入口，以及等价的 `make setup` 便捷入口；本地与部署侧 Python 执行入口现已统一为 `uv run`
-- `make collect-bing MARKET=en-US COUNT=1` Bing 手动采集入口
+- `make collect-bing MARKET=en-US COUNT=1` Bing 手动采集入口；也支持通过 `DATE_FROM` / `DATE_TO` 精确抓取最近 8 天内的指定 UTC 日期范围
 - `make collect-nasa-apod MARKET=global` NASA APOD 手动采集入口
 - `make create-scheduled-collection-tasks` 每日固定日期采集任务创建入口，会按当天 UTC 日期为已启用来源生成 `queued` 的 `cron` 任务；Bing 会按 `BINGWALL_COLLECT_BING_MARKETS` 为每个市场各建一条任务，并把窗口起点按 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 回溯
 - `make scheduled-collect` 本地联调便捷入口，会先创建当天固定日期采集任务，再立即消费最多 `5` 个任务
@@ -147,7 +149,7 @@ make verify-deploy
 - 新采集内容默认会在资源全部就绪后自动切到 `enabled + is_public=true`；如需保留人工审核，可通过 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false` 关闭自动公开
 - `/api/public/wallpapers`、`/api/public/wallpapers/today`、`/api/public/wallpapers/random`、`/api/public/wallpapers/by-market/{market_code}`、`/api/public/wallpapers/by-date/{wallpaper_date}`、`/api/public/wallpapers/{wallpaper_id}`、`/api/public/wallpaper-filters`、`/api/public/tags`、`/api/public/site-info` 与 `/api/public/download-events` 十个公开接口；其中单条壁纸接口都会返回默认下载地址和 `download_variants` 多分辨率下载列表
 - 统一公开成功响应、统一错误响应、分页结构、`trace_id` 回传与访问日志记录
-- 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword`、`tag_keys`、`date_from`、`date_to` 组合查询，其中日期格式固定为 `YYYY-MM-DD`，且按 `wallpaper_date` 做包含边界的范围过滤；`/api/public/wallpapers/today` 按 UTC 当天匹配并优先默认市场，`/api/public/wallpapers/random` 仅从当前公开可见内容中随机返回，`/api/public/wallpapers/by-market/{market_code}` 返回该地区最新一张公开壁纸，`/api/public/wallpapers/by-date/{wallpaper_date}` 按指定日期精确取一张并优先默认市场
+- 公开可见性过滤：仅返回已启用、允许公开、资源已就绪且处于发布时间窗口内的数据；公开列表支持 `keyword`、`tag_keys`、`date_from`、`date_to` 组合查询，其中日期格式固定为 `YYYY-MM-DD`，且按 `wallpaper_date` 做包含边界的范围过滤；`/api/public/wallpapers/today` 优先返回 UTC 今天的公开壁纸，若今天没有则回退到 UTC 昨天，并在候选日期内优先默认市场，`/api/public/wallpapers/random` 仅从当前公开可见内容中随机返回，`/api/public/wallpapers/by-market/{market_code}` 返回该地区最新一张公开壁纸，`/api/public/wallpapers/by-date/{wallpaper_date}` 按指定日期精确取一张并优先默认市场
 - `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面；其中首页已直接展示“今日壁纸 API”和“随机壁纸 API”两个快捷入口，`/wallpapers` 提供固定 8 个地区选项与单独的日期选择器；地区筛选通过公开列表接口按 `market_code` 过滤，日期选择器调用 `/api/public/wallpapers/by-date/{wallpaper_date}` 精确查找单张公开壁纸
 - `web/public/assets/site.css` 与 `web/public/assets/site.js` 页面静态资源
 - 前端页面只通过公开 API 获取业务数据，并在空结果、内容不存在、服务繁忙时显示明确提示

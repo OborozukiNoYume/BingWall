@@ -368,16 +368,45 @@ def test_public_today_wallpaper_applies_visibility_rules(tmp_path: Path) -> None
     assert payload["data"] == detail_payload["data"]
 
 
-def test_public_today_wallpaper_returns_not_found_when_current_utc_date_has_no_visible_candidate(
+def test_public_today_wallpaper_falls_back_to_yesterday_when_current_utc_date_has_no_visible_candidate(
     tmp_path: Path,
 ) -> None:
     database_path = prepare_database(tmp_path)
     yesterday = (datetime.now(tz=UTC).date() - timedelta(days=1)).isoformat()
-    seed_wallpaper(
+    expected_id = seed_wallpaper(
         database_path=database_path,
         wallpaper_date=yesterday,
         market_code="en-US",
         title="Visible Yesterday",
+    )
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=datetime.now(tz=UTC).date().isoformat(),
+        market_code="en-US",
+        title="Hidden Today",
+        content_status="draft",
+    )
+
+    with build_client(tmp_path) as client:
+        response = client.get("/api/public/wallpapers/today")
+        detail_response = client.get(f"/api/public/wallpapers/{expected_id}")
+
+    payload = response.json()
+    detail_payload = detail_response.json()
+    assert response.status_code == 200
+    assert payload["data"] == detail_payload["data"]
+
+
+def test_public_today_wallpaper_returns_not_found_when_today_and_yesterday_have_no_visible_candidate(
+    tmp_path: Path,
+) -> None:
+    database_path = prepare_database(tmp_path)
+    two_days_ago = (datetime.now(tz=UTC).date() - timedelta(days=2)).isoformat()
+    seed_wallpaper(
+        database_path=database_path,
+        wallpaper_date=two_days_ago,
+        market_code="en-US",
+        title="Visible Two Days Ago",
     )
     seed_wallpaper(
         database_path=database_path,

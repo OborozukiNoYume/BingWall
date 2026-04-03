@@ -7,6 +7,8 @@ UV_RUN := $(UV_BIN) run python
 
 MARKET ?= en-US
 COUNT ?= 1
+DATE_FROM ?=
+DATE_TO ?=
 CRON_APP_DIR ?= /opt/bingwall/app
 CRON_UV_BIN ?= $(UV_BIN)
 CRON_LOG_DIR ?= /var/log/bingwall
@@ -39,7 +41,7 @@ db-migrate:
 	$(UV_RUN) -m app.repositories.migrations
 
 collect-bing:
-	$(UV_RUN) -m app.collectors.bing --market $(MARKET) --count $(COUNT)
+	$(UV_RUN) -m app.collectors.bing --market $(MARKET) --count $(COUNT) $(if $(DATE_FROM),--date-from $(DATE_FROM),) $(if $(DATE_TO),--date-to $(DATE_TO),)
 
 collect-nasa-apod:
 	$(UV_RUN) -m app.collectors.nasa_apod --market $(MARKET)

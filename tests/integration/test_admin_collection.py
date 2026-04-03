@@ -138,8 +138,15 @@ def test_admin_collection_task_can_be_consumed_manually(tmp_path: Path, monkeypa
         )
     ]
 
-    def fake_fetch_metadata(self: object, market_code: str, count: int) -> list[BingImageMetadata]:
-        del self, market_code, count
+    def fake_fetch_metadata(
+        self: object,
+        *,
+        market_code: str,
+        count: int,
+        date_from: object,
+        date_to: object,
+    ) -> list[BingImageMetadata]:
+        del self, market_code, count, date_from, date_to
         return list(metadata)
 
     def fake_download_image(self: object, image_url: str) -> DownloadedImage:

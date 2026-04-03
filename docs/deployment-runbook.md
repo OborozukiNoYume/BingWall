@@ -184,7 +184,7 @@
 - 数据库初始化命令：`make db-migrate`
 - 首次管理员初始化方式：在 `.env` 或生产环境变量文件中同时设置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 后执行 `make db-migrate`
 - 自动公开开关：`BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED`，默认 `true`；开启时，新采集内容会在资源全部就绪后自动公开
-- 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`
+- 手动采集命令：`make collect-bing MARKET=en-US COUNT=1`；如需精确抓取最近 8 天内的指定 UTC 日期范围，可改用 `make collect-bing MARKET=en-US DATE_FROM=2026-04-02 DATE_TO=2026-04-02`
 - 定时固定日期建任务命令：`make create-scheduled-collection-tasks`
 - 本地联调便捷命令：`make scheduled-collect`
 - 手动采集任务消费命令：`make consume-collection-tasks`

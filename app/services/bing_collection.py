@@ -12,7 +12,14 @@ from app.services.source_collection import SourceCollectionService
 
 
 class BingClientProtocol(Protocol):
-    def fetch_metadata(self, market_code: str, count: int) -> list[BingImageMetadata]: ...
+    def fetch_metadata(
+        self,
+        *,
+        market_code: str,
+        count: int,
+        date_from: date | None,
+        date_to: date | None,
+    ) -> list[BingImageMetadata]: ...
 
     def download_image(self, image_url: str) -> DownloadedImage: ...
 
@@ -32,9 +39,12 @@ class BingSourceAdapter:
         date_from: date | None,
         date_to: date | None,
     ) -> list[BingImageMetadata]:
-        del date_from
-        del date_to
-        return self.client.fetch_metadata(market_code, count)
+        return self.client.fetch_metadata(
+            market_code=market_code,
+            count=count,
+            date_from=date_from,
+            date_to=date_to,
+        )
 
     def download_image(self, image_url: str) -> DownloadedImage:
         return self.client.download_image(image_url)
