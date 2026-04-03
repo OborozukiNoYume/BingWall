@@ -112,7 +112,7 @@ async function renderDetailPage(id) {
   try {
     const detail = await fetchEnvelope(`/api/public/wallpapers/${encodeURIComponent(id)}`);
     const downloadBlock = detail.is_downloadable
-      ? `<a class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer no-underline" href="${escapeHtml(detail.download_url)}" target="_blank" rel="noreferrer" data-download-wallpaper-id="${escapeHtml(detail.id)}" data-download-channel="public_detail">下载原图</a>`
+      ? `<button class="inline-flex items-center justify-center h-10 rounded-full bg-stone-800 hover:bg-stone-700 hover:shadow-sm active:scale-[0.98] text-white px-5 text-sm cursor-pointer" type="button" data-download-wallpaper-id="${escapeHtml(detail.id)}" data-download-channel="public_detail" data-download-url="${escapeHtml(detail.download_url)}">下载原图</button>`
       : `<button class="inline-flex items-center justify-center h-10 rounded-full border border-stone-200 bg-white px-5 text-sm cursor-pointer opacity-50" type="button" disabled>当前不可下载</button>`;
 
     appRoot.innerHTML = `
@@ -160,15 +160,19 @@ async function renderDetailPage(id) {
 
 function bindDownloadAction(detail) {
   const downloadLink = document.querySelector("[data-download-wallpaper-id]");
-  if (!(downloadLink instanceof HTMLAnchorElement)) {
+  if (!(downloadLink instanceof HTMLButtonElement)) {
     return;
   }
 
   downloadLink.addEventListener("click", async (event) => {
     event.preventDefault();
-    const fallbackUrl = downloadLink.href;
+    const fallbackUrl = stringOrNull(downloadLink.dataset.downloadUrl);
+    if (!fallbackUrl) {
+      return;
+    }
     const originalLabel = downloadLink.textContent || "下载原图";
     downloadLink.textContent = "正在登记下载...";
+    downloadLink.disabled = true;
     downloadLink.setAttribute("aria-busy", "true");
 
     try {
@@ -176,16 +180,17 @@ function bindDownloadAction(detail) {
         wallpaper_id: Number(detail.id),
         download_channel: "public_detail",
       });
-      openDownloadTarget(response.redirect_url);
+      startWallpaperDownload(response.redirect_url);
     } catch (error) {
       console.error(error);
       if (error instanceof ApiError && (error.status === 404 || error.status === 409 || error.status === 422)) {
         window.alert(error.message);
       } else {
-        openDownloadTarget(fallbackUrl);
+        startWallpaperDownload(fallbackUrl);
       }
     } finally {
       downloadLink.textContent = originalLabel;
+      downloadLink.disabled = false;
       downloadLink.removeAttribute("aria-busy");
     }
   });
@@ -680,11 +685,27 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-function openDownloadTarget(url) {
-  const popup = window.open(url, "_blank", "noopener,noreferrer");
-  if (popup === null) {
-    window.location.assign(url);
+function startWallpaperDownload(url) {
+  const resolvedUrl = new URL(url, window.location.origin);
+  if (resolvedUrl.origin !== window.location.origin) {
+    window.location.assign(resolvedUrl.href);
+    return;
   }
+
+  const link = document.createElement("a");
+  link.href = resolvedUrl.href;
+  link.download = buildDownloadFilename(resolvedUrl.pathname);
+  link.rel = "noreferrer";
+  link.style.display = "none";
+  document.body.append(link);
+  link.click();
+  link.remove();
+}
+
+function buildDownloadFilename(pathname) {
+  const segments = pathname.split("/").filter(Boolean);
+  const lastSegment = segments.at(-1);
+  return stringOrNull(lastSegment) || "bingwall-wallpaper.jpg";
 }
 
 class ApiError extends Error {
