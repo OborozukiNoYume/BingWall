@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 2026-04-04T07:03:51Z
+
+### 变更内容
+
+- 保留 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) 作为没有现成代理层时的备用模板
+- 更新 [app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py)、[tests/integration/test_public_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_public_frontend.py) 与 [tests/integration/test_admin_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_admin_frontend.py)，让公开首页与后台登录页等前端壳页面显式支持 `HEAD`，以匹配 `H5` 中 `curl -I` 的真实验收方式
+- 更新 [deploy/systemd/bingwall.tmpfiles.conf](/home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf) 与 [tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)，补充 `/etc/bingwall/nginx` 目录模板和 Docker 代理模板断言
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把 `H5` 的正式部署口径收敛为“`systemd + Nginx Proxy Manager（或等价反向代理）`”，并将 Docker `nginx` 明确为备用方案
+
+### 变更原因
+
+- 你要求继续完成整改清单中的 `H5`
+- 你补充说明真实目标机通常复用现有的 Nginx Proxy Manager，而不是再为单个应用额外长驻一层 `nginx`
+- 因此 `H5` 的正式收口应优先围绕 `bingwall-api.service` 与现有代理层，而不是把 Docker `nginx` 写成唯一标准答案
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T06:21:21Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py)、[tests/integration/test_public_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_public_frontend.py)、[tests/integration/test_admin_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_admin_frontend.py)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service)、[deploy/systemd/bingwall.tmpfiles.conf](/home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 业务主体逻辑、数据库结构和公开 API 数据语义均保持不变；仅前端壳页面额外支持 `HEAD` 请求，便于部署验收
+- 更新后，仓库文档已与“正式使用 Nginx Proxy Manager、Docker `nginx` 仅作备用”的真实运维口径一致
+
+### 验证步骤
+
+- 执行 `uv run -m pytest tests/unit/test_deploy_templates.py -q`
+- 执行 `uv run -m pytest tests/integration/test_public_frontend.py tests/integration/test_admin_frontend.py -q`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-nginx.service`
+- 执行 `rg -n "Nginx Proxy Manager|bingwall-nginx.service|备用方案|<your-host>" README.md docs/deployment-runbook.md docs/remediation-checklist.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py)、[tests/integration/test_public_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_public_frontend.py)、[tests/integration/test_admin_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_admin_frontend.py)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service)、[deploy/systemd/bingwall.tmpfiles.conf](/home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库文档会重新偏向“Docker `nginx` 单独长驻”的部署口径，不再贴合你当前真实机器的运维习惯
+
 ## 2026-04-04T05:48:49Z
 
 ### 变更内容

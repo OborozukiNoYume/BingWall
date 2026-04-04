@@ -13,7 +13,7 @@
 - 中优先级：建议在小规模生产稳定前完成
 - 低优先级：作为持续改进事项推进
 - 每项任务完成后，至少执行本文列出的验收命令，并保留命令输出或截图作为执行记录
-- 本文中的 `<your-domain>`、`<sample-relative-path>` 等占位符，需要在实际执行时替换为目标环境真实值
+- 本文中的 `<your-host>`、`<sample-relative-path>` 等占位符，需要在实际执行时替换为目标环境真实值；`<your-host>` 可以是目标 IP 或正式域名
 
 ## 状态总览
 
@@ -25,7 +25,7 @@
 | `H1` | 统一生产监听配置 | `done` | 已完成（仓库） | `systemd`、`nginx`、环境模板、README 与部署文档中的监听口径已对齐 |
 | `H2` | 补全生产环境模板 | `done` | 已完成（仓库） | 生产模板已包含 `NASA APOD`、引导管理员和 `OSS` 相关说明 |
 | `H3` | 加固 `systemd` 服务沙箱 | `done` | 已完成（仓库） | 当前离线验收基线约为 `2.8`，且 `make verify-deploy` 已通过 |
-| `H5` | 完成真实目标机长驻部署与公网接入 | `todo` | 未完成（需目标机） | 仓库内暂无 `systemctl`、`nginx -t`、公网 `curl` 等真实部署记录 |
+| `H5` | 完成真实目标机长驻部署与公网接入 | `todo` | 未完成（需目标机） | 仓库侧已补 `Nginx Proxy Manager` 优先口径，并保留 `Docker nginx` 备用模板，但仍缺真实目标机 `systemctl` 与对外访问记录 |
 | `H4` | 完成首轮 `cron` 闭环验证 | `todo` | 未完成（需目标机） | 仓库内暂无首轮 `crontab`、日志、备份产物与深度健康检查记录 |
 | `M1` | 正式化 Node 测试链路 | `todo` | 未完成 | `npm test` 仍是占位脚本，Playwright 仍需手工安装 |
 | `M2` | 把部署验收纳入自动化 | `todo` | 未完成 | 当前 CI 只跑 `make verify`，尚未把 `make verify-deploy` 接入远端 workflow |
@@ -108,20 +108,24 @@ make verify-deploy
 - 状态：`todo`
 - 前置依赖：`H1`、`H2`、`H3`
 - 阻塞后续：`H4`、`M4`、`M5`
-- 目标：在真实目标机完成 `systemd + nginx + 域名` 的长期驻留部署，使公开站点、公开 API、图片访问和后台入口可稳定访问
-- 交付物：生效中的 `systemd` 服务、`nginx` 站点配置、正式环境变量文件、真实域名访问记录
+- 目标：在真实目标机完成 `systemd + Nginx Proxy Manager（或等价反向代理）+ 域名/目标 IP` 的长期驻留部署，使公开站点、公开 API、图片访问和后台入口可稳定访问；若目标机没有现成反向代理，再退回仓库内的 `Docker nginx` 备用方案
+- 交付物：生效中的 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、Nginx Proxy Manager 中的代理主机配置或等价反向代理记录、正式环境变量文件，以及真实访问记录
 - 验收命令：
 
 ```bash
 systemctl status bingwall-api --no-pager
-nginx -t
-curl -I http://<your-domain>/
-curl -sS http://<your-domain>/api/health/live
-curl -sS http://<your-domain>/api/public/site-info
-curl -I http://<your-domain>/images/<sample-relative-path>
+curl -I http://<your-host>/
+curl -sS http://<your-host>/api/health/live
+curl -sS http://<your-host>/api/public/site-info
+curl -I http://<your-host>/images/<sample-relative-path>
+curl -I http://<your-host>/admin/login
 ```
 
-- 通过标准：服务和代理均正常，公网首页、公开 API 和样例图片都返回预期状态码
+- 通过标准：应用服务处于运行态，且经由 Nginx Proxy Manager 或等价反向代理访问时，首页、公开 API、样例图片和后台登录入口都返回预期状态码
+
+补充说明：
+
+- 若真实目标机没有现成反向代理，可选用 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) + [deploy/nginx/bingwall.conf](/home/ops/Projects/BingWall/deploy/nginx/bingwall.conf) 作为备用方案
 
 ### H4 完成首轮 cron 闭环验证
 

@@ -24,6 +24,7 @@ def test_admin_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
 
     with build_client(tmp_path) as client:
         login_response = client.get("/admin/login")
+        login_head_response = client.head("/admin/login")
         list_response = client.get("/admin/wallpapers?page=2&content_status=draft")
         detail_response = client.get(f"/admin/wallpapers/{wallpaper_id}")
         tags_response = client.get("/admin/tags?status=enabled")
@@ -38,6 +39,7 @@ def test_admin_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
     assert "text/html" in login_response.headers["content-type"]
     assert 'data-page="admin-login"' in login_response.text
     assert 'src="/admin-assets/admin.js"' in login_response.text
+    assert login_head_response.status_code == 200
 
     assert list_response.status_code == 200
     assert 'data-page="admin-wallpapers"' in list_response.text

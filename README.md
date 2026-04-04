@@ -100,7 +100,7 @@ make run
 
 - 现在本地开发、`systemd` 服务模板和 `cron` 模板都统一通过 `uv` 执行 Python 命令
 - 运行时统一采用 `uv run --no-sync python ...`，避免服务启动或计划任务执行时再去改动虚拟环境
-- `make run` 与 `deploy/systemd/bingwall-api.service` 现在都会读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；生产模板默认口径是 `127.0.0.1:8000`，如需修改，必须同步调整 `deploy/nginx/bingwall.conf` 中的 upstream
+- `make run` 与 `deploy/systemd/bingwall-api.service` 现在都会读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；生产模板默认口径是 `127.0.0.1:8000`，如需修改，必须同步调整上游代理的转发目标；若使用仓库内 Docker `nginx` 备用方案，再同步修改 `deploy/nginx/bingwall.conf` 的 upstream
 - `.env.example` 与 `deploy/systemd/bingwall.env.example` 现在都已包含 `BINGWALL_COLLECT_NASA_APOD_*` 默认键；生产环境若不使用该来源，应显式把 `BINGWALL_COLLECT_NASA_APOD_ENABLED=false`，若使用则应把 `BINGWALL_COLLECT_NASA_APOD_API_KEY` 从 `DEMO_KEY` 替换为真实值
 
 健康检查：
@@ -188,7 +188,7 @@ bash scripts/dev/playwright_smoke_with_admin.example.sh
 - `/` 首页、`/wallpapers` 列表页、`/wallpapers/{id}` 详情页三个公开页面；其中首页已直接展示“今日壁纸 API”和“随机壁纸 API”两个快捷入口，`/wallpapers` 提供固定 8 个地区选项与单独的日期选择器；地区筛选通过公开列表接口按 `market_code` 过滤，日期选择器调用 `/api/public/wallpapers/by-date/{wallpaper_date}` 精确查找单张公开壁纸
 - `web/public/assets/site.css` 与 `web/public/assets/site.js` 页面静态资源
 - 前端页面只通过公开 API 获取业务数据，并在空结果、内容不存在、服务繁忙时显示明确提示
-- `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example` 单机部署模板
+- `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall-nginx.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example` 单机部署模板
 - `scripts/install_cron.py`、`deploy/cron/bingwall-cron` 与 `make install-cron` 目标机 `cron` 一键安装入口；模板固定使用 `CRON_TZ=UTC`，执行前会加载 `/etc/bingwall/bingwall.env`，并默认包含“建任务、消费队列、资源巡检、资源归档、备份”五类计划任务
 - `scripts/verify_t1_6.py` 与 `make verify-deploy` 自动化部署验收入口
 - 已在当前仓库环境通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成公开页面、公开 API、静态资源、图片访问与日志校验
@@ -433,7 +433,7 @@ make verify-backup-restore
 
 ## 阶段一单机部署说明
 
-以下命令用于把当前仓库部署到单机 Ubuntu 环境，目标是让公开页面、公开 API 和图片静态资源都通过 Nginx 对外访问。命令假定部署目录遵循 `docs/deployment-runbook.md` 中的一期约定，且部署账号具有 `sudo` 权限。
+以下命令用于把当前仓库部署到单机 Ubuntu 环境，目标是让公开页面、公开 API 和图片静态资源都通过 Nginx Proxy Manager 对外访问。命令假定部署目录遵循 `docs/deployment-runbook.md` 中的一期约定，且部署账号具有 `sudo` 权限。
 
 在执行真实部署前，建议先在仓库根目录执行一次 `make verify-deploy`，确认模板、代理链路和最小日志观察口径都正常。
 
@@ -456,7 +456,7 @@ sudo install -d -o bingwall -g bingwall -m 0750 /etc/bingwall
 说明：
 
 - 应用进程使用 `bingwall` 账号运行。
-- `/var/lib/bingwall/images/public` 目录使用 `bingwall:www-data` 和 `2750` 权限，应用可写入，Nginx 可读取。
+- `/var/lib/bingwall/images/public` 目录使用 `bingwall:www-data` 和 `2750` 权限，应用可写入，Nginx Proxy Manager 转发后的访问仍由应用统一处理。
 - 临时目录、失败目录、数据库目录和配置目录不暴露给 Nginx。
 
 ### 2. 安装 Python 依赖并初始化配置
@@ -473,7 +473,7 @@ sudoedit /etc/bingwall/bingwall.env
 - `BINGWALL_APP_BASE_URL` 改成实际访问域名或 IP
 - `BINGWALL_SECURITY_SESSION_SECRET` 改成不少于 `32` 字节的随机值
 - 如需首次自动创建后台管理员，同时填写 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`，其中密码至少 `12` 位
-- 生产模板默认使用 `BINGWALL_APP_HOST=127.0.0.1` 与 `BINGWALL_APP_PORT=8000`；如需调整监听地址或端口，必须同步修改 `deploy/nginx/bingwall.conf` 的 upstream
+- 生产模板默认使用 `BINGWALL_APP_HOST=127.0.0.1` 与 `BINGWALL_APP_PORT=8000`；如需调整监听地址或端口，需要同步更新 Nginx Proxy Manager 中的转发目标
 
 ### 3. 初始化数据库并安装服务配置
 
@@ -481,13 +481,9 @@ sudoedit /etc/bingwall/bingwall.env
 sudo -u bingwall bash -lc 'set -a && source /etc/bingwall/bingwall.env && set +a && cd /opt/bingwall/app && uv run --no-sync python -m app.repositories.migrations'
 sudo install -o root -g root -m 0644 /opt/bingwall/app/deploy/systemd/bingwall-api.service /etc/systemd/system/bingwall-api.service
 sudo install -o root -g root -m 0644 /opt/bingwall/app/deploy/systemd/bingwall.tmpfiles.conf /etc/tmpfiles.d/bingwall.conf
-sudo install -o root -g root -m 0644 /opt/bingwall/app/deploy/nginx/bingwall.conf /etc/nginx/sites-available/bingwall.conf
-sudo ln -sf /etc/nginx/sites-available/bingwall.conf /etc/nginx/sites-enabled/bingwall.conf
 sudo systemd-tmpfiles --create /etc/tmpfiles.d/bingwall.conf
 sudo systemctl daemon-reload
 sudo systemctl enable --now bingwall-api.service
-sudo nginx -t
-sudo systemctl reload nginx
 sudo -u bingwall make -C /opt/bingwall/app install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall
 ```
 
@@ -496,6 +492,8 @@ sudo -u bingwall make -C /opt/bingwall/app install-cron CRON_APP_DIR=/opt/bingwa
 - 当 `admin_users` 为空且已配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME`、`BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 时，以上数据库初始化命令会自动创建一个状态为 `enabled` 的 `super_admin`。
 - 若数据库里已经存在管理员账号，再次执行该命令不会覆盖已有账号，也不会重复创建默认管理员。
 - 上述 `make install-cron` 会把仓库中的 cron 模板渲染成真实路径，并安装到 `bingwall` 用户自己的 `crontab`；如需回滚，可使用安装输出中的备份文件重新执行 `crontab <backup_path>`。
+- 在 Nginx Proxy Manager 中新增一个 Proxy Host，把外部访问入口转发到 `127.0.0.1:8000`；`Scheme=http`、`Forward Hostname / IP=127.0.0.1`、`Forward Port=8000`。
+- 如果目标机没有现成反向代理，再考虑使用 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) 作为备用方案。
 
 ### 4. 最小上线检查
 
@@ -506,7 +504,6 @@ curl http://127.0.0.1/api/health/deep
 curl http://127.0.0.1/api/public/site-info
 curl http://127.0.0.1/
 journalctl -u bingwall-api.service -n 50 --no-pager
-tail -n 50 /var/log/bingwall/nginx.access.log
 ```
 
 如果前面已经执行过 Bing 采集并生成正式图片资源，还应额外检查：
@@ -518,6 +515,7 @@ curl -I http://127.0.0.1/images/<正式资源相对路径>
 仓库已提供的生产部署模板文件：
 
 - [deploy/nginx/bingwall.conf](/home/ops/Projects/BingWall/deploy/nginx/bingwall.conf)
+- [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service)
 - [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)
 - [deploy/systemd/bingwall.tmpfiles.conf](/home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf)
 - [deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example)

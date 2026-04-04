@@ -38,9 +38,23 @@ def test_systemd_service_uses_managed_env_and_restart_policy() -> None:
     assert "ReadWritePaths=/var/lib/bingwall /var/log/bingwall /etc/bingwall" in content
 
 
+def test_dockerized_nginx_systemd_service_uses_expected_mounts() -> None:
+    content = (REPO_ROOT / "deploy/systemd/bingwall-nginx.service").read_text(encoding="utf-8")
+
+    assert "Requires=docker.service bingwall-api.service" in content
+    assert "After=network-online.target docker.service bingwall-api.service" in content
+    assert "docker rm -f bingwall-nginx" in content
+    assert "--network host" in content
+    assert "/etc/bingwall/nginx/bingwall.conf:/etc/nginx/conf.d/default.conf:ro" in content
+    assert "/var/lib/bingwall/images/public:/var/lib/bingwall/images/public:ro" in content
+    assert "/opt/bingwall/app/web/public/assets:/opt/bingwall/app/web/public/assets:ro" in content
+    assert "nginx:1.27-alpine" in content
+
+
 def test_tmpfiles_template_defines_public_image_permissions() -> None:
     content = (REPO_ROOT / "deploy/systemd/bingwall.tmpfiles.conf").read_text(encoding="utf-8")
 
     assert "d /var/lib/bingwall/images/public 2750 bingwall www-data -" in content
     assert "d /var/lib/bingwall/images/tmp 0750 bingwall bingwall -" in content
     assert "d /var/log/bingwall 0750 bingwall bingwall -" in content
+    assert "d /etc/bingwall/nginx 0750 bingwall bingwall -" in content

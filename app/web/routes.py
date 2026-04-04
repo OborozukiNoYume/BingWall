@@ -20,7 +20,7 @@ def project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.api_route("/", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_public_home_page() -> HTMLResponse:
     return render_public_page(
         page_name="home",
@@ -30,7 +30,7 @@ def get_public_home_page() -> HTMLResponse:
     )
 
 
-@router.get("/wallpapers", response_class=HTMLResponse)
+@router.api_route("/wallpapers", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_public_wallpaper_list_page() -> HTMLResponse:
     return render_public_page(
         page_name="list",
@@ -40,7 +40,7 @@ def get_public_wallpaper_list_page() -> HTMLResponse:
     )
 
 
-@router.get("/wallpapers/{wallpaper_id}", response_class=HTMLResponse)
+@router.api_route("/wallpapers/{wallpaper_id}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_public_wallpaper_detail_page(wallpaper_id: int) -> HTMLResponse:
     return render_public_page(
         page_name="detail",
@@ -51,7 +51,7 @@ def get_public_wallpaper_detail_page(wallpaper_id: int) -> HTMLResponse:
     )
 
 
-@router.get("/admin/login", response_class=HTMLResponse)
+@router.api_route("/admin/login", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_login_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-login",
@@ -61,7 +61,7 @@ def get_admin_login_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin", response_class=HTMLResponse)
+@router.api_route("/admin", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_wallpaper_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-wallpapers",
@@ -71,7 +71,7 @@ def get_admin_wallpaper_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin/wallpapers", response_class=HTMLResponse)
+@router.api_route("/admin/wallpapers", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_wallpapers_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-wallpapers",
@@ -81,7 +81,7 @@ def get_admin_wallpapers_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin/wallpapers/{wallpaper_id}", response_class=HTMLResponse)
+@router.api_route("/admin/wallpapers/{wallpaper_id}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_wallpaper_detail_page(wallpaper_id: int) -> HTMLResponse:
     return render_admin_page(
         page_name="admin-detail",
@@ -92,7 +92,7 @@ def get_admin_wallpaper_detail_page(wallpaper_id: int) -> HTMLResponse:
     )
 
 
-@router.get("/admin/tasks", response_class=HTMLResponse)
+@router.api_route("/admin/tasks", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_collection_tasks_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-tasks",
@@ -102,7 +102,7 @@ def get_admin_collection_tasks_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin/tags", response_class=HTMLResponse)
+@router.api_route("/admin/tags", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_tags_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-tags",
@@ -112,7 +112,7 @@ def get_admin_tags_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin/change-password", response_class=HTMLResponse)
+@router.api_route("/admin/change-password", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_change_password_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-change-password",
@@ -122,7 +122,7 @@ def get_admin_change_password_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin/tasks/{task_id}", response_class=HTMLResponse)
+@router.api_route("/admin/tasks/{task_id}", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_collection_task_detail_page(task_id: int) -> HTMLResponse:
     return render_admin_page(
         page_name="admin-task-detail",
@@ -133,7 +133,7 @@ def get_admin_collection_task_detail_page(task_id: int) -> HTMLResponse:
     )
 
 
-@router.get("/admin/logs", response_class=HTMLResponse)
+@router.api_route("/admin/logs", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_collection_logs_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-logs",
@@ -143,7 +143,7 @@ def get_admin_collection_logs_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin/download-stats", response_class=HTMLResponse)
+@router.api_route("/admin/download-stats", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_download_stats_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-download-stats",
@@ -153,7 +153,7 @@ def get_admin_download_stats_page() -> HTMLResponse:
     )
 
 
-@router.get("/admin/audit-logs", response_class=HTMLResponse)
+@router.api_route("/admin/audit-logs", methods=["GET", "HEAD"], response_class=HTMLResponse)
 def get_admin_audit_logs_page() -> HTMLResponse:
     return render_admin_page(
         page_name="admin-audit",
