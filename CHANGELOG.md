@@ -1,5 +1,80 @@
 # CHANGELOG
 
+## 2026-04-04T05:48:49Z
+
+### 变更内容
+
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，补充“状态总览”表，集中展示各整改项的清单标记、基于仓库可见证据的实际状态与当前说明
+- 同步更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 文档时间戳，反映本轮状态整理时间
+
+### 变更原因
+
+- 你要求更新 `docs/remediation-checklist.md`
+- 当前清单已包含任务定义、依赖和验收命令，但缺少一眼可用的全量状态总览
+- 需要把“清单标记”和“按当前仓库可确认的实际状态”明确分开，避免把目标机侧未验证事项误写为已完成
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T05:48:49Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库代码、部署模板、测试与运行时行为均保持不变
+- 更新后，整改清单可直接用于区分“仓库已完成”“需目标机验证”和“部分完成”的事项
+
+### 验证步骤
+
+- 执行 `sed -n '1,80p' docs/remediation-checklist.md`
+- 执行 `rg -n "状态总览|实际状态|需目标机验证|部分完成" docs/remediation-checklist.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，整改清单将重新只保留任务明细，不再包含集中状态总览
+
+## 2026-04-04T05:42:15Z
+
+### 变更内容
+
+- 更新 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)，移除 `bingwall-api` 服务中不必要的 `SupplementaryGroups=www-data`
+- 更新 [tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)，同步调整 `systemd` 模板断言，避免继续要求附加组配置
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把公开目录权限说明改为基于属主写入与 `setgid` 继承，并把离线安全评分基线更新为 `2.8`
+
+### 变更原因
+
+- 你要求继续完成整改清单中的 `H3`
+- 当前服务模板虽已达标，但仍保留一个对运行并非必需的附加组权限
+- 在不改变联网、写盘路径和公开资源权限模型的前提下，去掉该附加组可以进一步缩小服务可见权限面
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T05:42:15Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 正式资源目录权限、Nginx 读取方式、应用监听口径和持久化路径均保持不变
+- 更新后，服务模板的离线安全评分基线已从 `2.9` 下降到 `2.8`
+
+### 验证步骤
+
+- 执行 `uv run -m pytest tests/unit/test_deploy_templates.py -q`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
+- 执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`
+- 执行 `make verify-deploy`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，`bingwall-api` 服务会重新加入 `www-data` 附加组，离线暴露评分基线也会回到 `2.9`
+
 ## 2026-04-04T03:33:22Z
 
 ### 变更内容

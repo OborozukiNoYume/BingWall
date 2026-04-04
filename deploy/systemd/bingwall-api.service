@@ -7,7 +7,6 @@ Wants=network-online.target
 Type=simple
 User=bingwall
 Group=bingwall
-SupplementaryGroups=www-data
 WorkingDirectory=/opt/bingwall/app
 EnvironmentFile=/etc/bingwall/bingwall.env
 Environment=PATH=/usr/local/bin:/usr/bin:/bin

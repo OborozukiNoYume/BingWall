@@ -299,12 +299,12 @@
 - 使用 `bingwall` 账号运行应用
 - 通过 `/usr/bin/env uv run --no-sync python ...` 统一走 `uv` 运行入口，并固定 `PATH=/usr/local/bin:/usr/bin:/bin`
 - 当前模板会直接读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；生产默认口径是 `127.0.0.1:8000`
-- 通过 `SupplementaryGroups=www-data` 配合正式资源目录权限，保证应用写入、Nginx 读取
+- 正式资源目录继续使用 `bingwall:www-data` 和 `2750`；应用依赖目录属主写入，目录上的 `setgid` 负责让新文件继承 `www-data`，供 Nginx 读取
 - 采用 `Restart=on-failure`，在进程异常退出后自动重启
 - 当前模板已启用 `ProtectSystem=strict`，并仅通过 `ReadWritePaths=/var/lib/bingwall /var/log/bingwall /etc/bingwall` 放行数据库、图片、日志和受控配置目录写入
 - 当前模板已额外启用 `RemoveIPC`、`PrivateDevices`、`ProtectClock`、`ProtectControlGroups`、`ProtectKernelLogs`、`ProtectKernelModules`、`ProtectKernelTunables`、`ProtectProc=invisible`、`ProcSubset=pid`、`RestrictNamespaces`、`RestrictSUIDSGID`、`LockPersonality`、`RestrictRealtime`、`SystemCallArchitectures=native` 与空 `CapabilityBoundingSet`，用于收紧设备、内核接口、命名空间和进程可见性
 - 当前模板保留 `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`，只允许本地 socket 与常规 IPv4 / IPv6 网络访问；不要在未评估采集链路前启用 `PrivateNetwork=true`
-- 以当前模板执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`，离线暴露评分基线应降到约 `2.9`；如果后续新增运行时能力，应重新评估这些沙箱约束是否仍然成立
+- 以当前模板执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`，离线暴露评分基线应降到约 `2.8`；如果后续新增运行时能力，应重新评估这些沙箱约束是否仍然成立
 
 #### `deploy/systemd/bingwall.tmpfiles.conf`
 

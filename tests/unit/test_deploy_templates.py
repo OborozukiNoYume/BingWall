@@ -25,7 +25,7 @@ def test_systemd_service_uses_managed_env_and_restart_policy() -> None:
     assert "ExecStart=/usr/bin/env uv run --no-sync python -m uvicorn" in content
     assert "--host ${BINGWALL_APP_HOST} --port ${BINGWALL_APP_PORT}" in content
     assert "WorkingDirectory=/opt/bingwall/app" in content
-    assert "SupplementaryGroups=www-data" in content
+    assert "SupplementaryGroups=" not in content
     assert "Restart=on-failure" in content
     assert "RemoveIPC=true" in content
     assert "PrivateDevices=true" in content
