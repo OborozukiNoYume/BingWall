@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T15:17:23Z
+- 更新时间：2026-04-04T18:50:37Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -266,8 +266,6 @@
 
 - 验收脚本：`scripts/verify_t1_6.py`
 - 统一入口：`make verify-deploy`
-- GitHub Actions workflow：`.github/workflows/verify-deploy.yml`
-- 远端 runner 统一入口：`scripts/github/run_verify_deploy.sh`
 
 该验收入口会在不改写系统级 Nginx 和 `/etc/systemd/system` 的前提下，完成以下检查：
 
@@ -282,16 +280,6 @@
 - 验收脚本默认把 Nginx 监听端口改写到临时本地端口 `18080`，避免占用真实 `80` 端口
 - 验收脚本不会修改 `/etc/systemd/system`、`/etc/nginx`、`/etc/tmpfiles.d`
 - 若要在新的目标机复制部署，仍需按本文件的生产步骤安装正式服务配置，并在 Nginx Proxy Manager、等价反向代理或已评估的公网端口方案中完成真实入口配置
-
-#### GitHub Actions 远端入口
-
-- 工作流文件：`.github/workflows/verify-deploy.yml`
-- 触发方式：`workflow_dispatch`，以及 `dev` / `main` 上部署验收相关文件变更时自动触发
-- Runner 要求：带 `bingwall-deploy` 标签的 Linux self-hosted runner，并且当前 runner 账号能访问 `docker`，且 `systemctl --user is-system-running` 返回可用状态
-- 统一远端入口：`bash scripts/github/run_verify_deploy.sh`
-- 为避免与 runner 上已有常驻服务冲突，远端入口默认会把部署验收临时端口切到 `127.0.0.1:28000` 和 `28080`；如需改写，可设置 `BINGWALL_VERIFY_DEPLOY_APP_PORT` 与 `BINGWALL_VERIFY_DEPLOY_NGINX_PORT`
-- 若当前 runner 以 service 方式启动，通常还需要为 runner 用户启用 linger，并确保 `XDG_RUNTIME_DIR=/run/user/<uid>`、`DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/<uid>/bus`
-- 若本机安装了 GitHub CLI，可手工触发：`gh workflow run "Verify Deploy" --ref dev`
 
 ### 生产环境最小启动步骤
 

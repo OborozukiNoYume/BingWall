@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-04-04T18:50:37Z
+
+### 变更内容
+
+- 删除 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml)，移除 `Verify Deploy` 的 GitHub Actions 远端入口
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)，删除对专用 `bingwall-deploy` self-hosted runner 的说明
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，移除 `Verify Deploy` workflow 与远端 runner 章节，保留本地 `make verify-deploy` 验收入口
+
+### 变更原因
+
+- 你要求删除 `.github/workflows/verify-deploy.yml`
+- 当前 workflow 依赖带 `bingwall-deploy` 标签的 Linux self-hosted runner，而现有仓库环境没有稳定可用的对应 runner，导致相关任务长期停留在等待调度状态
+- 在未同步改写 `scripts/verify_t1_6.py` 验收前提的情况下，继续保留这个 workflow 只会留下一个默认不可用的远端入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T18:50:37Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- GitHub Actions 不再自动或手工触发 `Verify Deploy` 远端任务；仓库内本地部署验收入口 `make verify-deploy` 保持不变
+- `scripts/github/run_verify_deploy.sh` 当前未随本次改动删除，但已不再有 workflow 直接引用
+
+### 验证步骤
+
+- 执行 `find .github/workflows -maxdepth 1 -type f | sort`
+- 执行 `rg -n "Verify Deploy|bingwall-deploy|run_verify_deploy|workflow_dispatch" README.md docs/deployment-runbook.md .github/workflows`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新暴露一个依赖专用 self-hosted runner 的 `Verify Deploy` 远端入口
+
 ## 2026-04-04T15:17:23Z
 
 ### 变更内容
