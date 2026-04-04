@@ -7,11 +7,13 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 def test_nginx_template_covers_public_routes() -> None:
     content = (REPO_ROOT / "deploy/nginx/bingwall.conf").read_text(encoding="utf-8")
 
+    assert "upstream bingwall_app" in content
+    assert "server 127.0.0.1:8000;" in content
     assert "location /api/" in content
     assert "location / {" in content
     assert "location /images/" in content
     assert "location /assets/" in content
-    assert "proxy_pass http://127.0.0.1:8000;" in content
+    assert "proxy_pass http://bingwall_app;" in content
     assert "alias /var/lib/bingwall/images/public/;" in content
 
 
@@ -21,6 +23,7 @@ def test_systemd_service_uses_managed_env_and_restart_policy() -> None:
     assert "EnvironmentFile=/etc/bingwall/bingwall.env" in content
     assert "Environment=PATH=/usr/local/bin:/usr/bin:/bin" in content
     assert "ExecStart=/usr/bin/env uv run --no-sync python -m uvicorn" in content
+    assert "--host ${BINGWALL_APP_HOST} --port ${BINGWALL_APP_PORT}" in content
     assert "WorkingDirectory=/opt/bingwall/app" in content
     assert "SupplementaryGroups=www-data" in content
     assert "Restart=on-failure" in content

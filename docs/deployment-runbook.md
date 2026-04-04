@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-03T06:25:00Z
+- 更新时间：2026-04-04T02:48:38Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -137,8 +137,8 @@
 | 变量名 | 默认示例 | 说明 |
 |---|---|---|
 | `BINGWALL_APP_ENV` | `development` | 应用运行环境标识；生产模板中通常使用 `production` |
-| `BINGWALL_APP_HOST` | `127.0.0.1` | FastAPI 监听地址 |
-| `BINGWALL_APP_PORT` | `30003` | FastAPI 监听端口；生产模板默认可改为 `8000` |
+| `BINGWALL_APP_HOST` | `127.0.0.1` | FastAPI 监听地址；当前生产模板默认监听回环地址 |
+| `BINGWALL_APP_PORT` | `8000` | FastAPI 监听端口；当前生产模板默认端口，本地开发示例通常使用 `30003` |
 | `BINGWALL_APP_BASE_URL` | `http://127.0.0.1:30003` | 对外基础 URL，用于生成站点级链接与回调语义 |
 | `BINGWALL_LOG_LEVEL` | `INFO` | 当前唯一已实现的日志级别配置项 |
 | `BINGWALL_COLLECT_NASA_APOD_ENABLED` | `true` | 是否启用 `nasa_apod` 来源采集 |
@@ -149,7 +149,8 @@
 
 补充说明：
 
-- `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT` 当前会被应用配置模型和 `make run` 使用，但仓库内现有 `deploy/systemd/bingwall-api.service` 仍把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`；若生产环境需要改监听地址或端口，必须同步修改 `systemd` 与 `nginx` 模板，不能只改环境变量
+- `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT` 当前会被应用配置模型、`make run` 和 `deploy/systemd/bingwall-api.service` 共同使用；当前生产模板默认口径是 `127.0.0.1:8000`
+- `deploy/nginx/bingwall.conf` 当前默认把 upstream 指向 `127.0.0.1:8000`；若生产环境需要改监听地址或端口，必须同步修改 `/etc/bingwall/bingwall.env` 与 `deploy/nginx/bingwall.conf`，不能只改其中一处
 - `BINGWALL_COLLECT_NASA_APOD_*` 变量当前已在 `.env.example` 中给出本地开发示例，但 `deploy/systemd/bingwall.env.example` 仍未预填这些键；如目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，需在 `/etc/bingwall/bingwall.env` 中手工补充
 
 ### Bing 采集配置补充
@@ -278,7 +279,7 @@
    当前若需要显式配置 NASA APOD 采集参数，还需手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `uv run --no-sync python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
-   当前若需修改 FastAPI 监听地址或端口，必须同步修改 `deploy/systemd/bingwall-api.service` 中固定的 `--host/--port`，并同步调整 `deploy/nginx/bingwall.conf` 的 upstream
+   当前生产模板默认监听 `127.0.0.1:8000`；如需修改 FastAPI 监听地址或端口，先更新 `/etc/bingwall/bingwall.env` 中的 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT`，再同步调整 `deploy/nginx/bingwall.conf` 的 upstream
 6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`、`nginx -t`、`systemctl reload nginx`
 7. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
 
@@ -289,7 +290,7 @@
 - 通过 `/etc/bingwall/bingwall.env` 注入受控环境变量
 - 使用 `bingwall` 账号运行应用
 - 通过 `/usr/bin/env uv run --no-sync python ...` 统一走 `uv` 运行入口，并固定 `PATH=/usr/local/bin:/usr/bin:/bin`
-- 当前模板把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`，不会直接读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`
+- 当前模板会直接读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；生产默认口径是 `127.0.0.1:8000`
 - 通过 `SupplementaryGroups=www-data` 配合正式资源目录权限，保证应用写入、Nginx 读取
 - 采用 `Restart=on-failure`，在进程异常退出后自动重启
 
@@ -308,7 +309,8 @@
 
 #### `deploy/nginx/bingwall.conf`
 
-- `/api/` 反向代理到 `127.0.0.1:8000`
+- 默认 upstream 指向 `127.0.0.1:8000`，应与 `/etc/bingwall/bingwall.env` 中的 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT` 保持一致
+- `/api/` 反向代理到该 upstream
 - `/` 代理公开页面
 - `/assets/` 直接读取前端静态资源
 - `/images/` 直接读取正式资源目录，不暴露磁盘真实路径给浏览器

@@ -11,7 +11,7 @@ SupplementaryGroups=www-data
 WorkingDirectory=/opt/bingwall/app
 EnvironmentFile=/etc/bingwall/bingwall.env
 Environment=PATH=/usr/local/bin:/usr/bin:/bin
-ExecStart=/usr/bin/env uv run --no-sync python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+ExecStart=/usr/bin/env uv run --no-sync python -m uvicorn app.main:create_app --factory --host ${BINGWALL_APP_HOST} --port ${BINGWALL_APP_PORT}
 Restart=on-failure
 RestartSec=5
 TimeoutStartSec=30

@@ -20,6 +20,7 @@ from typing import TypedDict
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 NGINX_IMAGE = "nginx:1.27-alpine"
+APP_HOST = "127.0.0.1"
 APP_PORT = 8000
 DEFAULT_NGINX_PORT = 18080
 HTTP_TIMEOUT_SECONDS = 5
@@ -131,6 +132,7 @@ def prepare_workspace(*, listen_port: int) -> VerificationPaths:
     nginx_template = (REPO_ROOT / "deploy/nginx/bingwall.conf").read_text(encoding="utf-8")
     nginx_template = nginx_template.replace("listen 80;", f"listen {listen_port};", 1)
     nginx_template = nginx_template.replace("listen [::]:80;", f"listen [::]:{listen_port};", 1)
+    nginx_template = nginx_template.replace("server 127.0.0.1:8000;", f"server {APP_HOST}:{APP_PORT};", 1)
     nginx_config_path.write_text(nginx_template, encoding="utf-8")
 
     return VerificationPaths(
@@ -145,7 +147,10 @@ def prepare_workspace(*, listen_port: int) -> VerificationPaths:
 def verify_systemd_unit_file(*, paths: VerificationPaths) -> None:
     service_path = REPO_ROOT / "deploy/systemd/bingwall-api.service"
     local_verify_env = paths.workspace / "local-verify.env"
-    local_verify_env.write_text("", encoding="utf-8")
+    local_verify_env.write_text(
+        f"BINGWALL_APP_HOST={APP_HOST}\nBINGWALL_APP_PORT={APP_PORT}\n",
+        encoding="utf-8",
+    )
     local_service_path = paths.workspace / "bingwall-api.local-verify.service"
     service_text = service_path.read_text(encoding="utf-8")
     service_text = service_text.replace("/opt/bingwall/app", str(REPO_ROOT))
@@ -352,12 +357,12 @@ def start_uvicorn_under_systemd(*, paths: VerificationPaths, unit_name: str) -> 
         "app.main:create_app",
         "--factory",
         "--host",
-        "127.0.0.1",
+        APP_HOST,
         "--port",
         str(APP_PORT),
     ])
     run_command(command, description="systemd-run uvicorn")
-    wait_for_url(f"http://127.0.0.1:{APP_PORT}/api/health/live", expected_status=200)
+    wait_for_url(f"http://{APP_HOST}:{APP_PORT}/api/health/live", expected_status=200)
 
 
 def verify_systemd_restart(*, unit_name: str) -> None:
@@ -365,7 +370,7 @@ def verify_systemd_restart(*, unit_name: str) -> None:
         ["systemctl", "--user", "restart", unit_name],
         description="systemctl --user restart",
     )
-    wait_for_url(f"http://127.0.0.1:{APP_PORT}/api/health/live", expected_status=200)
+    wait_for_url(f"http://{APP_HOST}:{APP_PORT}/api/health/live", expected_status=200)
 
 
 def verify_nginx_proxy(
@@ -409,7 +414,7 @@ def verify_nginx_proxy(
         ["journalctl", "--user", "-u", unit_name, "-n", "100", "--no-pager"],
         description="journalctl --user",
     ).stdout
-    if "Application configured for 127.0.0.1:8000." not in journal_output:
+    if f"Application configured for {APP_HOST}:{APP_PORT}." not in journal_output:
         raise VerificationError("Application startup log was not found in the user journal.")
     if "Request completed method=GET path=/api/health/live status_code=200" not in journal_output:
         raise VerificationError("Application access log was not found in the user journal.")
@@ -464,7 +469,7 @@ def build_nginx_mounts(paths: VerificationPaths) -> list[str]:
 def build_runtime_env(paths: VerificationPaths) -> dict[str, str]:
     return {
         "BINGWALL_APP_ENV": "production",
-        "BINGWALL_APP_HOST": "127.0.0.1",
+        "BINGWALL_APP_HOST": APP_HOST,
         "BINGWALL_APP_PORT": str(APP_PORT),
         "BINGWALL_APP_BASE_URL": "http://127.0.0.1",
         "BINGWALL_SITE_NAME": "BingWall",

@@ -101,7 +101,7 @@ make run
 
 - 现在本地开发、`systemd` 服务模板和 `cron` 模板都统一通过 `uv` 执行 Python 命令
 - 运行时统一采用 `uv run --no-sync python ...`，避免服务启动或计划任务执行时再去改动虚拟环境
-- `make run` 会跟随 `.env` / 环境变量中的 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；但当前仓库内 `deploy/systemd/bingwall-api.service` 仍把生产 `uvicorn` 监听地址固定为 `127.0.0.1:8000`，如需修改生产监听地址或端口，必须同步调整 `systemd` 与 `nginx` 模板
+- `make run` 与 `deploy/systemd/bingwall-api.service` 现在都会读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；生产模板默认口径是 `127.0.0.1:8000`，如需修改，必须同步调整 `deploy/nginx/bingwall.conf` 中的 upstream
 - `.env.example` 已包含 `BINGWALL_COLLECT_NASA_APOD_*` 本地示例；`deploy/systemd/bingwall.env.example` 当前未预填这些键，若目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，应在 `/etc/bingwall/bingwall.env` 中手工补充
 
 健康检查：
@@ -474,7 +474,7 @@ sudoedit /etc/bingwall/bingwall.env
 - `BINGWALL_APP_BASE_URL` 改成实际访问域名或 IP
 - `BINGWALL_SECURITY_SESSION_SECRET` 改成不少于 `32` 字节的随机值
 - 如需首次自动创建后台管理员，同时填写 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`，其中密码至少 `12` 位
-- 如需调整监听端口，必须同步修改 `deploy/systemd/bingwall-api.service`
+- 生产模板默认使用 `BINGWALL_APP_HOST=127.0.0.1` 与 `BINGWALL_APP_PORT=8000`；如需调整监听地址或端口，必须同步修改 `deploy/nginx/bingwall.conf` 的 upstream
 
 ### 3. 初始化数据库并安装服务配置
 
