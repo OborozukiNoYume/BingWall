@@ -438,7 +438,6 @@ make verify-backup-restore
 
 - 最小告警方案与真实测试通知
 - 运维执行记录模板和日志轮转方案
-- `npm test` / Playwright 的可复现自动化安装链路
 
 ## 阶段一单机部署说明
 

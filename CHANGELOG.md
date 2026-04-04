@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## 2026-04-04T15:17:23Z
+
+### 变更内容
+
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，移除仍把 `M1` 写成未完成的旧描述，不再把 `npm test` / Playwright 安装链路列为当前缺口
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，把目标机后续补强项统一收敛为“日志轮转、最小告警、运维执行记录模板”
+- 更新 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，同步文档索引中的使用场景描述，避免仍停留在阶段一/二口径
+
+### 变更原因
+
+- 你要求“完成 `M3`”
+- 当前整改清单已将 `M3` 标记为完成，但 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [README.md](/home/ops/Projects/BingWall/README.md) 仍残留“`npm test` / Playwright 自动化安装链路尚未完成”的旧口径，与 `M1` 已完成状态不一致
+- 需要把 README、项目状态、部署文档和文档索引中的剩余缺口重新统一到当前真实状态
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T15:17:23Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、部署模板、测试链路与真实目标机状态均未被当前改动直接改变；本次仅同步文档状态和剩余缺口口径
+- 更新后，`M3` 涉及的主文档不再同时出现“`M1` 已完成”和“`M1` 仍待完成”的冲突描述
+
+### 验证步骤
+
+- 执行 `rg -n "npm test|Playwright|日志轮转|运维执行记录模板|最小告警" README.md PROJECT_STATE.md docs/deployment-runbook.md docs/README.md docs/remediation-checklist.md`
+- 执行 `sed -n '1,40p' PROJECT_STATE.md`
+- 执行 `sed -n '432,446p' README.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现“整改清单已标记 `M1` 完成，但项目状态和 README 仍把它写成待完成”的旧口径
+
 ## 2026-04-04T09:50:00Z
 
 ### 变更内容
