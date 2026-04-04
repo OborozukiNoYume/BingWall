@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T08:45:46Z
+- 更新时间：2026-04-04T09:50:00Z
 - 来源：`2026-04-04` 项目评估结论
 - 文档定位：按优先级输出整改任务、依赖关系与验收命令
 - 适用范围：当前一期单机架构仓库与目标部署环境
@@ -26,10 +26,10 @@
 | `H2` | 补全生产环境模板 | `done` | 已完成（仓库） | 生产模板已包含 `NASA APOD`、引导管理员和 `OSS` 相关说明 |
 | `H3` | 加固 `systemd` 服务沙箱 | `done` | 已完成（仓库） | 当前离线验收基线约为 `2.8`，且 `make verify-deploy` 已通过 |
 | `H5` | 完成真实目标机长驻部署与公网接入 | `done` | 已完成（目标机） | 目标机 `139.224.235.228:8000` 已形成长驻服务；本次会话已复核首页、公开 API、样例图片和后台登录入口，对外 `systemd` 状态沿用目标机部署记录 |
-| `H4` | 完成首轮 `cron` 闭环验证 | `todo` | 未完成（需目标机） | 仓库内暂无首轮 `crontab`、日志、备份产物与深度健康检查记录 |
+| `H4` | 完成首轮 `cron` 闭环验证 | `done` | 已完成（目标机） | 已根据 `2026-04-04` 目标机执行报告回写首轮 `cron` 安装、日志、备份与深度健康检查记录，详见 `docs/h4-cron-first-run-record-2026-04-04.md` |
 | `M1` | 正式化 Node 测试链路 | `todo` | 未完成 | `npm test` 仍是占位脚本，Playwright 仍需手工安装 |
 | `M2` | 把部署验收纳入自动化 | `todo` | 未完成 | 当前 CI 只跑 `make verify`，尚未把 `make verify-deploy` 接入远端 workflow |
-| `M3` | 同步项目状态文档 | `todo` | 部分完成 | `H5` 相关口径已同步到 README、部署文档、项目状态与变更记录，但仍需在 `H4` 完成后再做一次最终状态收口 |
+| `M3` | 同步项目状态文档 | `done` | 已完成 | `H4` / `H5` 相关口径已同步到 README、部署文档、项目状态、文档索引与变更记录 |
 | `M4` | 明确最小告警方案 | `todo` | 部分完成 | 目前仅有监控阈值建议，尚无明确告警渠道、触发矩阵与真实测试通知 |
 | `M5` | 为关键运维动作补执行记录模板 | `todo` | 未完成 | 仓库内尚未沉淀部署、恢复演练、`cron` 首轮验证等固定记录模板 |
 | `L1` | 拆分超大模块 | `todo` | 未完成 | 仍存在明显大文件，例如 `web/admin/assets/admin.js` |
@@ -138,22 +138,42 @@ curl -I http://139.224.235.228:8000/admin/login
 
 ### H4 完成首轮 cron 闭环验证
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：已根据 `2026-04-04` 目标机执行报告回写首轮闭环记录，见 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
 - 前置依赖：`H2`、`H5`
 - 阻塞后续：`M4`、`M5`
 - 目标：在目标机完成 `cron` 安装并确认“建任务、消费队列、巡检、归档、备份”至少成功跑完 1 轮
-- 交付物：已安装的 `crontab`、首轮运行日志、样例备份产物、首轮深度健康检查记录
+- 交付物：已安装的 `crontab`、首轮运行日志、样例备份产物、首轮深度健康检查记录，以及 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
 - 验收命令：
 
 ```bash
-make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env
+make install-cron \
+  CRON_APP_DIR=/home/ubuntu/BingWall \
+  CRON_ENV_FILE=/etc/bingwall/bingwall.env \
+  CRON_LOG_DIR=/var/log/bingwall \
+  CRON_UV_BIN=/home/ubuntu/.local/bin/uv
 crontab -l | rg "create-scheduled-collection-tasks|consume-collection-tasks|inspect-resources|archive-wallpapers|backup"
 find /var/log/bingwall -maxdepth 1 -type f | sort
-find /var/backups/bingwall -maxdepth 2 -name manifest.json | sort
-curl -sS http://127.0.0.1/api/health/deep
+find /home/ubuntu/BingWall/var/backups -maxdepth 2 -name manifest.json | sort
+curl -sS http://127.0.0.1:8000/api/health/deep
 ```
 
-- 通过标准：计划任务已安装，日志目录和备份目录都有首轮产物，深度健康检查返回可解释的正常结果
+- 通过标准：计划任务已安装，且已在目标机手工验证“建任务、消费队列、巡检、归档、备份”5 类任务至少成功跑完 1 轮；日志目录和备份目录都有首轮产物，深度健康检查返回可解释的正常结果
+
+验收记录：
+
+- 以下记录基于 `2026-04-04` 的目标机执行报告回写到仓库；当前会话未直接登录目标机复核
+- 目标机已执行 `make install-cron`，并把 5 条 `cron` 任务安装到当前用户 `crontab`；安装前旧 `crontab` 已备份到 `/var/log/bingwall/crontab.backup.20260404T091149Z.txt`
+- `create-scheduled-collection-tasks` 首轮手工验证成功创建 `9` 个任务，其中 `8` 个 Bing 市场任务、`1` 个 `NASA APOD` 任务
+- `consume-collection-tasks --max-tasks 5` 首轮手工验证成功处理 `5` 个任务，累计成功下载 `9` 张图片
+- `run_resource_inspection.py` 已巡检 `20` 个资源，未发现缺失或损坏；`run_wallpaper_archive.py` 已成功执行，当前新部署环境无历史资源需要归档
+- `run_backup.py --skip-nginx --skip-tmpfiles` 已产出 `var/backups/backup-20260404T094004Z-d0172fd9/manifest.json`，深度健康检查 `http://127.0.0.1:8000/api/health/deep` 返回 `healthy`
+
+补充说明：
+
+- 当前已验收目标机采用 `ubuntu` 用户在 `/home/ubuntu/BingWall` 直接部署，目录口径与仓库推荐的 `/opt/bingwall/app` / `bingwall` 用户方案存在差异
+- 当前目标机未额外部署反向代理，公网入口仍为 `http://139.224.235.228:8000`
+- 备份任务之所以使用 `--skip-nginx --skip-tmpfiles`，是因为该目标机当前不存在仓库推荐口径下的本地 `nginx` 与 `tmpfiles` 配置文件
 
 ## 中优先级
 
@@ -201,11 +221,12 @@ gh run watch
 
 ### M3 同步项目状态文档
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：已基于 `2026-04-04` 的 `H4` / `H5` 目标机执行记录同步 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
 - 前置依赖：`H1`、`H2`、`H4`、`H5`
 - 阻塞后续：无
 - 目标：统一 README、项目状态、部署文档和变更记录里对阶段状态、未完成项和当前运维缺口的描述
-- 交付物：更新后的 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 交付物：更新后的 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
 - 验收命令：
 
 ```bash

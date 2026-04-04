@@ -380,10 +380,11 @@
 5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
 6. 观察 `/var/log/bingwall/create-scheduled-collection-tasks.log`、`consume-collection-tasks.log`、`inspect-resources.log`、`archive-wallpapers.log` 与 `backup.log`，确认首轮计划任务结果
 
-当前目标机仍需补齐：
+当前已记录的目标机首轮闭环结果：
 
-- 执行一次真实目标机安装并确认首轮任务运行
-- 生产机日志轮转确认
+- `H4` 首轮 `cron` 闭环验证已根据 `2026-04-04` 目标机执行报告回写到仓库，记录文件见 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
+- 当前已验收目标机实际使用 `ubuntu` 用户在 `/home/ubuntu/BingWall` 直接部署，`cron` 安装路径、备份目录与仓库推荐的 `/opt/bingwall/app` 口径存在差异
+- 当前生产机仍建议补齐日志轮转与后续告警收敛
 
 ### H5 已验收目标机记录
 
@@ -404,6 +405,26 @@
 - 上述公网访问结果已由当前会话直接复核
 - `systemctl status` 与开机自启状态来自目标机部署记录，当前会话未直接登录目标机执行
 - 若后续要把这台机器收敛回仓库推荐口径，可把应用监听改回 `127.0.0.1:8000`，再由 Nginx Proxy Manager 或等价反向代理接管公网入口
+
+### H4 首轮 cron 闭环记录
+
+- 记录日期：`2026-04-04`
+- 记录来源：目标机执行报告回写；当前会话未直接登录目标机复核
+- 记录文件：[docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
+- 当前目标机实际口径：
+  - 应用目录：`/home/ubuntu/BingWall`
+  - 服务用户：`ubuntu`
+  - `uv` 路径：`/home/ubuntu/.local/bin/uv`
+  - 备份目录：`/home/ubuntu/BingWall/var/backups`
+  - 深度健康检查地址：`http://127.0.0.1:8000/api/health/deep`
+- 验收摘要：
+  - 已安装 5 条 BingWall `cron` 任务，并备份旧 `crontab` 到 `/var/log/bingwall/crontab.backup.20260404T091149Z.txt`
+  - `create-scheduled-collection-tasks` 首轮成功创建 `9` 个任务，其中 `8` 个 Bing 市场任务、`1` 个 `NASA APOD` 任务
+  - `consume-collection-tasks --max-tasks 5` 首轮成功处理 `5` 个任务，累计成功下载 `9` 张图片
+  - `run_resource_inspection.py` 已巡检 `20` 个资源，`missing_resource_count = 0`
+  - `run_wallpaper_archive.py` 成功执行，当前新部署环境无历史资源需要归档
+  - `run_backup.py --skip-nginx --skip-tmpfiles` 已产出 `backup-20260404T094004Z-d0172fd9/manifest.json`
+  - `curl -sS http://127.0.0.1:8000/api/health/deep` 返回 `status = healthy`
 
 ### 健康检查
 
@@ -547,11 +568,13 @@
 
 ## 11. 当前已知缺口
 
-- 尚未完成目标机执行 `make install-cron` 后的首轮运行确认
+- 尚未完成最小告警方案与真实测试通知
+- 尚未形成可复用的运维执行记录模板
+- 尚未确认生产机日志轮转策略
 
 补充说明：
 
 - 当前仓库已通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成 `T1.6` 自动化验收；该 Docker 代理链路主要用于模板验证与无现成代理时的备用方案
-- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成；当前剩余缺口集中在 `cron` 首轮闭环与后续运维标准化记录
+- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成，`H4` 首轮 `cron` 闭环记录也已在同日回写到仓库；当前剩余缺口集中在告警、运维记录模板与日志轮转等标准化工作
 
 这些缺口必须在阶段一和阶段二实施中逐项关闭。

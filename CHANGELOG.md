@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-04-04T09:50:00Z
+
+### 变更内容
+
+- 新增 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)，把 `2026-04-04` 真实目标机的首轮 `cron` 安装、5 类任务手工闭环验证、日志 / 备份产物与深度健康检查结果回写到仓库，并显式标注“基于目标机执行报告、当前会话未直接登录目标机复核”的边界
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把 `H4` 从“未完成（需目标机）”改为“已完成（目标机）”，补充首轮 `cron` 闭环验收摘要，并同步把 `M3` 项目标记为已完成
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，清理“目标机仍待首轮 `cron` 验证”的过期描述，并补充当前剩余运维缺口
+
+### 变更原因
+
+- 你要求“根据真实服务器的报告完成 `H4`”
+- 你提供了 `2026-04-04` 的目标机执行报告，其中已经包含 `cron` 安装结果、5 类计划任务首轮闭环验证、日志目录、备份目录和深度健康检查记录
+- 当前仓库文档仍把 `H4` 标记为未完成，且 README、部署文档、项目状态中仍保留“需在目标机确认首轮运行”的过期描述
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T09:50:00Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、部署模板、测试与真实服务器运行状态均未被当前改动直接改变；本次仅回写目标机执行记录并同步文档状态
+- 更新后，`H4` 在仓库内已有可追溯的执行记录，且相关文档不会再继续把首轮 `cron` 验证写成“待完成”
+
+### 验证步骤
+
+- 执行 `rg -n "H4|首轮 cron|h4-cron-first-run-record-2026-04-04|仍需在目标机执行" README.md PROJECT_STATE.md docs/deployment-runbook.md docs/remediation-checklist.md docs/README.md CHANGELOG.md`
+- 执行 `sed -n '1,220p' docs/h4-cron-first-run-record-2026-04-04.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)，并恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新恢复为“`H4` 尚未完成、首轮 `cron` 运行记录未回写”的旧口径
+
 ## 2026-04-04T08:45:46Z
 
 ### 变更内容
