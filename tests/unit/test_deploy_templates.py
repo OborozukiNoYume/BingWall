@@ -27,6 +27,14 @@ def test_systemd_service_uses_managed_env_and_restart_policy() -> None:
     assert "WorkingDirectory=/opt/bingwall/app" in content
     assert "SupplementaryGroups=www-data" in content
     assert "Restart=on-failure" in content
+    assert "RemoveIPC=true" in content
+    assert "PrivateDevices=true" in content
+    assert "ProtectSystem=strict" in content
+    assert "ProtectProc=invisible" in content
+    assert "CapabilityBoundingSet=" in content
+    assert "RestrictNamespaces=true" in content
+    assert "RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6" in content
+    assert "SystemCallArchitectures=native" in content
     assert "ReadWritePaths=/var/lib/bingwall /var/log/bingwall /etc/bingwall" in content
 
 

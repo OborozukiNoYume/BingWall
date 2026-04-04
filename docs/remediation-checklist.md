@@ -1,0 +1,305 @@
+# BingWall 整改清单
+
+## 文档元信息
+
+- 更新时间：2026-04-04T03:33:22Z
+- 来源：`2026-04-04` 项目评估结论
+- 文档定位：按优先级输出整改任务、依赖关系与验收命令
+- 适用范围：当前一期单机架构仓库与目标部署环境
+
+## 使用说明
+
+- 高优先级：进入试运行前必须完成
+- 中优先级：建议在小规模生产稳定前完成
+- 低优先级：作为持续改进事项推进
+- 每项任务完成后，至少执行本文列出的验收命令，并保留命令输出或截图作为执行记录
+- 本文中的 `<your-domain>`、`<sample-relative-path>` 等占位符，需要在实际执行时替换为目标环境真实值
+
+## 高优先级
+
+### H1 统一生产监听配置
+
+- 状态：`done`
+- 完成记录：已完成模板、文档与验收脚本同步，参考提交 `dbf29c1`
+- 前置依赖：无
+- 阻塞后续：`H3`、`H5`、`M2`、`M3`
+- 目标：统一 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT`、`systemd` 模板、`nginx` 模板和部署文档的真实生效口径，避免“环境变量声明”和“服务实际监听地址”不一致
+- 交付物：修正后的 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[deploy/nginx/bingwall.conf](/home/ops/Projects/BingWall/deploy/nginx/bingwall.conf)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)
+- 验收命令：
+
+```bash
+rg -n "BINGWALL_APP_HOST|BINGWALL_APP_PORT|uvicorn|proxy_pass http://127.0.0.1:8000" \
+  README.md \
+  docs/deployment-runbook.md \
+  deploy/systemd/bingwall-api.service \
+  deploy/systemd/bingwall.env.example \
+  deploy/nginx/bingwall.conf \
+  Makefile
+
+make verify-deploy
+```
+
+- 通过标准：搜索结果中的监听口径不再互相冲突，且部署验收仍可通过
+
+### H2 补全生产环境模板
+
+- 状态：`done`
+- 完成记录：已完成生产环境模板补全与文档说明同步，参考提交 `c30ad23`
+- 前置依赖：无
+- 阻塞后续：`H4`、`H5`、`M3`
+- 目标：把生产部署需要手工补充的关键环境变量显式写入模板，包括 `BINGWALL_COLLECT_NASA_APOD_*`、管理员初始化相关配置和可选项说明
+- 交付物：更新后的 [deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example) 与 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)
+- 验收命令：
+
+```bash
+rg -n "BINGWALL_COLLECT_NASA_APOD_|BINGWALL_SECURITY_BOOTSTRAP_ADMIN_|BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL" \
+  .env.example \
+  deploy/systemd/bingwall.env.example \
+  docs/deployment-runbook.md \
+  README.md
+
+make verify-deploy
+```
+
+- 通过标准：本地示例与生产模板之间不再存在关键配置缺项，部署文档能解释每个新增键的用途与默认策略
+
+### H3 加固 systemd 服务沙箱
+
+- 状态：`done`
+- 完成记录：已完成 `systemd` 服务沙箱加固、部署说明同步与离线验收，当前 `systemd-analyze security --offline=yes` 基线约为 `2.9`
+- 前置依赖：`H1`
+- 阻塞后续：`H5`、`M2`
+- 目标：在不破坏当前服务运行的前提下，降低 `systemd-analyze security` 暴露评分，重点收紧能力边界和内核/设备访问权限
+- 交付物：更新后的 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service) 与部署说明中的权限说明
+- 验收命令：
+
+```bash
+systemd-analyze security /home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service
+make verify-deploy
+```
+
+- 通过标准：服务可正常启动，部署验收通过，且 `systemd-analyze security` 的整体暴露评分较当前基线明显下降，建议目标小于 `5.0`
+
+### H5 完成真实目标机长驻部署与公网接入
+
+- 状态：`todo`
+- 前置依赖：`H1`、`H2`、`H3`
+- 阻塞后续：`H4`、`M4`、`M5`
+- 目标：在真实目标机完成 `systemd + nginx + 域名` 的长期驻留部署，使公开站点、公开 API、图片访问和后台入口可稳定访问
+- 交付物：生效中的 `systemd` 服务、`nginx` 站点配置、正式环境变量文件、真实域名访问记录
+- 验收命令：
+
+```bash
+systemctl status bingwall-api --no-pager
+nginx -t
+curl -I http://<your-domain>/
+curl -sS http://<your-domain>/api/health/live
+curl -sS http://<your-domain>/api/public/site-info
+curl -I http://<your-domain>/images/<sample-relative-path>
+```
+
+- 通过标准：服务和代理均正常，公网首页、公开 API 和样例图片都返回预期状态码
+
+### H4 完成首轮 cron 闭环验证
+
+- 状态：`todo`
+- 前置依赖：`H2`、`H5`
+- 阻塞后续：`M4`、`M5`
+- 目标：在目标机完成 `cron` 安装并确认“建任务、消费队列、巡检、归档、备份”至少成功跑完 1 轮
+- 交付物：已安装的 `crontab`、首轮运行日志、样例备份产物、首轮深度健康检查记录
+- 验收命令：
+
+```bash
+make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env
+crontab -l | rg "create-scheduled-collection-tasks|consume-collection-tasks|inspect-resources|archive-wallpapers|backup"
+find /var/log/bingwall -maxdepth 1 -type f | sort
+find /var/backups/bingwall -maxdepth 2 -name manifest.json | sort
+curl -sS http://127.0.0.1/api/health/deep
+```
+
+- 通过标准：计划任务已安装，日志目录和备份目录都有首轮产物，深度健康检查返回可解释的正常结果
+
+## 中优先级
+
+### M1 正式化 Node 测试链路
+
+- 状态：`todo`
+- 前置依赖：无
+- 阻塞后续：`L5`
+- 目标：让 `npm test` 不再是占位脚本，并把浏览器冒烟依赖纳入可复现安装流程
+- 交付物：更新后的 [package.json](/home/ops/Projects/BingWall/package.json)、锁文件和前端验证说明
+- 验收命令：
+
+```bash
+npm ci
+npm test
+
+# 另开一个终端启动本地服务
+bash scripts/dev/run-api.sh
+
+# 再执行浏览器冒烟
+make browser-smoke
+```
+
+- 通过标准：`npm ci` 后无需再手工 `npm install --no-save playwright`，且 `npm test` 与浏览器冒烟都能直接跑通
+
+### M2 把部署验收纳入自动化
+
+- 状态：`todo`
+- 前置依赖：`H1`、`H3`
+- 阻塞后续：无
+- 目标：把 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 或等价部署验收接入 CI / 手动 workflow，避免部署模板回归只靠本地人工发现
+- 交付物：新的或更新后的 GitHub Actions workflow、触发说明和验收记录
+- 验收命令：
+
+```bash
+rg -n "verify_t1_6.py|make verify-deploy" .github/workflows
+
+# 若仓库已安装 GitHub CLI，可直接触发并观察运行结果
+gh workflow list
+gh workflow run <workflow-name> --ref dev
+gh run watch
+```
+
+- 通过标准：仓库内存在可用的自动化入口，并能在远端流水线中执行部署验收
+
+### M3 同步项目状态文档
+
+- 状态：`todo`
+- 前置依赖：`H1`、`H2`、`H4`、`H5`
+- 阻塞后续：无
+- 目标：统一 README、项目状态、部署文档和变更记录里对阶段状态、未完成项和当前运维缺口的描述
+- 交付物：更新后的 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 验收命令：
+
+```bash
+rg -n "阶段三|cron|监听地址|NASA APOD|公网|试运行" \
+  README.md \
+  PROJECT_STATE.md \
+  docs/deployment-runbook.md \
+  CHANGELOG.md
+```
+
+- 通过标准：同一事项在不同文档中的状态描述保持一致，不再出现互相冲突的阶段口径
+
+### M4 明确最小告警方案
+
+- 状态：`todo`
+- 前置依赖：`H4`、`H5`
+- 阻塞后续：`L4`
+- 目标：确定最小可落地的告警渠道和触发矩阵，至少覆盖采集连续失败、深度健康异常、备份过期和磁盘占用过高
+- 交付物：告警渠道决策、触发矩阵、值班处理步骤，建议沉淀到 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)
+- 验收命令：
+
+```bash
+rg -n "告警|Webhook|邮件|触发条件|值班|升级路径" docs/deployment-runbook.md docs/remediation-checklist.md
+
+# 若最终采用 Webhook，可执行一次测试通知
+curl -sS -X POST "<webhook-url>" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"bingwall alert test"}'
+```
+
+- 通过标准：已有明确告警渠道与触发条件，且至少完成 1 次真实测试通知
+
+### M5 为关键运维动作补执行记录模板
+
+- 状态：`todo`
+- 前置依赖：`H4`、`H5`
+- 阻塞后续：无
+- 目标：为部署、恢复演练、cron 首轮验证、域名切换等关键动作建立固定记录模板，降低后续交接和复盘成本
+- 交付物：执行记录模板文档，建议补充到 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 或新增配套文档
+- 验收命令：
+
+```bash
+rg -n "执行记录|部署记录|恢复演练记录|cron 首轮验证记录|回滚记录" docs
+```
+
+- 通过标准：仓库中能找到可复用的记录模板，且字段覆盖时间、操作者、命令、结果、风险和回滚点
+
+## 低优先级
+
+### L1 拆分超大模块
+
+- 状态：`todo`
+- 前置依赖：建议在高优先级完成后执行
+- 阻塞后续：无
+- 目标：降低大文件维护成本，优先拆分采集主服务、公开仓储查询和后台前端脚本
+- 交付物：拆分后的模块结构、补齐的测试和必要文档更新
+- 验收命令：
+
+```bash
+make verify
+find app/services app/repositories web/admin/assets -type f | xargs wc -l | sort -n | tail -n 20
+```
+
+- 通过标准：行为不变，验证通过，且极端大文件数量较当前明显减少
+
+### L2 建立搜索与查询性能基线
+
+- 状态：`todo`
+- 前置依赖：无
+- 阻塞后续：无
+- 目标：针对公开列表和后台内容列表的关键词、标签、日期过滤建立可重复的性能基线，并定义何时需要额外索引或 FTS
+- 交付物：性能基准脚本、样本数据规模说明、报告文档
+- 验收命令：
+
+```bash
+# 以下命令依赖本任务新增的基准脚本与报告
+uv run python scripts/benchmark_public_queries.py
+rg -n "P50|P95|P99|升级阈值|FTS" docs/benchmark-report.md
+```
+
+- 通过标准：有可复跑的基准命令，有明确数据规模和升级阈值，不再只靠经验判断
+
+### L3 设计密码算法升级路径
+
+- 状态：`todo`
+- 前置依赖：无
+- 阻塞后续：无
+- 目标：在不破坏现有登录链路的前提下，形成从 `pbkdf2_sha256` 向更强算法迁移的兼容设计
+- 交付物：迁移设计文档与兼容策略说明
+- 验收命令：
+
+```bash
+rg -n "argon2id|pbkdf2_sha256|兼容验证|渐进迁移|回滚方案" docs
+```
+
+- 通过标准：文档中明确记录哈希兼容读取、渐进重哈希与回滚策略
+
+### L4 增加最小运维指标出口
+
+- 状态：`todo`
+- 前置依赖：`M4`
+- 阻塞后续：无
+- 目标：让运维能够快速回答“最近采集成功率、最近备份时间、最近 5xx 情况”等基础问题
+- 交付物：最小指标导出方案、说明文档，以及对应脚本或接口
+- 验收命令：
+
+```bash
+# 以下命令依赖本任务新增的指标出口
+rg -n "采集成功率|最近备份时间|5xx|指标出口" docs
+curl -sS http://127.0.0.1:30003/<metrics-endpoint-or-script-output>
+```
+
+- 通过标准：关键运维指标可以被稳定读取，且读取方式已写入文档
+
+### L5 收口前端构建与源码边界
+
+- 状态：`todo`
+- 前置依赖：`M1`
+- 阻塞后续：无
+- 目标：明确 `web/src`、`web/public/assets`、`web/admin/assets` 的职责，避免构建产物和手工维护文件混用
+- 交付物：更新后的前端构建说明、约定清晰的源码/产物边界
+- 验收命令：
+
+```bash
+rg -n "web/src|web/public/assets|web/admin/assets|构建产物|源码" \
+  README.md \
+  docs/README.md \
+  docs/remediation-checklist.md \
+  package.json \
+  Makefile
+```
+
+- 通过标准：开发者可以明确判断“改哪个目录、是否需要重新构建、构建产物是否应提交”

@@ -1,5 +1,82 @@
 # CHANGELOG
 
+## 2026-04-04T03:33:22Z
+
+### 变更内容
+
+- 更新 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)，为 `bingwall-api` 服务补充 `systemd` 沙箱约束，收紧设备访问、内核接口、进程可见性、命名空间与能力边界
+- 更新 [tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)，补充 `systemd` 服务模板关键沙箱配置断言，避免部署模板回归
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，同步记录新的生产 `systemd` 沙箱口径、允许的写入目录和离线验收基线
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，将 `H3 加固 systemd 服务沙箱` 状态同步为已完成，并记录当前离线评分基线
+
+### 变更原因
+
+- 你要求执行整改清单中的 `H3`
+- 现有 `deploy/systemd/bingwall-api.service` 只有基础隔离项，`systemd-analyze security --offline=yes` 暴露评分为 `8.4`
+- 需要在不破坏现有运行、联网和持久化路径的前提下，优先收紧高收益且低风险的沙箱项
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T03:33:22Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 公开 API、后台 API、数据库结构、前端资源和部署监听口径均保持不变
+- 更新后，服务模板的离线安全评分已从 `8.4` 下降到 `2.9`
+
+### 验证步骤
+
+- 执行 `uv run -m pytest tests/unit/test_deploy_templates.py -q`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
+- 执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`
+- 执行 `make verify-deploy`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，`bingwall-api` 服务模板会回到较宽松的沙箱状态，离线暴露评分也会回升
+
+## 2026-04-04T02:23:21Z
+
+### 变更内容
+
+- 新增 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把项目评估后的整改建议细化为高/中/低优先级任务，并为每项任务补充前置依赖、阻塞关系、交付物和验收命令
+- 更新 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，将“整改清单”纳入文档索引和阅读顺序
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档新增范围与验证方式
+
+### 变更原因
+
+- 你要求把“整改清单”继续细化成包含“依赖关系 / 验收命令”的版本，并保存到 `docs`
+- 当前仓库已有系统设计、部署说明和阶段 TODO，但缺少一份直接面向整改执行的计划文档
+- 为了让后续执行能直接落地，需要把原先的评估建议转成可操作、可验收、可排依赖的任务列表
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T02:23:21Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、测试、部署模板、数据库迁移和运行时行为均保持不变
+- 更新后，仓库内已具备一份可直接用于跟踪整改执行的文档入口
+
+### 验证步骤
+
+- 执行 `rg -n "整改清单|remediation-checklist" docs/README.md docs/remediation-checklist.md CHANGELOG.md`
+- 人工复核 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，确认高/中/低优先级任务都包含依赖关系和验收命令
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，并恢复 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库将重新回到“只有评估建议、没有独立整改执行文档”的状态
+
 ## 2026-04-03T06:25:00Z
 
 ### 变更内容
