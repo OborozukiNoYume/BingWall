@@ -433,7 +433,7 @@ make verify-backup-restore
 
 ## 阶段一单机部署说明
 
-以下命令用于把当前仓库部署到单机 Ubuntu 环境，目标是让公开页面、公开 API 和图片静态资源都通过 Nginx Proxy Manager 对外访问。命令假定部署目录遵循 `docs/deployment-runbook.md` 中的一期约定，且部署账号具有 `sudo` 权限。
+以下命令用于把当前仓库部署到单机 Ubuntu 环境，目标是让公开页面、公开 API 和图片静态资源稳定对外访问。仓库仍优先推荐复用 Nginx Proxy Manager 或等价反向代理；当前 `H5` 已验收目标机也记录了直接开放 `http://139.224.235.228:8000` 的最小公网入口。命令假定部署目录遵循 `docs/deployment-runbook.md` 中的一期约定，且部署账号具有 `sudo` 权限。
 
 在执行真实部署前，建议先在仓库根目录执行一次 `make verify-deploy`，确认模板、代理链路和最小日志观察口径都正常。
 
@@ -474,6 +474,7 @@ sudoedit /etc/bingwall/bingwall.env
 - `BINGWALL_SECURITY_SESSION_SECRET` 改成不少于 `32` 字节的随机值
 - 如需首次自动创建后台管理员，同时填写 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`，其中密码至少 `12` 位
 - 生产模板默认使用 `BINGWALL_APP_HOST=127.0.0.1` 与 `BINGWALL_APP_PORT=8000`；如需调整监听地址或端口，需要同步更新 Nginx Proxy Manager 中的转发目标
+- 若当前目标机直接开放公网 `8000/tcp`，则需要把 `BINGWALL_APP_HOST=0.0.0.0`，并同步确认云安全组 / 防火墙已放行 `8000/tcp`
 
 ### 3. 初始化数据库并安装服务配置
 
@@ -492,7 +493,8 @@ sudo -u bingwall make -C /opt/bingwall/app install-cron CRON_APP_DIR=/opt/bingwa
 - 当 `admin_users` 为空且已配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME`、`BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 时，以上数据库初始化命令会自动创建一个状态为 `enabled` 的 `super_admin`。
 - 若数据库里已经存在管理员账号，再次执行该命令不会覆盖已有账号，也不会重复创建默认管理员。
 - 上述 `make install-cron` 会把仓库中的 cron 模板渲染成真实路径，并安装到 `bingwall` 用户自己的 `crontab`；如需回滚，可使用安装输出中的备份文件重新执行 `crontab <backup_path>`。
-- 在 Nginx Proxy Manager 中新增一个 Proxy Host，把外部访问入口转发到 `127.0.0.1:8000`；`Scheme=http`、`Forward Hostname / IP=127.0.0.1`、`Forward Port=8000`。
+- 若使用现成代理层，在 Nginx Proxy Manager 中新增一个 Proxy Host，把外部访问入口转发到 `127.0.0.1:8000`；`Scheme=http`、`Forward Hostname / IP=127.0.0.1`、`Forward Port=8000`。
+- 若直接开放公网 `8000/tcp`，则无需额外代理，但必须同步收紧安全组 / 防火墙与运维访问面。
 - 如果目标机没有现成反向代理，再考虑使用 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) 作为备用方案。
 
 ### 4. 最小上线检查

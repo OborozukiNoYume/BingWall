@@ -1,5 +1,46 @@
 # CHANGELOG
 
+## 2026-04-04T08:45:46Z
+
+### 变更内容
+
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把 `H5` 从“未完成（需目标机）”改为“已完成（目标机）”，补充真实目标机 `139.224.235.228:8000` 的验收记录、样例图片路径与“公网访问已复核 / `systemd` 状态来自部署记录”的边界说明
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，新增 `H5` 已验收目标机记录，并把生产入口说明改为“优先代理层，但允许经评估后直接开放公网 `8000/tcp`”的实际口径
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，清理“真实目标机长期驻留部署仍未完成”的过期描述，把当前剩余缺口收敛到 `cron` 首轮闭环验证
+
+### 变更原因
+
+- 你要求“根据这份文档，修复 `H5`”
+- 你提供了真实服务器部署记录，显示阿里云 Ubuntu 服务器 `139.224.235.228` 已完成长驻部署并对外提供 `http://139.224.235.228:8000`
+- 当前仓库文档仍把 `H5` 标记为未完成，且部分描述仍默认必须经过 Nginx Proxy Manager，对实际已验收目标机不再准确
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T08:45:46Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库代码、部署模板与测试行为均保持不变；本次仅修正文档状态、真实部署记录和验收边界
+- 更新后，`H5` 的完成状态与当前真实目标机公网可达性一致，同时不会把当前会话未直接执行的 `systemctl` 校验误写成已复核
+
+### 验证步骤
+
+- 执行 `curl -I http://139.224.235.228:8000/`
+- 执行 `curl -sS http://139.224.235.228:8000/api/health/live`
+- 执行 `curl -sS http://139.224.235.228:8000/api/public/site-info`
+- 执行 `curl -I http://139.224.235.228:8000/images/bing/2026/04/03_OHR.GrouseGuff_ZH-CN2647001885_preview_1600x900.jpg`
+- 执行 `curl -I http://139.224.235.228:8000/admin/login`
+- 执行 `rg -n "139\\.224\\.235\\.228|H5|cron|公网入口" docs/remediation-checklist.md docs/deployment-runbook.md README.md PROJECT_STATE.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新把 `H5` 视为未完成，并恢复“真实目标机长期驻留部署尚未落地”的旧口径
+
 ## 2026-04-04T07:03:51Z
 
 ### 变更内容

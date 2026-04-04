@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T07:03:51Z
+- 更新时间：2026-04-04T08:45:46Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -14,7 +14,7 @@
 
 一期采用单机部署，目标是以最小复杂度打通以下链路：
 
-- Nginx Proxy Manager 或等价反向代理提供对外入口
+- 优先由 Nginx Proxy Manager 或等价反向代理提供对外入口；当前已验收目标机也记录了直接开放 `8000/tcp` 的最小公网入口
 - FastAPI 提供公开 API、后台 API 和健康检查接口
 - SQLite 保存结构化数据
 - 本地文件系统保存图片资源
@@ -278,7 +278,7 @@
 
 - 验收脚本默认把 Nginx 监听端口改写到临时本地端口 `18080`，避免占用真实 `80` 端口
 - 验收脚本不会修改 `/etc/systemd/system`、`/etc/nginx`、`/etc/tmpfiles.d`
-- 真实目标机上线前，仍需按本文件的生产步骤安装正式服务配置，并在 Nginx Proxy Manager 或等价反向代理中完成真实代理配置
+- 若要在新的目标机复制部署，仍需按本文件的生产步骤安装正式服务配置，并在 Nginx Proxy Manager、等价反向代理或已评估的公网端口方案中完成真实入口配置
 
 ### 生产环境最小启动步骤
 
@@ -290,9 +290,10 @@
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `uv run --no-sync python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service` 与 `deploy/systemd/bingwall.tmpfiles.conf`
 6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`
-7. 在 Nginx Proxy Manager 中新增一个 Proxy Host，把外部访问入口转发到 `127.0.0.1:8000`
+7. 选择对外入口：
+   若目标机已有 Nginx Proxy Manager 或等价反向代理，则把外部访问入口转发到 `127.0.0.1:8000`
    `Scheme=http`、`Forward Hostname / IP=127.0.0.1`、`Forward Port=8000`
-   若使用目标 IP 而非正式域名，可先按 IP 建立临时代理记录
+   若本次部署与 `H5` 当前已验收目标机一致，直接开放公网 `8000/tcp`，则需把 `BINGWALL_APP_HOST=0.0.0.0`，并同步确认云安全组 / 本机防火墙已放行 `8000/tcp`
 8. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
 
 ### 生产环境模板说明
@@ -316,6 +317,7 @@
 - 推荐把 Proxy Host 转发到 `127.0.0.1:8000`
 - 公开页面、后台页面、公开 API、后台 API、`/assets/*`、`/admin-assets/*` 与 `/images/*` 都继续由 `bingwall-api` 提供，反向代理只负责入口转发
 - 若未来启用 HTTPS、访问控制或来源 IP 限制，应优先在现有代理层实施，而不是在应用服务模板里额外堆叠一层 `nginx`
+- 当前 `H5` 已验收目标机 `139.224.235.228` 暂未复用代理层，而是直接暴露 `http://139.224.235.228:8000`；该形态可作为最小公网入口记录，但不改变仓库对“优先复用现成代理层”的推荐
 - 若目标机没有现成反向代理，可再启用 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) 作为备用方案
 
 #### `deploy/systemd/bingwall-nginx.service`（备用）
@@ -382,6 +384,26 @@
 
 - 执行一次真实目标机安装并确认首轮任务运行
 - 生产机日志轮转确认
+
+### H5 已验收目标机记录
+
+- 验收日期：`2026-04-04`
+- 目标机：阿里云 Ubuntu，公网 IP `139.224.235.228`
+- 当前公网入口：`http://139.224.235.228:8000`
+- 当前部署形态：`systemd` 长驻 `uvicorn`，由应用直接监听公网 `8000/tcp`
+- 目标机执行记录：应用状态为“运行中”，`bingwall-api.service` 为 `active` 且 `enabled`
+- 本次会话外部复核结果：
+  - `curl -I http://139.224.235.228:8000/` 返回 `HTTP/1.1 200 OK`
+  - `curl http://139.224.235.228:8000/api/health/live` 返回 `{"status":"ok", ...}`
+  - `curl http://139.224.235.228:8000/api/public/site-info` 返回 `site_name = "BingWall"`
+  - `curl -I http://139.224.235.228:8000/images/bing/2026/04/03_OHR.GrouseGuff_ZH-CN2647001885_preview_1600x900.jpg` 返回 `HTTP/1.1 200 OK`
+  - `curl -I http://139.224.235.228:8000/admin/login` 返回 `HTTP/1.1 200 OK`
+
+说明：
+
+- 上述公网访问结果已由当前会话直接复核
+- `systemctl status` 与开机自启状态来自目标机部署记录，当前会话未直接登录目标机执行
+- 若后续要把这台机器收敛回仓库推荐口径，可把应用监听改回 `127.0.0.1:8000`，再由 Nginx Proxy Manager 或等价反向代理接管公网入口
 
 ### 健康检查
 
@@ -499,7 +521,7 @@
 
 1. 在仓库根目录执行 `make verify-deploy`
 2. 在目标机按本文件“生产环境最小启动步骤”安装正式服务
-3. 在目标机确认 Nginx Proxy Manager 或等价反向代理的 Proxy Host 已指向 `127.0.0.1:8000`
+3. 在目标机确认公网入口方案已生效：若使用 Nginx Proxy Manager 或等价反向代理，则 Proxy Host 已指向 `127.0.0.1:8000`；若直接开放公网端口，则确认 `8000/tcp` 已放行且 `BINGWALL_APP_HOST=0.0.0.0`
 4. 执行 `curl http://127.0.0.1/api/health/live`
 5. 执行 `curl http://127.0.0.1/api/health/ready`
 6. 执行 `curl http://127.0.0.1/api/health/deep`
@@ -508,7 +530,7 @@
 9. 如已有正式资源，执行 `curl -I http://127.0.0.1/images/<正式资源相对路径>`
 10. 执行 `make inspect-resources`
 11. 执行 `make archive-wallpapers`
-12. 观察 `journalctl -u bingwall-api.service`，并在 Nginx Proxy Manager 中确认访问日志或代理状态正常
+12. 观察 `journalctl -u bingwall-api.service`，并确认代理访问日志或公网探测结果正常
 
 ### 完整上线检查（阶段二目标）
 
@@ -530,6 +552,6 @@
 补充说明：
 
 - 当前仓库已通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成 `T1.6` 自动化验收；该 Docker 代理链路主要用于模板验证与无现成代理时的备用方案
-- 目标机仍需执行真实 Nginx Proxy Manager 或等价反向代理配置、systemd 服务安装和公网域名/目标 IP 接入，这些属于部署执行动作，不再阻塞阶段一验收
+- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成；当前剩余缺口集中在 `cron` 首轮闭环与后续运维标准化记录
 
 这些缺口必须在阶段一和阶段二实施中逐项关闭。

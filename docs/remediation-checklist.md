@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T05:48:49Z
+- 更新时间：2026-04-04T08:45:46Z
 - 来源：`2026-04-04` 项目评估结论
 - 文档定位：按优先级输出整改任务、依赖关系与验收命令
 - 适用范围：当前一期单机架构仓库与目标部署环境
@@ -25,11 +25,11 @@
 | `H1` | 统一生产监听配置 | `done` | 已完成（仓库） | `systemd`、`nginx`、环境模板、README 与部署文档中的监听口径已对齐 |
 | `H2` | 补全生产环境模板 | `done` | 已完成（仓库） | 生产模板已包含 `NASA APOD`、引导管理员和 `OSS` 相关说明 |
 | `H3` | 加固 `systemd` 服务沙箱 | `done` | 已完成（仓库） | 当前离线验收基线约为 `2.8`，且 `make verify-deploy` 已通过 |
-| `H5` | 完成真实目标机长驻部署与公网接入 | `todo` | 未完成（需目标机） | 仓库侧已补 `Nginx Proxy Manager` 优先口径，并保留 `Docker nginx` 备用模板，但仍缺真实目标机 `systemctl` 与对外访问记录 |
+| `H5` | 完成真实目标机长驻部署与公网接入 | `done` | 已完成（目标机） | 目标机 `139.224.235.228:8000` 已形成长驻服务；本次会话已复核首页、公开 API、样例图片和后台登录入口，对外 `systemd` 状态沿用目标机部署记录 |
 | `H4` | 完成首轮 `cron` 闭环验证 | `todo` | 未完成（需目标机） | 仓库内暂无首轮 `crontab`、日志、备份产物与深度健康检查记录 |
 | `M1` | 正式化 Node 测试链路 | `todo` | 未完成 | `npm test` 仍是占位脚本，Playwright 仍需手工安装 |
 | `M2` | 把部署验收纳入自动化 | `todo` | 未完成 | 当前 CI 只跑 `make verify`，尚未把 `make verify-deploy` 接入远端 workflow |
-| `M3` | 同步项目状态文档 | `todo` | 未完成 | README 与部署文档已更新，但 `PROJECT_STATE.md` 仍保留部分旧口径 |
+| `M3` | 同步项目状态文档 | `todo` | 部分完成 | `H5` 相关口径已同步到 README、部署文档、项目状态与变更记录，但仍需在 `H4` 完成后再做一次最终状态收口 |
 | `M4` | 明确最小告警方案 | `todo` | 部分完成 | 目前仅有监控阈值建议，尚无明确告警渠道、触发矩阵与真实测试通知 |
 | `M5` | 为关键运维动作补执行记录模板 | `todo` | 未完成 | 仓库内尚未沉淀部署、恢复演练、`cron` 首轮验证等固定记录模板 |
 | `L1` | 拆分超大模块 | `todo` | 未完成 | 仍存在明显大文件，例如 `web/admin/assets/admin.js` |
@@ -105,26 +105,35 @@ make verify-deploy
 
 ### H5 完成真实目标机长驻部署与公网接入
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：`2026-04-04` 已在阿里云 Ubuntu 目标机 `139.224.235.228:8000` 完成长期驻留部署；公网入口当前由 `uvicorn` 直接对外监听 `8000/tcp`
 - 前置依赖：`H1`、`H2`、`H3`
 - 阻塞后续：`H4`、`M4`、`M5`
-- 目标：在真实目标机完成 `systemd + Nginx Proxy Manager（或等价反向代理）+ 域名/目标 IP` 的长期驻留部署，使公开站点、公开 API、图片访问和后台入口可稳定访问；若目标机没有现成反向代理，再退回仓库内的 `Docker nginx` 备用方案
-- 交付物：生效中的 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、Nginx Proxy Manager 中的代理主机配置或等价反向代理记录、正式环境变量文件，以及真实访问记录
+- 目标：在真实目标机完成 `systemd + 对外访问入口（Nginx Proxy Manager、等价反向代理，或经运维评估后直接开放的公网监听端口） + 域名/目标 IP` 的长期驻留部署，使公开站点、公开 API、图片访问和后台入口可稳定访问；若目标机没有现成反向代理，再退回仓库内的 `Docker nginx` 备用方案
+- 交付物：生效中的 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service) 对应目标机服务、正式环境变量文件，以及真实访问记录；当前已记录的目标机入口为 `http://139.224.235.228:8000`
 - 验收命令：
 
 ```bash
-systemctl status bingwall-api --no-pager
-curl -I http://<your-host>/
-curl -sS http://<your-host>/api/health/live
-curl -sS http://<your-host>/api/public/site-info
-curl -I http://<your-host>/images/<sample-relative-path>
-curl -I http://<your-host>/admin/login
+systemctl status bingwall-api.service --no-pager
+curl -I http://139.224.235.228:8000/
+curl -sS http://139.224.235.228:8000/api/health/live
+curl -sS http://139.224.235.228:8000/api/public/site-info
+curl -I http://139.224.235.228:8000/images/bing/2026/04/03_OHR.GrouseGuff_ZH-CN2647001885_preview_1600x900.jpg
+curl -I http://139.224.235.228:8000/admin/login
 ```
 
-- 通过标准：应用服务处于运行态，且经由 Nginx Proxy Manager 或等价反向代理访问时，首页、公开 API、样例图片和后台登录入口都返回预期状态码
+- 通过标准：应用服务处于运行态，且经由目标机当前对外入口访问时，首页、公开 API、样例图片和后台登录入口都返回预期状态码
+
+验收记录：
+
+- 目标机部署记录显示 `bingwall-api.service` 已处于 `active` 且 `enabled` 状态；该项为目标机执行记录，当前会话未直接登录目标机复核
+- 本次会话已外部复核 `http://139.224.235.228:8000/`、`/api/health/live`、`/api/public/site-info`、`/images/bing/2026/04/03_OHR.GrouseGuff_ZH-CN2647001885_preview_1600x900.jpg` 与 `/admin/login`，均返回预期 `200` 或有效 JSON
+- 当前公网响应头显示 `server: uvicorn`，说明这台已验收目标机当前采用“应用直接监听公网 `8000/tcp`”的最小入口，而非额外代理层
 
 补充说明：
 
+- 仓库仍推荐优先复用现成的 Nginx Proxy Manager 或等价反向代理；当前目标机之所以可直接按 `http://139.224.235.228:8000` 验收，是因为运维侧已经显式开放公网 `8000/tcp`
+- 若后续需要把当前已验收目标机收敛回仓库推荐口径，可再把应用监听改回 `127.0.0.1:8000`，并在外层补一层现成代理配置
 - 若真实目标机没有现成反向代理，可选用 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) + [deploy/nginx/bingwall.conf](/home/ops/Projects/BingWall/deploy/nginx/bingwall.conf) 作为备用方案
 
 ### H4 完成首轮 cron 闭环验证
