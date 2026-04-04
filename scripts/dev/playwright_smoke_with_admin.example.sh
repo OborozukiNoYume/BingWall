@@ -8,7 +8,7 @@ set -euo pipefail
 #   edit the variables below
 #   /tmp/bingwall-browser-smoke.sh
 
-export BINGWALL_BROWSER_BASE_URL="${BINGWALL_BROWSER_BASE_URL:-http://127.0.0.1:30003}"
+export BINGWALL_BROWSER_BASE_URL="${BINGWALL_BROWSER_BASE_URL:-${BINGWALL_APP_BASE_URL:-http://127.0.0.1:30003}}"
 export BINGWALL_BROWSER_HEADLESS="${BINGWALL_BROWSER_HEADLESS:-true}"
 
 # Fill in a real admin account before running.

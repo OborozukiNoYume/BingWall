@@ -129,7 +129,9 @@ make verify-deploy
 浏览器模拟测试（Playwright）：
 
 ```bash
-make run
+npm ci
+npm test
+bash scripts/dev/run-api.sh
 make browser-smoke
 ```
 
@@ -149,13 +151,15 @@ bash scripts/dev/playwright_smoke_with_admin.example.sh
 说明：
 
 - 脚本位置：`scripts/dev/playwright_smoke.js`
+- Node 测试入口：`npm test`，当前会执行 `tests/node/*.test.js`，用于校验浏览器冒烟配置解析与默认口径
 - 带后台登录账号的示例模板：`scripts/dev/playwright_smoke_with_admin.example.sh`
-- 默认访问地址：`http://127.0.0.1:30003`；如需改地址，可在命令前设置 `BINGWALL_BROWSER_BASE_URL=http://127.0.0.1:18080`
+- `bash scripts/dev/run-api.sh` 与 `make run` 现都会读取 `.env` 中的 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT`；默认本地口径仍是 `127.0.0.1:30003`
+- 默认访问地址优先取 `BINGWALL_BROWSER_BASE_URL`，否则回退到 `BINGWALL_APP_BASE_URL`，再回退到 `http://127.0.0.1:30003`
 - 默认以无头 Chromium 运行；如需切到非无头模式，可设置 `BINGWALL_BROWSER_HEADLESS=false`
 - 冒烟步骤默认覆盖公开首页、公开列表筛选、壁纸详情页和后台登录页壳；若同时设置 `BINGWALL_ADMIN_USERNAME` 与 `BINGWALL_ADMIN_PASSWORD`，脚本会继续执行一次真实后台登录并进入 `/admin/wallpapers`
 - 若不想把管理员密码直接留在命令行历史里，可复制 `scripts/dev/playwright_smoke_with_admin.example.sh` 到临时目录后再编辑
-- 当前脚本依赖本地 `node_modules` 中可用的 `playwright` 模块；如模块缺失，可先执行 `npm install --no-save playwright`
-- 如目标机器还没下载 Chromium，可执行 `npx playwright install chromium`
+- 执行 `npm ci` 时会一并安装仓库锁定版本的 `playwright`，不需要再手工 `npm install --no-save playwright`
+- 若当前环境显式跳过了 Playwright 浏览器下载，或本机浏览器缓存已被清理，可补执行 `npx playwright install chromium`
 - Ubuntu 24.04 上如果浏览器启动时报 GTK 相关依赖缺失，优先安装 `libgtk-3-0t64`；旧版发行版对应包名可能是 `libgtk-3-0`
 
 当前 `T1.1` 到 `T1.6` 已补齐内容：

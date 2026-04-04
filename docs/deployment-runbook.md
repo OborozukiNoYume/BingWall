@@ -244,18 +244,19 @@
 ### Playwright 浏览器冒烟测试
 
 - 脚本位置：`scripts/dev/playwright_smoke.js`
+- Node 测试入口：`npm test`
 - 带后台登录账号的示例模板：`scripts/dev/playwright_smoke_with_admin.example.sh`
-- 默认前提：先执行 `make run`，确保本地服务已监听在 `127.0.0.1:30003`
+- 默认前提：先执行 `npm ci`、`npm test`，再通过 `bash scripts/dev/run-api.sh` 或 `make run` 启动本地服务；默认本地监听口径为 `127.0.0.1:30003`
 - 统一入口：`make browser-smoke`
 - 等价入口：`node scripts/dev/playwright_smoke.js`、`npm run browser-smoke`
 - 带后台登录账号的模板入口：`bash scripts/dev/playwright_smoke_with_admin.example.sh`
 - 可选环境变量：
-  - `BINGWALL_BROWSER_BASE_URL`：改写默认访问地址
+  - `BINGWALL_BROWSER_BASE_URL`：改写默认访问地址；未设置时优先回退到 `BINGWALL_APP_BASE_URL`
   - `BINGWALL_BROWSER_HEADLESS=false`：切换到非无头模式
   - `BINGWALL_ADMIN_USERNAME`、`BINGWALL_ADMIN_PASSWORD`：启用真实后台登录验证
 - 当前脚本默认覆盖公开首页、公开列表筛选、壁纸详情页和后台登录页壳；若提供后台账号，还会继续验证后台登录跳转
-- 若本机缺少 Playwright Node 模块，可先执行 `npm install --no-save playwright`
-- 若本机尚未下载 Chromium，可执行 `npx playwright install chromium`
+- `npm ci` 会安装锁定版本的 Playwright 依赖，不需要再手工追加 `npm install --no-save playwright`
+- 若当前环境跳过了浏览器下载，或本机浏览器缓存已被清理，可执行 `npx playwright install chromium`
 - Ubuntu 24.04 若浏览器启动缺 GTK 运行库，优先安装 `libgtk-3-0t64`；旧版发行版对应包名通常为 `libgtk-3-0`
 - `cron` 安装脚本：`scripts/install_cron.py`
 

@@ -3,4 +3,4 @@ set -euo pipefail
 
 UV_BIN="${UV_BIN:-uv}"
 
-exec "${UV_BIN}" run python -m uvicorn app.main:create_app --factory --host 127.0.0.1 --port 8000
+exec "${UV_BIN}" run python -c 'from app.core.config import get_settings; import uvicorn; settings = get_settings(); uvicorn.run("app.main:create_app", factory=True, host=settings.app_host, port=settings.app_port)'

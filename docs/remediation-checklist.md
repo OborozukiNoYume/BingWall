@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T09:50:00Z
+- 更新时间：2026-04-04T14:59:32Z
 - 来源：`2026-04-04` 项目评估结论
 - 文档定位：按优先级输出整改任务、依赖关系与验收命令
 - 适用范围：当前一期单机架构仓库与目标部署环境
@@ -27,7 +27,7 @@
 | `H3` | 加固 `systemd` 服务沙箱 | `done` | 已完成（仓库） | 当前离线验收基线约为 `2.8`，且 `make verify-deploy` 已通过 |
 | `H5` | 完成真实目标机长驻部署与公网接入 | `done` | 已完成（目标机） | 目标机 `139.224.235.228:8000` 已形成长驻服务；本次会话已复核首页、公开 API、样例图片和后台登录入口，对外 `systemd` 状态沿用目标机部署记录 |
 | `H4` | 完成首轮 `cron` 闭环验证 | `done` | 已完成（目标机） | 已根据 `2026-04-04` 目标机执行报告回写首轮 `cron` 安装、日志、备份与深度健康检查记录，详见 `docs/h4-cron-first-run-record-2026-04-04.md` |
-| `M1` | 正式化 Node 测试链路 | `todo` | 未完成 | `npm test` 仍是占位脚本，Playwright 仍需手工安装 |
+| `M1` | 正式化 Node 测试链路 | `done` | 已完成（仓库） | `npm test` 已接入 Node 原生测试，`playwright` 已纳入锁文件，浏览器冒烟默认口径已与本地启动脚本对齐 |
 | `M2` | 把部署验收纳入自动化 | `todo` | 未完成 | 当前 CI 只跑 `make verify`，尚未把 `make verify-deploy` 接入远端 workflow |
 | `M3` | 同步项目状态文档 | `done` | 已完成 | `H4` / `H5` 相关口径已同步到 README、部署文档、项目状态、文档索引与变更记录 |
 | `M4` | 明确最小告警方案 | `todo` | 部分完成 | 目前仅有监控阈值建议，尚无明确告警渠道、触发矩阵与真实测试通知 |
@@ -179,11 +179,12 @@ curl -sS http://127.0.0.1:8000/api/health/deep
 
 ### M1 正式化 Node 测试链路
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：已补充 `tests/node/*.test.js`、正式纳入 `playwright` 开发依赖，并把 `scripts/dev/run-api.sh` 与浏览器冒烟默认配置统一到本地 `.env` 口径
 - 前置依赖：无
 - 阻塞后续：`L5`
 - 目标：让 `npm test` 不再是占位脚本，并把浏览器冒烟依赖纳入可复现安装流程
-- 交付物：更新后的 [package.json](/home/ops/Projects/BingWall/package.json)、锁文件和前端验证说明
+- 交付物：更新后的 [package.json](/home/ops/Projects/BingWall/package.json)、[package-lock.json](/home/ops/Projects/BingWall/package-lock.json)、Node 测试文件、浏览器冒烟配置脚本与前端验证说明
 - 验收命令：
 
 ```bash
