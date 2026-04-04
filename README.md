@@ -102,7 +102,7 @@ make run
 - 现在本地开发、`systemd` 服务模板和 `cron` 模板都统一通过 `uv` 执行 Python 命令
 - 运行时统一采用 `uv run --no-sync python ...`，避免服务启动或计划任务执行时再去改动虚拟环境
 - `make run` 与 `deploy/systemd/bingwall-api.service` 现在都会读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；生产模板默认口径是 `127.0.0.1:8000`，如需修改，必须同步调整 `deploy/nginx/bingwall.conf` 中的 upstream
-- `.env.example` 已包含 `BINGWALL_COLLECT_NASA_APOD_*` 本地示例；`deploy/systemd/bingwall.env.example` 当前未预填这些键，若目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，应在 `/etc/bingwall/bingwall.env` 中手工补充
+- `.env.example` 与 `deploy/systemd/bingwall.env.example` 现在都已包含 `BINGWALL_COLLECT_NASA_APOD_*` 默认键；生产环境若不使用该来源，应显式把 `BINGWALL_COLLECT_NASA_APOD_ENABLED=false`，若使用则应把 `BINGWALL_COLLECT_NASA_APOD_API_KEY` 从 `DEMO_KEY` 替换为真实值
 
 健康检查：
 

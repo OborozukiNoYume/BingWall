@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T02:48:38Z
+- 更新时间：2026-04-04T03:05:12Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -140,18 +140,25 @@
 | `BINGWALL_APP_HOST` | `127.0.0.1` | FastAPI 监听地址；当前生产模板默认监听回环地址 |
 | `BINGWALL_APP_PORT` | `8000` | FastAPI 监听端口；当前生产模板默认端口，本地开发示例通常使用 `30003` |
 | `BINGWALL_APP_BASE_URL` | `http://127.0.0.1:30003` | 对外基础 URL，用于生成站点级链接与回调语义 |
+| `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` | 未设置 | 仅当资源使用 `storage_backend = oss` 时设置；本地文件存储场景保持未设置 |
 | `BINGWALL_LOG_LEVEL` | `INFO` | 当前唯一已实现的日志级别配置项 |
+| `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED` | `true` | 采集完成且资源就绪后是否自动公开；生产模板默认延续当前自动公开策略 |
 | `BINGWALL_COLLECT_NASA_APOD_ENABLED` | `true` | 是否启用 `nasa_apod` 来源采集 |
 | `BINGWALL_COLLECT_NASA_APOD_DEFAULT_MARKET` | `global` | `nasa_apod` 默认市场代码，当前固定使用 `global` |
 | `BINGWALL_COLLECT_NASA_APOD_API_KEY` | `DEMO_KEY` | NASA APOD API 密钥；生产环境应替换为真实密钥 |
 | `BINGWALL_COLLECT_NASA_APOD_TIMEOUT_SECONDS` | `10` | NASA APOD HTTP 请求超时时间 |
 | `BINGWALL_COLLECT_NASA_APOD_MAX_DOWNLOAD_RETRIES` | `3` | NASA APOD 图片下载最大重试次数 |
+| `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` | 未设置 | 可选；仅在首次执行 `make db-migrate` 且 `admin_users` 为空时用于创建引导管理员 |
+| `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` | 未设置 | 可选；必须与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 成对提供，且至少 `12` 位 |
 
 补充说明：
 
 - `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT` 当前会被应用配置模型、`make run` 和 `deploy/systemd/bingwall-api.service` 共同使用；当前生产模板默认口径是 `127.0.0.1:8000`
 - `deploy/nginx/bingwall.conf` 当前默认把 upstream 指向 `127.0.0.1:8000`；若生产环境需要改监听地址或端口，必须同步修改 `/etc/bingwall/bingwall.env` 与 `deploy/nginx/bingwall.conf`，不能只改其中一处
-- `BINGWALL_COLLECT_NASA_APOD_*` 变量当前已在 `.env.example` 中给出本地开发示例，但 `deploy/systemd/bingwall.env.example` 仍未预填这些键；如目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，需在 `/etc/bingwall/bingwall.env` 中手工补充
+- `deploy/systemd/bingwall.env.example` 现在已与 `.env.example` 对齐，预填 `BINGWALL_COLLECT_NASA_APOD_*` 默认键；生产环境不使用该来源时，建议显式设置 `BINGWALL_COLLECT_NASA_APOD_ENABLED=false`
+- `BINGWALL_COLLECT_NASA_APOD_API_KEY` 在模板中仍保留 `DEMO_KEY` 仅用于占位；真实生产环境应替换为有效 NASA API Key，或直接关闭该来源
+- `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_*` 属于一次性引导配置；首次成功初始化管理员后，建议从生产环境文件中移除，降低误用与暴露风险
+- `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 只在 `storage_backend = oss` 场景填写；本地文件存储场景不要写成空字符串，而应保持未设置
 
 ### Bing 采集配置补充
 
@@ -276,7 +283,8 @@
 1. 把仓库代码部署到 `/opt/bingwall/app`
 2. 使用 `uv python install 3.14` 与 `uv sync --python 3.14 --frozen --no-dev` 准备生产虚拟环境
 3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
-   当前若需要显式配置 NASA APOD 采集参数，还需手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
+   若启用 NASA APOD，需把模板中的 `BINGWALL_COLLECT_NASA_APOD_API_KEY=DEMO_KEY` 替换为真实值；若不启用，则显式设置 `BINGWALL_COLLECT_NASA_APOD_ENABLED=false`
+   若仅用于首次初始化管理员，可临时取消注释 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`，并在引导成功后移除
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `uv run --no-sync python -m app.repositories.migrations`
 5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
    当前生产模板默认监听 `127.0.0.1:8000`；如需修改 FastAPI 监听地址或端口，先更新 `/etc/bingwall/bingwall.env` 中的 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT`，再同步调整 `deploy/nginx/bingwall.conf` 的 upstream
@@ -303,8 +311,9 @@
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
 - 如需调整 Bing 手动/定时采集覆盖的地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU`
 - 如需调整 Bing 定时采集回溯窗口，可把 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 设为 `3`、`5` 或 `7`
-- 如需显式配置 NASA APOD 采集开关、API Key、超时或重试参数，需要在生产环境文件中手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
-- 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
+- 生产模板已预填 `BINGWALL_COLLECT_NASA_APOD_*` 默认值；若继续启用该来源，应替换真实 API Key，若不需要则显式关闭
+- 如需首次自动创建后台管理员，可在环境文件中取消注释 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
+- 引导管理员创建成功后，建议从生产环境文件中移除 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_*`，避免后续迁移时重复携带一次性敏感值
 - 如需保留“采集后先人工审核再发布”的旧策略，可在环境文件中把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`
 
 #### `deploy/nginx/bingwall.conf`
