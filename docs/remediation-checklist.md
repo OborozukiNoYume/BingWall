@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T14:59:32Z
+- 更新时间：2026-04-04T15:11:14Z
 - 来源：`2026-04-04` 项目评估结论
 - 文档定位：按优先级输出整改任务、依赖关系与验收命令
 - 适用范围：当前一期单机架构仓库与目标部署环境
@@ -28,7 +28,7 @@
 | `H5` | 完成真实目标机长驻部署与公网接入 | `done` | 已完成（目标机） | 目标机 `139.224.235.228:8000` 已形成长驻服务；本次会话已复核首页、公开 API、样例图片和后台登录入口，对外 `systemd` 状态沿用目标机部署记录 |
 | `H4` | 完成首轮 `cron` 闭环验证 | `done` | 已完成（目标机） | 已根据 `2026-04-04` 目标机执行报告回写首轮 `cron` 安装、日志、备份与深度健康检查记录，详见 `docs/h4-cron-first-run-record-2026-04-04.md` |
 | `M1` | 正式化 Node 测试链路 | `done` | 已完成（仓库） | `npm test` 已接入 Node 原生测试，`playwright` 已纳入锁文件，浏览器冒烟默认口径已与本地启动脚本对齐 |
-| `M2` | 把部署验收纳入自动化 | `todo` | 未完成 | 当前 CI 只跑 `make verify`，尚未把 `make verify-deploy` 接入远端 workflow |
+| `M2` | 把部署验收纳入自动化 | `done` | 已完成（仓库） | 已新增独立 `Verify Deploy` workflow 和 runner 统一入口脚本，可在带 `bingwall-deploy` 标签的远端 runner 上执行 `make verify-deploy` |
 | `M3` | 同步项目状态文档 | `done` | 已完成 | `H4` / `H5` 相关口径已同步到 README、部署文档、项目状态、文档索引与变更记录 |
 | `M4` | 明确最小告警方案 | `todo` | 部分完成 | 目前仅有监控阈值建议，尚无明确告警渠道、触发矩阵与真实测试通知 |
 | `M5` | 为关键运维动作补执行记录模板 | `todo` | 未完成 | 仓库内尚未沉淀部署、恢复演练、`cron` 首轮验证等固定记录模板 |
@@ -202,11 +202,12 @@ make browser-smoke
 
 ### M2 把部署验收纳入自动化
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：已新增 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml) 和 [scripts/github/run_verify_deploy.sh](/home/ops/Projects/BingWall/scripts/github/run_verify_deploy.sh)，支持 `workflow_dispatch` 与部署相关文件变更触发的远端部署验收入口
 - 前置依赖：`H1`、`H3`
 - 阻塞后续：无
 - 目标：把 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 或等价部署验收接入 CI / 手动 workflow，避免部署模板回归只靠本地人工发现
-- 交付物：新的或更新后的 GitHub Actions workflow、触发说明和验收记录
+- 交付物：新的 GitHub Actions workflow、runner 统一入口脚本、触发说明与仓库内执行口径
 - 验收命令：
 
 ```bash

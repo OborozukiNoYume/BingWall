@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 import argparse
 import json
+import os
 import shutil
 import sqlite3
 import subprocess
@@ -20,9 +21,6 @@ from typing import TypedDict
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 NGINX_IMAGE = "nginx:1.27-alpine"
-APP_HOST = "127.0.0.1"
-APP_PORT = 8000
-DEFAULT_NGINX_PORT = 18080
 HTTP_TIMEOUT_SECONDS = 5
 HTTP_WAIT_SECONDS = 30
 RELATIVE_IMAGE_PATH = Path("bing/2026/03/en-US/t1-6-smoke.jpg")
@@ -31,6 +29,24 @@ JPEG_BYTES = b"\xff\xd8\xff\xdbt1-6-smoke-jpeg"
 
 class VerificationError(RuntimeError):
     pass
+
+
+def get_env_int(name: str, default: int) -> int:
+    raw_value = os.environ.get(name)
+    if raw_value is None:
+        return default
+    try:
+        value = int(raw_value)
+    except ValueError as exc:
+        raise VerificationError(f"Environment variable {name} must be an integer.") from exc
+    if not 1 <= value <= 65535:
+        raise VerificationError(f"Environment variable {name} must be between 1 and 65535.")
+    return value
+
+
+APP_HOST = os.environ.get("BINGWALL_VERIFY_DEPLOY_APP_HOST", "127.0.0.1")
+APP_PORT = get_env_int("BINGWALL_VERIFY_DEPLOY_APP_PORT", 8000)
+DEFAULT_NGINX_PORT = get_env_int("BINGWALL_VERIFY_DEPLOY_NGINX_PORT", 18080)
 
 
 @dataclass(frozen=True, slots=True)
