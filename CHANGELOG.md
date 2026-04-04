@@ -1,5 +1,351 @@
 # CHANGELOG
 
+## 2026-04-04T18:50:37Z
+
+### 变更内容
+
+- 删除 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml)，移除 `Verify Deploy` 的 GitHub Actions 远端入口
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)，删除对专用 `bingwall-deploy` self-hosted runner 的说明
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，移除 `Verify Deploy` workflow 与远端 runner 章节，保留本地 `make verify-deploy` 验收入口
+
+### 变更原因
+
+- 你要求删除 `.github/workflows/verify-deploy.yml`
+- 当前 workflow 依赖带 `bingwall-deploy` 标签的 Linux self-hosted runner，而现有仓库环境没有稳定可用的对应 runner，导致相关任务长期停留在等待调度状态
+- 在未同步改写 `scripts/verify_t1_6.py` 验收前提的情况下，继续保留这个 workflow 只会留下一个默认不可用的远端入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T18:50:37Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- GitHub Actions 不再自动或手工触发 `Verify Deploy` 远端任务；仓库内本地部署验收入口 `make verify-deploy` 保持不变
+- `scripts/github/run_verify_deploy.sh` 当前未随本次改动删除，但已不再有 workflow 直接引用
+
+### 验证步骤
+
+- 执行 `find .github/workflows -maxdepth 1 -type f | sort`
+- 执行 `rg -n "Verify Deploy|bingwall-deploy|run_verify_deploy|workflow_dispatch" README.md docs/deployment-runbook.md .github/workflows`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新暴露一个依赖专用 self-hosted runner 的 `Verify Deploy` 远端入口
+
+## 2026-04-04T15:17:23Z
+
+### 变更内容
+
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，移除仍把 `M1` 写成未完成的旧描述，不再把 `npm test` / Playwright 安装链路列为当前缺口
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，把目标机后续补强项统一收敛为“日志轮转、最小告警、运维执行记录模板”
+- 更新 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，同步文档索引中的使用场景描述，避免仍停留在阶段一/二口径
+
+### 变更原因
+
+- 你要求“完成 `M3`”
+- 当前整改清单已将 `M3` 标记为完成，但 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [README.md](/home/ops/Projects/BingWall/README.md) 仍残留“`npm test` / Playwright 自动化安装链路尚未完成”的旧口径，与 `M1` 已完成状态不一致
+- 需要把 README、项目状态、部署文档和文档索引中的剩余缺口重新统一到当前真实状态
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T15:17:23Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、部署模板、测试链路与真实目标机状态均未被当前改动直接改变；本次仅同步文档状态和剩余缺口口径
+- 更新后，`M3` 涉及的主文档不再同时出现“`M1` 已完成”和“`M1` 仍待完成”的冲突描述
+
+### 验证步骤
+
+- 执行 `rg -n "npm test|Playwright|日志轮转|运维执行记录模板|最小告警" README.md PROJECT_STATE.md docs/deployment-runbook.md docs/README.md docs/remediation-checklist.md`
+- 执行 `sed -n '1,40p' PROJECT_STATE.md`
+- 执行 `sed -n '432,446p' README.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新出现“整改清单已标记 `M1` 完成，但项目状态和 README 仍把它写成待完成”的旧口径
+
+## 2026-04-04T09:50:00Z
+
+### 变更内容
+
+- 新增 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)，把 `2026-04-04` 真实目标机的首轮 `cron` 安装、5 类任务手工闭环验证、日志 / 备份产物与深度健康检查结果回写到仓库，并显式标注“基于目标机执行报告、当前会话未直接登录目标机复核”的边界
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把 `H4` 从“未完成（需目标机）”改为“已完成（目标机）”，补充首轮 `cron` 闭环验收摘要，并同步把 `M3` 项目标记为已完成
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，清理“目标机仍待首轮 `cron` 验证”的过期描述，并补充当前剩余运维缺口
+
+### 变更原因
+
+- 你要求“根据真实服务器的报告完成 `H4`”
+- 你提供了 `2026-04-04` 的目标机执行报告，其中已经包含 `cron` 安装结果、5 类计划任务首轮闭环验证、日志目录、备份目录和深度健康检查记录
+- 当前仓库文档仍把 `H4` 标记为未完成，且 README、部署文档、项目状态中仍保留“需在目标机确认首轮运行”的过期描述
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T09:50:00Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、部署模板、测试与真实服务器运行状态均未被当前改动直接改变；本次仅回写目标机执行记录并同步文档状态
+- 更新后，`H4` 在仓库内已有可追溯的执行记录，且相关文档不会再继续把首轮 `cron` 验证写成“待完成”
+
+### 验证步骤
+
+- 执行 `rg -n "H4|首轮 cron|h4-cron-first-run-record-2026-04-04|仍需在目标机执行" README.md PROJECT_STATE.md docs/deployment-runbook.md docs/remediation-checklist.md docs/README.md CHANGELOG.md`
+- 执行 `sed -n '1,220p' docs/h4-cron-first-run-record-2026-04-04.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)，并恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新恢复为“`H4` 尚未完成、首轮 `cron` 运行记录未回写”的旧口径
+
+## 2026-04-04T08:45:46Z
+
+### 变更内容
+
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把 `H5` 从“未完成（需目标机）”改为“已完成（目标机）”，补充真实目标机 `139.224.235.228:8000` 的验收记录、样例图片路径与“公网访问已复核 / `systemd` 状态来自部署记录”的边界说明
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，新增 `H5` 已验收目标机记录，并把生产入口说明改为“优先代理层，但允许经评估后直接开放公网 `8000/tcp`”的实际口径
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，清理“真实目标机长期驻留部署仍未完成”的过期描述，把当前剩余缺口收敛到 `cron` 首轮闭环验证
+
+### 变更原因
+
+- 你要求“根据这份文档，修复 `H5`”
+- 你提供了真实服务器部署记录，显示阿里云 Ubuntu 服务器 `139.224.235.228` 已完成长驻部署并对外提供 `http://139.224.235.228:8000`
+- 当前仓库文档仍把 `H5` 标记为未完成，且部分描述仍默认必须经过 Nginx Proxy Manager，对实际已验收目标机不再准确
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T08:45:46Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库代码、部署模板与测试行为均保持不变；本次仅修正文档状态、真实部署记录和验收边界
+- 更新后，`H5` 的完成状态与当前真实目标机公网可达性一致，同时不会把当前会话未直接执行的 `systemctl` 校验误写成已复核
+
+### 验证步骤
+
+- 执行 `curl -I http://139.224.235.228:8000/`
+- 执行 `curl -sS http://139.224.235.228:8000/api/health/live`
+- 执行 `curl -sS http://139.224.235.228:8000/api/public/site-info`
+- 执行 `curl -I http://139.224.235.228:8000/images/bing/2026/04/03_OHR.GrouseGuff_ZH-CN2647001885_preview_1600x900.jpg`
+- 执行 `curl -I http://139.224.235.228:8000/admin/login`
+- 执行 `rg -n "139\\.224\\.235\\.228|H5|cron|公网入口" docs/remediation-checklist.md docs/deployment-runbook.md README.md PROJECT_STATE.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新把 `H5` 视为未完成，并恢复“真实目标机长期驻留部署尚未落地”的旧口径
+
+## 2026-04-04T07:03:51Z
+
+### 变更内容
+
+- 保留 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) 作为没有现成代理层时的备用模板
+- 更新 [app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py)、[tests/integration/test_public_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_public_frontend.py) 与 [tests/integration/test_admin_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_admin_frontend.py)，让公开首页与后台登录页等前端壳页面显式支持 `HEAD`，以匹配 `H5` 中 `curl -I` 的真实验收方式
+- 更新 [deploy/systemd/bingwall.tmpfiles.conf](/home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf) 与 [tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)，补充 `/etc/bingwall/nginx` 目录模板和 Docker 代理模板断言
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把 `H5` 的正式部署口径收敛为“`systemd + Nginx Proxy Manager（或等价反向代理）`”，并将 Docker `nginx` 明确为备用方案
+
+### 变更原因
+
+- 你要求继续完成整改清单中的 `H5`
+- 你补充说明真实目标机通常复用现有的 Nginx Proxy Manager，而不是再为单个应用额外长驻一层 `nginx`
+- 因此 `H5` 的正式收口应优先围绕 `bingwall-api.service` 与现有代理层，而不是把 Docker `nginx` 写成唯一标准答案
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T06:21:21Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py)、[tests/integration/test_public_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_public_frontend.py)、[tests/integration/test_admin_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_admin_frontend.py)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service)、[deploy/systemd/bingwall.tmpfiles.conf](/home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 业务主体逻辑、数据库结构和公开 API 数据语义均保持不变；仅前端壳页面额外支持 `HEAD` 请求，便于部署验收
+- 更新后，仓库文档已与“正式使用 Nginx Proxy Manager、Docker `nginx` 仅作备用”的真实运维口径一致
+
+### 验证步骤
+
+- 执行 `uv run -m pytest tests/unit/test_deploy_templates.py -q`
+- 执行 `uv run -m pytest tests/integration/test_public_frontend.py tests/integration/test_admin_frontend.py -q`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-nginx.service`
+- 执行 `rg -n "Nginx Proxy Manager|bingwall-nginx.service|备用方案|<your-host>" README.md docs/deployment-runbook.md docs/remediation-checklist.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/web/routes.py](/home/ops/Projects/BingWall/app/web/routes.py)、[tests/integration/test_public_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_public_frontend.py)、[tests/integration/test_admin_frontend.py](/home/ops/Projects/BingWall/tests/integration/test_admin_frontend.py)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service)、[deploy/systemd/bingwall.tmpfiles.conf](/home/ops/Projects/BingWall/deploy/systemd/bingwall.tmpfiles.conf)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库文档会重新偏向“Docker `nginx` 单独长驻”的部署口径，不再贴合你当前真实机器的运维习惯
+
+## 2026-04-04T05:48:49Z
+
+### 变更内容
+
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，补充“状态总览”表，集中展示各整改项的清单标记、基于仓库可见证据的实际状态与当前说明
+- 同步更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 文档时间戳，反映本轮状态整理时间
+
+### 变更原因
+
+- 你要求更新 `docs/remediation-checklist.md`
+- 当前清单已包含任务定义、依赖和验收命令，但缺少一眼可用的全量状态总览
+- 需要把“清单标记”和“按当前仓库可确认的实际状态”明确分开，避免把目标机侧未验证事项误写为已完成
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T05:48:49Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库代码、部署模板、测试与运行时行为均保持不变
+- 更新后，整改清单可直接用于区分“仓库已完成”“需目标机验证”和“部分完成”的事项
+
+### 验证步骤
+
+- 执行 `sed -n '1,80p' docs/remediation-checklist.md`
+- 执行 `rg -n "状态总览|实际状态|需目标机验证|部分完成" docs/remediation-checklist.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，整改清单将重新只保留任务明细，不再包含集中状态总览
+
+## 2026-04-04T05:42:15Z
+
+### 变更内容
+
+- 更新 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)，移除 `bingwall-api` 服务中不必要的 `SupplementaryGroups=www-data`
+- 更新 [tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)，同步调整 `systemd` 模板断言，避免继续要求附加组配置
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把公开目录权限说明改为基于属主写入与 `setgid` 继承，并把离线安全评分基线更新为 `2.8`
+
+### 变更原因
+
+- 你要求继续完成整改清单中的 `H3`
+- 当前服务模板虽已达标，但仍保留一个对运行并非必需的附加组权限
+- 在不改变联网、写盘路径和公开资源权限模型的前提下，去掉该附加组可以进一步缩小服务可见权限面
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T05:42:15Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 正式资源目录权限、Nginx 读取方式、应用监听口径和持久化路径均保持不变
+- 更新后，服务模板的离线安全评分基线已从 `2.9` 下降到 `2.8`
+
+### 验证步骤
+
+- 执行 `uv run -m pytest tests/unit/test_deploy_templates.py -q`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
+- 执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`
+- 执行 `make verify-deploy`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，`bingwall-api` 服务会重新加入 `www-data` 附加组，离线暴露评分基线也会回到 `2.9`
+
+## 2026-04-04T03:33:22Z
+
+### 变更内容
+
+- 更新 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)，为 `bingwall-api` 服务补充 `systemd` 沙箱约束，收紧设备访问、内核接口、进程可见性、命名空间与能力边界
+- 更新 [tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)，补充 `systemd` 服务模板关键沙箱配置断言，避免部署模板回归
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，同步记录新的生产 `systemd` 沙箱口径、允许的写入目录和离线验收基线
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，将 `H3 加固 systemd 服务沙箱` 状态同步为已完成，并记录当前离线评分基线
+
+### 变更原因
+
+- 你要求执行整改清单中的 `H3`
+- 现有 `deploy/systemd/bingwall-api.service` 只有基础隔离项，`systemd-analyze security --offline=yes` 暴露评分为 `8.4`
+- 需要在不破坏现有运行、联网和持久化路径的前提下，优先收紧高收益且低风险的沙箱项
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T03:33:22Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 公开 API、后台 API、数据库结构、前端资源和部署监听口径均保持不变
+- 更新后，服务模板的离线安全评分已从 `8.4` 下降到 `2.9`
+
+### 验证步骤
+
+- 执行 `uv run -m pytest tests/unit/test_deploy_templates.py -q`
+- 执行 `systemd-analyze verify deploy/systemd/bingwall-api.service`
+- 执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`
+- 执行 `make verify-deploy`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [deploy/systemd/bingwall-api.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-api.service)、[tests/unit/test_deploy_templates.py](/home/ops/Projects/BingWall/tests/unit/test_deploy_templates.py)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，`bingwall-api` 服务模板会回到较宽松的沙箱状态，离线暴露评分也会回升
+
+## 2026-04-04T02:23:21Z
+
+### 变更内容
+
+- 新增 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把项目评估后的整改建议细化为高/中/低优先级任务，并为每项任务补充前置依赖、阻塞关系、交付物和验收命令
+- 更新 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，将“整改清单”纳入文档索引和阅读顺序
+- 更新 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)，记录本次文档新增范围与验证方式
+
+### 变更原因
+
+- 你要求把“整改清单”继续细化成包含“依赖关系 / 验收命令”的版本，并保存到 `docs`
+- 当前仓库已有系统设计、部署说明和阶段 TODO，但缺少一份直接面向整改执行的计划文档
+- 为了让后续执行能直接落地，需要把原先的评估建议转成可操作、可验收、可排依赖的任务列表
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-04T02:23:21Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围仅覆盖 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、测试、部署模板、数据库迁移和运行时行为均保持不变
+- 更新后，仓库内已具备一份可直接用于跟踪整改执行的文档入口
+
+### 验证步骤
+
+- 执行 `rg -n "整改清单|remediation-checklist" docs/README.md docs/remediation-checklist.md CHANGELOG.md`
+- 人工复核 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，确认高/中/低优先级任务都包含依赖关系和验收命令
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，并恢复 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库将重新回到“只有评估建议、没有独立整改执行文档”的状态
+
 ## 2026-04-03T06:25:00Z
 
 ### 变更内容

@@ -2,17 +2,16 @@ let chromium;
 try {
   ({ chromium } = require("playwright"));
 } catch (error) {
-  console.error("Missing Playwright module. Run `npm install --no-save playwright` first.");
+  console.error("Missing Playwright module. Run `npm ci` first.");
   if (error && error.stack) {
     console.error(error.stack);
   }
   process.exit(1);
 }
 
-const baseUrl = process.env.BINGWALL_BROWSER_BASE_URL || "http://127.0.0.1:30003";
-const headless = (process.env.BINGWALL_BROWSER_HEADLESS || "true").toLowerCase() !== "false";
-const adminUsername = process.env.BINGWALL_ADMIN_USERNAME || "";
-const adminPassword = process.env.BINGWALL_ADMIN_PASSWORD || "";
+const { getBrowserSmokeConfig } = require("./playwright_smoke_config");
+
+const { baseUrl, headless, adminUsername, adminPassword } = getBrowserSmokeConfig();
 
 function assert(condition, message) {
   if (!condition) {

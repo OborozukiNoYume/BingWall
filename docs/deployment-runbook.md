@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-03T06:25:00Z
+- 更新时间：2026-04-04T18:50:37Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -14,7 +14,7 @@
 
 一期采用单机部署，目标是以最小复杂度打通以下链路：
 
-- Nginx 提供前端静态资源和图片资源
+- 优先由 Nginx Proxy Manager 或等价反向代理提供对外入口；当前已验收目标机也记录了直接开放 `8000/tcp` 的最小公网入口
 - FastAPI 提供公开 API、后台 API 和健康检查接口
 - SQLite 保存结构化数据
 - 本地文件系统保存图片资源
@@ -31,18 +31,18 @@
 | Python | `3.14` | 当前开发基线，固定 `3.14` 版本线，允许 `3.14.x` 补丁版本 |
 | Node.js | `24.13.0` | 当前前端与构建运行时基线，后续如引入 Node.js 构建链路需补充版本锁定文件 |
 | SQLite | 待实施环境安装后记录精确版本 | 一期数据库 |
-| Nginx | 待实施环境安装后记录精确版本 | 反向代理与静态资源服务 |
+| Nginx Proxy Manager / Nginx | 待实施环境记录精确版本 | 反向代理与静态资源服务 |
 | systemd | 当前工作环境可见为 `255.4-1ubuntu8.12` | 进程托管 |
 | cron | 待实施环境安装后记录精确版本 | 定时触发 |
 
 说明：
 
 - 当前仓库已生成 `.python-version`、`.nvmrc`、`pyproject.toml` 与 `uv.lock`，并统一以 `uv sync` 创建和维护 `.venv`
-- 当前仓库已生成 `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example`
+- 当前仓库已生成 `deploy/nginx/bingwall.conf`、`deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall-nginx.service`、`deploy/systemd/bingwall.tmpfiles.conf` 与 `deploy/systemd/bingwall.env.example`
 - 当前已确认 `Python 3.14` 为一期开发基线，阶段一初始化代码时必须围绕该版本线生成运行时与依赖锁定文件
 - 当前后端依赖基线已固定为 `FastAPI 0.118.3`，该版本官方支持 `Python 3.14`，并兼容当前锁定的 `Starlette 0.47.3`
 - 当前已确认 `Node.js 24.13.0` 为前端与构建运行时基线；若后续引入 Node.js 构建链路，必须补充对应版本锁定文件
-- SQLite、Nginx、cron 的精确版本必须在目标部署环境创建时记录到部署清单
+- SQLite、Docker、Nginx 镜像与 cron 的精确版本必须在目标部署环境创建时记录到部署清单
 
 ## 3. 目录约定
 
@@ -58,6 +58,7 @@
 | `/var/log/bingwall` | 应用和任务日志目录 |
 | `/var/backups/bingwall` | 备份目录 |
 | `/etc/bingwall` | 受控配置目录 |
+| `/etc/bingwall/nginx` | 仓库内 Docker `nginx` 备用方案的配置目录 |
 
 ### 目录权限建议
 
@@ -70,6 +71,7 @@
 - `/var/lib/bingwall/images/public`：应用写入、Nginx 读取，建议 `2750`，`bingwall:www-data`
 - `/var/log/bingwall`：应用日志和 Nginx 日志目录，建议 `0750`
 - `/etc/bingwall`：受控配置目录，建议 `0750`，仅运维与应用账户可访问
+- `/etc/bingwall/nginx`：仅在使用仓库内 Docker `nginx` 备用方案时创建，建议 `0750`
 
 当前仓库提供的 `deploy/systemd/bingwall.tmpfiles.conf` 已按上述口径写出目录模板。
 
@@ -137,20 +139,28 @@
 | 变量名 | 默认示例 | 说明 |
 |---|---|---|
 | `BINGWALL_APP_ENV` | `development` | 应用运行环境标识；生产模板中通常使用 `production` |
-| `BINGWALL_APP_HOST` | `127.0.0.1` | FastAPI 监听地址 |
-| `BINGWALL_APP_PORT` | `30003` | FastAPI 监听端口；生产模板默认可改为 `8000` |
+| `BINGWALL_APP_HOST` | `127.0.0.1` | FastAPI 监听地址；当前生产模板默认监听回环地址 |
+| `BINGWALL_APP_PORT` | `8000` | FastAPI 监听端口；当前生产模板默认端口，本地开发示例通常使用 `30003` |
 | `BINGWALL_APP_BASE_URL` | `http://127.0.0.1:30003` | 对外基础 URL，用于生成站点级链接与回调语义 |
+| `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` | 未设置 | 仅当资源使用 `storage_backend = oss` 时设置；本地文件存储场景保持未设置 |
 | `BINGWALL_LOG_LEVEL` | `INFO` | 当前唯一已实现的日志级别配置项 |
+| `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED` | `true` | 采集完成且资源就绪后是否自动公开；生产模板默认延续当前自动公开策略 |
 | `BINGWALL_COLLECT_NASA_APOD_ENABLED` | `true` | 是否启用 `nasa_apod` 来源采集 |
 | `BINGWALL_COLLECT_NASA_APOD_DEFAULT_MARKET` | `global` | `nasa_apod` 默认市场代码，当前固定使用 `global` |
 | `BINGWALL_COLLECT_NASA_APOD_API_KEY` | `DEMO_KEY` | NASA APOD API 密钥；生产环境应替换为真实密钥 |
 | `BINGWALL_COLLECT_NASA_APOD_TIMEOUT_SECONDS` | `10` | NASA APOD HTTP 请求超时时间 |
 | `BINGWALL_COLLECT_NASA_APOD_MAX_DOWNLOAD_RETRIES` | `3` | NASA APOD 图片下载最大重试次数 |
+| `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` | 未设置 | 可选；仅在首次执行 `make db-migrate` 且 `admin_users` 为空时用于创建引导管理员 |
+| `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` | 未设置 | 可选；必须与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 成对提供，且至少 `12` 位 |
 
 补充说明：
 
-- `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT` 当前会被应用配置模型和 `make run` 使用，但仓库内现有 `deploy/systemd/bingwall-api.service` 仍把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`；若生产环境需要改监听地址或端口，必须同步修改 `systemd` 与 `nginx` 模板，不能只改环境变量
-- `BINGWALL_COLLECT_NASA_APOD_*` 变量当前已在 `.env.example` 中给出本地开发示例，但 `deploy/systemd/bingwall.env.example` 仍未预填这些键；如目标机需要显式关闭 NASA APOD、替换 API Key 或调整其超时 / 重试参数，需在 `/etc/bingwall/bingwall.env` 中手工补充
+- `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT` 当前会被应用配置模型、`make run` 和 `deploy/systemd/bingwall-api.service` 共同使用；当前生产模板默认口径是 `127.0.0.1:8000`
+- `deploy/nginx/bingwall.conf` 当前默认把 upstream 指向 `127.0.0.1:8000`；若生产环境需要改监听地址或端口，必须同步修改 `/etc/bingwall/bingwall.env` 与上游代理的转发目标；若使用仓库内 Docker `nginx` 备用方案，再同步修改实际挂载的 `bingwall.conf`
+- `deploy/systemd/bingwall.env.example` 现在已与 `.env.example` 对齐，预填 `BINGWALL_COLLECT_NASA_APOD_*` 默认键；生产环境不使用该来源时，建议显式设置 `BINGWALL_COLLECT_NASA_APOD_ENABLED=false`
+- `BINGWALL_COLLECT_NASA_APOD_API_KEY` 在模板中仍保留 `DEMO_KEY` 仅用于占位；真实生产环境应替换为有效 NASA API Key，或直接关闭该来源
+- `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_*` 属于一次性引导配置；首次成功初始化管理员后，建议从生产环境文件中移除，降低误用与暴露风险
+- `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 只在 `storage_backend = oss` 场景填写；本地文件存储场景不要写成空字符串，而应保持未设置
 
 ### Bing 采集配置补充
 
@@ -234,18 +244,19 @@
 ### Playwright 浏览器冒烟测试
 
 - 脚本位置：`scripts/dev/playwright_smoke.js`
+- Node 测试入口：`npm test`
 - 带后台登录账号的示例模板：`scripts/dev/playwright_smoke_with_admin.example.sh`
-- 默认前提：先执行 `make run`，确保本地服务已监听在 `127.0.0.1:30003`
+- 默认前提：先执行 `npm ci`、`npm test`，再通过 `bash scripts/dev/run-api.sh` 或 `make run` 启动本地服务；默认本地监听口径为 `127.0.0.1:30003`
 - 统一入口：`make browser-smoke`
 - 等价入口：`node scripts/dev/playwright_smoke.js`、`npm run browser-smoke`
 - 带后台登录账号的模板入口：`bash scripts/dev/playwright_smoke_with_admin.example.sh`
 - 可选环境变量：
-  - `BINGWALL_BROWSER_BASE_URL`：改写默认访问地址
+  - `BINGWALL_BROWSER_BASE_URL`：改写默认访问地址；未设置时优先回退到 `BINGWALL_APP_BASE_URL`
   - `BINGWALL_BROWSER_HEADLESS=false`：切换到非无头模式
   - `BINGWALL_ADMIN_USERNAME`、`BINGWALL_ADMIN_PASSWORD`：启用真实后台登录验证
 - 当前脚本默认覆盖公开首页、公开列表筛选、壁纸详情页和后台登录页壳；若提供后台账号，还会继续验证后台登录跳转
-- 若本机缺少 Playwright Node 模块，可先执行 `npm install --no-save playwright`
-- 若本机尚未下载 Chromium，可执行 `npx playwright install chromium`
+- `npm ci` 会安装锁定版本的 Playwright 依赖，不需要再手工追加 `npm install --no-save playwright`
+- 若当前环境跳过了浏览器下载，或本机浏览器缓存已被清理，可执行 `npx playwright install chromium`
 - Ubuntu 24.04 若浏览器启动缺 GTK 运行库，优先安装 `libgtk-3-0t64`；旧版发行版对应包名通常为 `libgtk-3-0`
 - `cron` 安装脚本：`scripts/install_cron.py`
 
@@ -268,19 +279,23 @@
 
 - 验收脚本默认把 Nginx 监听端口改写到临时本地端口 `18080`，避免占用真实 `80` 端口
 - 验收脚本不会修改 `/etc/systemd/system`、`/etc/nginx`、`/etc/tmpfiles.d`
-- 真实目标机上线前，仍需按本文件的生产步骤安装正式服务配置和真实 Nginx 配置
+- 若要在新的目标机复制部署，仍需按本文件的生产步骤安装正式服务配置，并在 Nginx Proxy Manager、等价反向代理或已评估的公网端口方案中完成真实入口配置
 
 ### 生产环境最小启动步骤
 
 1. 把仓库代码部署到 `/opt/bingwall/app`
 2. 使用 `uv python install 3.14` 与 `uv sync --python 3.14 --frozen --no-dev` 准备生产虚拟环境
 3. 复制 `deploy/systemd/bingwall.env.example` 到 `/etc/bingwall/bingwall.env`，替换域名、会话密钥和实际路径；仅在资源使用 `storage_backend = oss` 时设置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`
-   当前若需要显式配置 NASA APOD 采集参数，还需手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
+   若启用 NASA APOD，需把模板中的 `BINGWALL_COLLECT_NASA_APOD_API_KEY=DEMO_KEY` 替换为真实值；若不启用，则显式设置 `BINGWALL_COLLECT_NASA_APOD_ENABLED=false`
+   若仅用于首次初始化管理员，可临时取消注释 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`，并在引导成功后移除
 4. 使用 `set -a && source /etc/bingwall/bingwall.env && set +a` 导入环境后执行 `uv run --no-sync python -m app.repositories.migrations`
-5. 安装 `deploy/systemd/bingwall-api.service`、`deploy/systemd/bingwall.tmpfiles.conf` 和 `deploy/nginx/bingwall.conf`
-   当前若需修改 FastAPI 监听地址或端口，必须同步修改 `deploy/systemd/bingwall-api.service` 中固定的 `--host/--port`，并同步调整 `deploy/nginx/bingwall.conf` 的 upstream
-6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`、`nginx -t`、`systemctl reload nginx`
-7. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
+5. 安装 `deploy/systemd/bingwall-api.service` 与 `deploy/systemd/bingwall.tmpfiles.conf`
+6. 执行 `systemd-tmpfiles --create`、`systemctl enable --now bingwall-api.service`
+7. 选择对外入口：
+   若目标机已有 Nginx Proxy Manager 或等价反向代理，则把外部访问入口转发到 `127.0.0.1:8000`
+   `Scheme=http`、`Forward Hostname / IP=127.0.0.1`、`Forward Port=8000`
+   若本次部署与 `H5` 当前已验收目标机一致，直接开放公网 `8000/tcp`，则需把 `BINGWALL_APP_HOST=0.0.0.0`，并同步确认云安全组 / 本机防火墙已放行 `8000/tcp`
+8. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
 
 ### 生产环境模板说明
 
@@ -289,9 +304,32 @@
 - 通过 `/etc/bingwall/bingwall.env` 注入受控环境变量
 - 使用 `bingwall` 账号运行应用
 - 通过 `/usr/bin/env uv run --no-sync python ...` 统一走 `uv` 运行入口，并固定 `PATH=/usr/local/bin:/usr/bin:/bin`
-- 当前模板把 `uvicorn` 监听地址固定为 `127.0.0.1:8000`，不会直接读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`
-- 通过 `SupplementaryGroups=www-data` 配合正式资源目录权限，保证应用写入、Nginx 读取
+- 当前模板会直接读取 `BINGWALL_APP_HOST` 与 `BINGWALL_APP_PORT`；生产默认口径是 `127.0.0.1:8000`
+- 正式资源目录继续使用 `bingwall:www-data` 和 `2750`；应用依赖目录属主写入，目录上的 `setgid` 负责让新文件继承 `www-data`，供 Nginx 读取
 - 采用 `Restart=on-failure`，在进程异常退出后自动重启
+- 当前模板已启用 `ProtectSystem=strict`，并仅通过 `ReadWritePaths=/var/lib/bingwall /var/log/bingwall /etc/bingwall` 放行数据库、图片、日志和受控配置目录写入
+- 当前模板已额外启用 `RemoveIPC`、`PrivateDevices`、`ProtectClock`、`ProtectControlGroups`、`ProtectKernelLogs`、`ProtectKernelModules`、`ProtectKernelTunables`、`ProtectProc=invisible`、`ProcSubset=pid`、`RestrictNamespaces`、`RestrictSUIDSGID`、`LockPersonality`、`RestrictRealtime`、`SystemCallArchitectures=native` 与空 `CapabilityBoundingSet`，用于收紧设备、内核接口、命名空间和进程可见性
+- 当前模板保留 `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6`，只允许本地 socket 与常规 IPv4 / IPv6 网络访问；不要在未评估采集链路前启用 `PrivateNetwork=true`
+- 以当前模板执行 `systemd-analyze security --offline=yes deploy/systemd/bingwall-api.service`，离线暴露评分基线应降到约 `2.8`；如果后续新增运行时能力，应重新评估这些沙箱约束是否仍然成立
+
+#### 反向代理推荐口径
+
+- 真实目标机优先复用现成的 Nginx Proxy Manager 或等价反向代理，不再额外为 BingWall 单独长驻一个 `nginx` 容器
+- 推荐把 Proxy Host 转发到 `127.0.0.1:8000`
+- 公开页面、后台页面、公开 API、后台 API、`/assets/*`、`/admin-assets/*` 与 `/images/*` 都继续由 `bingwall-api` 提供，反向代理只负责入口转发
+- 若未来启用 HTTPS、访问控制或来源 IP 限制，应优先在现有代理层实施，而不是在应用服务模板里额外堆叠一层 `nginx`
+- 当前 `H5` 已验收目标机 `139.224.235.228` 暂未复用代理层，而是直接暴露 `http://139.224.235.228:8000`；该形态可作为最小公网入口记录，但不改变仓库对“优先复用现成代理层”的推荐
+- 若目标机没有现成反向代理，可再启用 [deploy/systemd/bingwall-nginx.service](/home/ops/Projects/BingWall/deploy/systemd/bingwall-nginx.service) 作为备用方案
+
+#### `deploy/systemd/bingwall-nginx.service`（备用）
+
+- 该模板仅在目标机没有现成反向代理、但仍希望以容器方式长驻 `nginx` 时使用
+- 以系统级 `systemd` 托管 `Docker` 容器中的 `nginx:1.27-alpine`
+- 固定容器名 `bingwall-nginx`，便于执行 `docker ps`、`docker logs` 与 `docker exec`
+- 使用 `--network host` 暴露 `80` 端口，避免额外维护端口映射和容器内外地址转换
+- 挂载 `/etc/bingwall/nginx/bingwall.conf` 作为容器内 `/etc/nginx/conf.d/default.conf`
+- 挂载 `/var/lib/bingwall/images/public` 与 `/opt/bingwall/app/web/public/assets`，让代理容器直接提供图片与前端静态资源
+- 通过 `Requires=docker.service bingwall-api.service` 与 `Restart=always` 保证应用服务和代理容器的启动顺序与长期驻留行为
 
 #### `deploy/systemd/bingwall.tmpfiles.conf`
 
@@ -302,13 +340,16 @@
 - 如启用 OSS/CDN 公网访问，需要配置 `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL`，例如 `https://cdn.example.com/bingwall`
 - 如需调整 Bing 手动/定时采集覆盖的地区，可在环境文件中设置 `BINGWALL_COLLECT_BING_MARKETS=zh-CN,en-US,ja-JP,en-GB,de-DE,fr-FR,en-CA,en-AU`
 - 如需调整 Bing 定时采集回溯窗口，可把 `BINGWALL_COLLECT_BING_SCHEDULED_BACKTRACK_DAYS` 设为 `3`、`5` 或 `7`
-- 如需显式配置 NASA APOD 采集开关、API Key、超时或重试参数，需要在生产环境文件中手工补充 `BINGWALL_COLLECT_NASA_APOD_*`
-- 如需首次自动创建后台管理员，可在环境文件中配置 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
+- 生产模板已预填 `BINGWALL_COLLECT_NASA_APOD_*` 默认值；若继续启用该来源，应替换真实 API Key，若不需要则显式关闭
+- 如需首次自动创建后台管理员，可在环境文件中取消注释 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_USERNAME` 与 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD`；`make db-migrate` 仅会在 `admin_users` 为空时创建一个启用中的 `super_admin`
+- 引导管理员创建成功后，建议从生产环境文件中移除 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_*`，避免后续迁移时重复携带一次性敏感值
 - 如需保留“采集后先人工审核再发布”的旧策略，可在环境文件中把 `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED=false`
 
 #### `deploy/nginx/bingwall.conf`
 
-- `/api/` 反向代理到 `127.0.0.1:8000`
+- 该模板主要供仓库内 Docker `nginx` 备用方案挂载到容器内的 `/etc/nginx/conf.d/default.conf`
+- 默认 upstream 指向 `127.0.0.1:8000`，应与 `/etc/bingwall/bingwall.env` 中的 `BINGWALL_APP_HOST` / `BINGWALL_APP_PORT` 保持一致
+- `/api/` 反向代理到该 upstream
 - `/` 代理公开页面
 - `/assets/` 直接读取前端静态资源
 - `/images/` 直接读取正式资源目录，不暴露磁盘真实路径给浏览器
@@ -340,10 +381,51 @@
 5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
 6. 观察 `/var/log/bingwall/create-scheduled-collection-tasks.log`、`consume-collection-tasks.log`、`inspect-resources.log`、`archive-wallpapers.log` 与 `backup.log`，确认首轮计划任务结果
 
-当前目标机仍需补齐：
+当前已记录的目标机首轮闭环结果：
 
-- 执行一次真实目标机安装并确认首轮任务运行
-- 生产机日志轮转确认
+- `H4` 首轮 `cron` 闭环验证已根据 `2026-04-04` 目标机执行报告回写到仓库，记录文件见 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
+- 当前已验收目标机实际使用 `ubuntu` 用户在 `/home/ubuntu/BingWall` 直接部署，`cron` 安装路径、备份目录与仓库推荐的 `/opt/bingwall/app` 口径存在差异
+- 当前生产机仍建议补齐日志轮转、最小告警与运维执行记录模板
+
+### H5 已验收目标机记录
+
+- 验收日期：`2026-04-04`
+- 目标机：阿里云 Ubuntu，公网 IP `139.224.235.228`
+- 当前公网入口：`http://139.224.235.228:8000`
+- 当前部署形态：`systemd` 长驻 `uvicorn`，由应用直接监听公网 `8000/tcp`
+- 目标机执行记录：应用状态为“运行中”，`bingwall-api.service` 为 `active` 且 `enabled`
+- 本次会话外部复核结果：
+  - `curl -I http://139.224.235.228:8000/` 返回 `HTTP/1.1 200 OK`
+  - `curl http://139.224.235.228:8000/api/health/live` 返回 `{"status":"ok", ...}`
+  - `curl http://139.224.235.228:8000/api/public/site-info` 返回 `site_name = "BingWall"`
+  - `curl -I http://139.224.235.228:8000/images/bing/2026/04/03_OHR.GrouseGuff_ZH-CN2647001885_preview_1600x900.jpg` 返回 `HTTP/1.1 200 OK`
+  - `curl -I http://139.224.235.228:8000/admin/login` 返回 `HTTP/1.1 200 OK`
+
+说明：
+
+- 上述公网访问结果已由当前会话直接复核
+- `systemctl status` 与开机自启状态来自目标机部署记录，当前会话未直接登录目标机执行
+- 若后续要把这台机器收敛回仓库推荐口径，可把应用监听改回 `127.0.0.1:8000`，再由 Nginx Proxy Manager 或等价反向代理接管公网入口
+
+### H4 首轮 cron 闭环记录
+
+- 记录日期：`2026-04-04`
+- 记录来源：目标机执行报告回写；当前会话未直接登录目标机复核
+- 记录文件：[docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
+- 当前目标机实际口径：
+  - 应用目录：`/home/ubuntu/BingWall`
+  - 服务用户：`ubuntu`
+  - `uv` 路径：`/home/ubuntu/.local/bin/uv`
+  - 备份目录：`/home/ubuntu/BingWall/var/backups`
+  - 深度健康检查地址：`http://127.0.0.1:8000/api/health/deep`
+- 验收摘要：
+  - 已安装 5 条 BingWall `cron` 任务，并备份旧 `crontab` 到 `/var/log/bingwall/crontab.backup.20260404T091149Z.txt`
+  - `create-scheduled-collection-tasks` 首轮成功创建 `9` 个任务，其中 `8` 个 Bing 市场任务、`1` 个 `NASA APOD` 任务
+  - `consume-collection-tasks --max-tasks 5` 首轮成功处理 `5` 个任务，累计成功下载 `9` 张图片
+  - `run_resource_inspection.py` 已巡检 `20` 个资源，`missing_resource_count = 0`
+  - `run_wallpaper_archive.py` 成功执行，当前新部署环境无历史资源需要归档
+  - `run_backup.py --skip-nginx --skip-tmpfiles` 已产出 `backup-20260404T094004Z-d0172fd9/manifest.json`
+  - `curl -sS http://127.0.0.1:8000/api/health/deep` 返回 `status = healthy`
 
 ### 健康检查
 
@@ -439,7 +521,7 @@
 
 1. 执行 `make backup`，确认最新快照目录已生成 `manifest.json`
 2. 如需先做隔离演练，执行 `make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1`
-3. 如需原位恢复，执行 `uv run --no-sync python scripts/run_restore.py --snapshot /var/backups/bingwall/<snapshot> --database-path /var/lib/bingwall/data/bingwall.sqlite3 --public-dir /var/lib/bingwall/images/public --config-dir /etc/bingwall --log-dir /var/log/bingwall --backup-dir /var/backups/bingwall --nginx-config-path /etc/nginx/sites-available/bingwall.conf --systemd-service-path /etc/systemd/system/bingwall-api.service --tmpfiles-config-path /etc/tmpfiles.d/bingwall.conf --force`
+3. 如需原位恢复，执行 `uv run --no-sync python scripts/run_restore.py --snapshot /var/backups/bingwall/<snapshot> --database-path /var/lib/bingwall/data/bingwall.sqlite3 --public-dir /var/lib/bingwall/images/public --config-dir /etc/bingwall --log-dir /var/log/bingwall --backup-dir /var/backups/bingwall --nginx-config-path <proxy-config-path> --systemd-service-path /etc/systemd/system/bingwall-api.service --tmpfiles-config-path /etc/tmpfiles.d/bingwall.conf --force`
 4. 恢复完成后启动或重启应用与代理服务
 5. 执行 `curl http://127.0.0.1/api/health/deep`
 6. 执行 `make inspect-resources`
@@ -452,7 +534,7 @@
 
 - 配置文件已审查
 - 数据目录和权限已创建
-- Nginx 路由已校验
+- 反向代理入口已校验
 - `systemd` 服务已可启动
 - 公开页面、公开 API 和静态资源可访问
 - `README.md` 中存在可复制启动说明
@@ -461,7 +543,7 @@
 
 1. 在仓库根目录执行 `make verify-deploy`
 2. 在目标机按本文件“生产环境最小启动步骤”安装正式服务
-3. 在目标机执行 `nginx -t`
+3. 在目标机确认公网入口方案已生效：若使用 Nginx Proxy Manager 或等价反向代理，则 Proxy Host 已指向 `127.0.0.1:8000`；若直接开放公网端口，则确认 `8000/tcp` 已放行且 `BINGWALL_APP_HOST=0.0.0.0`
 4. 执行 `curl http://127.0.0.1/api/health/live`
 5. 执行 `curl http://127.0.0.1/api/health/ready`
 6. 执行 `curl http://127.0.0.1/api/health/deep`
@@ -470,14 +552,14 @@
 9. 如已有正式资源，执行 `curl -I http://127.0.0.1/images/<正式资源相对路径>`
 10. 执行 `make inspect-resources`
 11. 执行 `make archive-wallpapers`
-12. 观察 `journalctl -u bingwall-api.service` 与 `/var/log/bingwall/nginx.access.log`
+12. 观察 `journalctl -u bingwall-api.service`，并确认代理访问日志或公网探测结果正常
 
 ### 完整上线检查（阶段二目标）
 
 - 配置文件已审查
 - 数据目录和权限已创建
 - 日志目录和备份目录已创建
-- Nginx 路由已校验
+- 反向代理入口已校验
 - `systemd` 服务已可启动
 - cron 已加载
 - 健康检查可访问
@@ -487,11 +569,13 @@
 
 ## 11. 当前已知缺口
 
-- 尚未完成目标机执行 `make install-cron` 后的首轮运行确认
+- 尚未完成最小告警方案与真实测试通知
+- 尚未形成可复用的运维执行记录模板
+- 尚未确认生产机日志轮转策略
 
 补充说明：
 
-- 当前仓库已通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成 `T1.6` 自动化验收
-- 目标机仍需执行真实 Nginx 包安装、systemd 服务安装和公网域名接入，这些属于部署执行动作，不再阻塞阶段一验收
+- 当前仓库已通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成 `T1.6` 自动化验收；该 Docker 代理链路主要用于模板验证与无现成代理时的备用方案
+- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成，`H4` 首轮 `cron` 闭环记录也已在同日回写到仓库；当前剩余缺口集中在告警、运维记录模板与日志轮转等标准化工作
 
 这些缺口必须在阶段一和阶段二实施中逐项关闭。

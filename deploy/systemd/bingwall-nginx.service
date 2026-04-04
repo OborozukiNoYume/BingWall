@@ -1,0 +1,18 @@
+[Unit]
+Description=BingWall nginx proxy container
+After=network-online.target docker.service bingwall-api.service
+Wants=network-online.target docker.service
+Requires=docker.service bingwall-api.service
+
+[Service]
+Type=simple
+ExecStartPre=-/usr/bin/docker rm -f bingwall-nginx
+ExecStart=/usr/bin/docker run --name bingwall-nginx --rm --network host -v /etc/bingwall/nginx/bingwall.conf:/etc/nginx/conf.d/default.conf:ro -v /var/lib/bingwall/images/public:/var/lib/bingwall/images/public:ro -v /opt/bingwall/app/web/public/assets:/opt/bingwall/app/web/public/assets:ro nginx:1.27-alpine
+ExecStop=/usr/bin/docker stop bingwall-nginx
+Restart=always
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

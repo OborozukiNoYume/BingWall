@@ -20,6 +20,7 @@ def test_public_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
 
     with build_client(tmp_path) as client:
         home_response = client.get("/")
+        home_head_response = client.head("/")
         list_response = client.get("/wallpapers?page=2&market_code=en-US")
         detail_response = client.get(f"/wallpapers/{wallpaper_id}")
 
@@ -29,6 +30,7 @@ def test_public_frontend_shell_routes_return_html_pages(tmp_path: Path) -> None:
     assert 'src="/assets/site.js"' in home_response.text
     assert "/api/public/wallpapers/today" in home_response.text
     assert "/api/public/wallpapers/random" in home_response.text
+    assert home_head_response.status_code == 200
 
     assert list_response.status_code == 200
     assert 'data-page="list"' in list_response.text
