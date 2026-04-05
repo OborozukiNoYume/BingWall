@@ -1,5 +1,43 @@
 # CHANGELOG
 
+## 2026-04-05T05:47:44Z
+
+### 变更内容
+
+- 新增 [scripts/benchmark_public_queries.py](/home/ops/Projects/BingWall/scripts/benchmark_public_queries.py)，为公开列表与后台内容列表生成代表性 SQLite 样本，并输出 `P50`、`P95`、`P99`、升级阈值判断和当前 `FTS` 建议
+- 新增 [docs/benchmark-report.md](/home/ops/Projects/BingWall/docs/benchmark-report.md)，固化本轮 `12,000` 条壁纸样本下的实际基线结果、样本规模与索引 / `FTS` 触发条件
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，将 `L2` 从未完成调整为已完成，并补齐性能基线文档入口
+
+### 变更原因
+
+- 你要求“推进 L2”，并明确要求先阅读 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)
+- `L2` 在整改清单中的要求是补齐“基准脚本、报告文档与升级阈值记录”，此前仓库里只有一条 `30` 条样本的集成测试，缺少可独立复跑的性能基线
+- 需要把“当前是否要加索引或引入 `FTS`”从经验判断改成有样本规模、有阈值、有最新结果的文档化结论
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T05:47:44Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [scripts/benchmark_public_queries.py](/home/ops/Projects/BingWall/scripts/benchmark_public_queries.py)、[docs/benchmark-report.md](/home/ops/Projects/BingWall/docs/benchmark-report.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 本次未改动公开 API、后台 API、SQLite schema 或现有索引；当前仅新增离线基准入口和文档化阈值
+- 更新后，仓库内不再继续保留“`L2` 未完成，但已经具备可复跑基准脚本和报告”的冲突口径
+
+### 验证步骤
+
+- 执行 `uv run python scripts/benchmark_public_queries.py`
+- 执行 `rg -n "P50|P95|P99|升级阈值|FTS" docs/benchmark-report.md`
+- 执行 `rg -n "L2|benchmark-report|性能基线" docs/remediation-checklist.md docs/README.md README.md PROJECT_STATE.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [docs/benchmark-report.md](/home/ops/Projects/BingWall/docs/benchmark-report.md) 与 [scripts/benchmark_public_queries.py](/home/ops/Projects/BingWall/scripts/benchmark_public_queries.py)，并恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“搜索只靠零散测试与经验判断，没有统一基线脚本和升级阈值”的状态
+
 ## 2026-04-05T03:46:34Z
 
 ### 变更内容
