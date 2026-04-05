@@ -25,6 +25,7 @@ def set_valid_env() -> None:
     os.environ["BINGWALL_STORAGE_FAILED_DIR"] = "./var/images/failed"
     os.environ["BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL"] = "https://cdn.example.com/bingwall"
     os.environ["BINGWALL_BACKUP_DIR"] = "./var/backups"
+    os.environ["BINGWALL_ALERT_SERVERCHAN_SENDKEY"] = "serverchan-test-sendkey"
     os.environ["BINGWALL_COLLECT_BING_ENABLED"] = "true"
     os.environ["BINGWALL_COLLECT_BING_DEFAULT_MARKET"] = "en-US"
     os.environ["BINGWALL_COLLECT_BING_MARKETS"] = "en-US,zh-CN,ja-JP"
@@ -70,6 +71,8 @@ def test_settings_load_valid_configuration() -> None:
     assert settings.collect_bing_max_download_retries == 3
     assert settings.collect_auto_publish_enabled is True
     assert str(settings.storage_oss_public_base_url) == "https://cdn.example.com/bingwall"
+    assert settings.alert_serverchan_sendkey is not None
+    assert settings.alert_serverchan_sendkey.get_secret_value() == "serverchan-test-sendkey"
     assert settings.security_session_ttl_hours == 12
 
     clear_bingwall_env()
@@ -106,6 +109,19 @@ def test_settings_use_fixed_eight_bing_markets_by_default() -> None:
         "en-CA",
         "en-AU",
     )
+
+    clear_bingwall_env()
+
+
+def test_settings_allow_missing_serverchan_sendkey() -> None:
+    clear_bingwall_env()
+    set_valid_env()
+    os.environ.pop("BINGWALL_ALERT_SERVERCHAN_SENDKEY", None)
+    reset_settings_cache()
+
+    settings = load_settings()
+
+    assert settings.alert_serverchan_sendkey is None
 
     clear_bingwall_env()
 

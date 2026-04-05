@@ -1,5 +1,151 @@
 # CHANGELOG
 
+## 2026-04-05T03:32:52Z
+
+### 变更内容
+
+- 更新 [`.env.example`](/home/ops/Projects/BingWall/.env.example) 与 [deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example)，把 `BINGWALL_SITE_DESCRIPTION` 统一改为带引号的 shell-safe 赋值形式，避免直接 `source` 环境文件时因中文空格被 shell 拆词
+
+### 变更原因
+
+- 你要求把环境文件统一整理成可被 Shell 安全 `source` 的格式
+- 本地 [`.env`](/home/ops/Projects/BingWall/.env) 已先行修正，但两个示例环境文件仍保留未加引号的中文值
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T03:32:52Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [`.env.example`](/home/ops/Projects/BingWall/.env.example)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 配置键名与默认语义保持不变；仅调整 shell 解析安全性
+
+### 验证步骤
+
+- 执行 `bash -lc 'set -a && . ./.env && set +a && printf "%s\n" "$BINGWALL_SITE_DESCRIPTION"'`
+- 执行 `bash -lc 'set -a && . ./.env.example && set +a && printf "%s\n" "$BINGWALL_SITE_DESCRIPTION"'`
+- 执行 `bash -lc 'set -a && . ./deploy/systemd/bingwall.env.example && set +a && printf "%s\n" "$BINGWALL_SITE_DESCRIPTION"'`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [`.env.example`](/home/ops/Projects/BingWall/.env.example)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，这两个示例环境文件会重新回到“可被 Python 配置读取，但不适合直接被 shell `source`”的状态
+
+## 2026-04-05T03:27:43Z
+
+### 变更内容
+
+- 更新 [app/core/config.py](/home/ops/Projects/BingWall/app/core/config.py)，新增可选配置 `BINGWALL_ALERT_SERVERCHAN_SENDKEY`，让后续告警脚本或手工测试可通过 `.env` / 受控环境文件读取 Server 酱 key，而不是把密钥写死到脚本或文档里
+- 更新 [tests/unit/test_config.py](/home/ops/Projects/BingWall/tests/unit/test_config.py)，补充 Server 酱 key 存在与缺失两种配置加载断言
+- 更新 [.env.example](/home/ops/Projects/BingWall/.env.example)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example) 与 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，统一改为通过 `BINGWALL_ALERT_SERVERCHAN_SENDKEY` 注入 Server 酱 key，并明确该密钥只应保存在本地 `.env` 或目标机 `/etc/bingwall/bingwall.env`
+
+### 变更原因
+
+- 你要求“server 酱 key 填到 `.env`，不要写死到配置里”
+- 当前仓库已经完成 Server 酱真实测试通知，但此前文档示例仍以 `<sendkey>` 直接拼接 URL 为主，配置模型里也没有对应环境变量键名
+- 需要把密钥入口显式收敛到环境变量，降低后续把真实 key 写进脚本、命令历史或仓库文件的风险
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T03:27:43Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [app/core/config.py](/home/ops/Projects/BingWall/app/core/config.py)、[tests/unit/test_config.py](/home/ops/Projects/BingWall/tests/unit/test_config.py)、[.env.example](/home/ops/Projects/BingWall/.env.example)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 本地工作区 `.env` 已补入真实 Server 酱 key，但该文件未加入本次 git 变更清单
+- 现有业务代码与部署行为不变；本次只新增了一个可选配置入口并统一了文档口径
+
+### 验证步骤
+
+- 执行 `uv run -m pytest tests/unit/test_config.py -q`
+- 执行 `rg -n "BINGWALL_ALERT_SERVERCHAN_SENDKEY" app/core/config.py .env.example deploy/systemd/bingwall.env.example docs/deployment-runbook.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [app/core/config.py](/home/ops/Projects/BingWall/app/core/config.py)、[tests/unit/test_config.py](/home/ops/Projects/BingWall/tests/unit/test_config.py)、[.env.example](/home/ops/Projects/BingWall/.env.example)、[deploy/systemd/bingwall.env.example](/home/ops/Projects/BingWall/deploy/systemd/bingwall.env.example)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“Server 酱 key 没有显式环境变量入口，只能靠手工拼接 URL”的状态
+
+## 2026-04-05T03:23:33Z
+
+### 变更内容
+
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，把 `M4` 的具体通道收口为 Server 酱，并补记 `2026-04-05` 的真实测试通知结果
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，将 `M4` 从 `todo` 调整为 `done`，并补充真实测试通知的完成记录
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[README.md](/home/ops/Projects/BingWall/README.md) 与 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，同步当前剩余运维缺口为“执行记录模板、日志轮转”
+
+### 变更原因
+
+- 你提供了 Server 酱测试 key，要求继续完成 `M4`
+- 当前会话已实际调用 Server 酱 `.send` 接口完成一次真实测试通知，并通过查询接口确认 `wxstatus` 返回成功
+- 因此 `M4` 的验收条件“已有明确告警渠道与触发条件，且至少完成 1 次真实测试通知”已满足
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T03:23:33Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码与部署模板未发生变化；本次只补齐真实通知测试结果和文档状态
+- 仓库内未写入真实 SENDKEY，仅记录通道类型和测试结果摘要
+
+### 验证步骤
+
+- 执行 `curl -sS -X POST "https://sctapi.ftqq.com/<sendkey>.send" ...`
+- 执行 `curl -sS "https://sctapi.ftqq.com/push?id=<pushid>&readkey=<readkey>"`
+- 执行 `rg -n "Server 酱|真实测试通知|M4" docs/deployment-runbook.md docs/remediation-checklist.md README.md PROJECT_STATE.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“`M4` 方案已写，但真实测试通知未完成”的状态
+
+## 2026-04-05T03:11:02Z
+
+### 变更内容
+
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，新增“最小告警方案（M4）”章节，明确当前阶段采用“运维值班群 Webhook + 外层巡检/监控”的最小落地口径，并补充触发矩阵、推荐检查命令、值班处理步骤与 Webhook 真实测试通知要求
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，把 `M4` 的仓库内完成度改写为“方案已文档化、真实测试通知待完成”，避免继续把该项写成“只有阈值建议”
+- 更新 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[README.md](/home/ops/Projects/BingWall/README.md) 与 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，同步当前剩余运维缺口口径为“告警真实测试通知、运维执行记录模板、日志轮转”
+
+### 变更原因
+
+- 你要求“执行 `M4`”
+- 当前仓库虽然已有健康检查、备份、`cron` 和磁盘阈值等可观测基础，但运维文档仍缺失明确告警渠道、触发矩阵和值班步骤，`M4` 只能算“部分完成”
+- 由于当前仓库内没有真实 Webhook URL 或其他可直接触发的告警目标，本次只能先完成仓库内文档收口，不能伪造“真实测试通知已完成”的结果
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T03:11:02Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、部署模板、测试链路与目标机运行状态均未被当前改动直接改变；本次仅收口运维文档与任务状态描述
+- 更新后，仓库内不再同时出现“`M4` 目标是明确告警方案”和“实际仍未指定渠道/触发矩阵”的冲突描述，但 `M4` 仍不能视为完全验收通过
+
+### 验证步骤
+
+- 执行 `rg -n "最小告警方案|Webhook|触发矩阵|值班处理步骤|真实测试通知" docs/deployment-runbook.md docs/remediation-checklist.md`
+- 执行 `rg -n "真实测试通知|Webhook" README.md PROJECT_STATE.md docs/README.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“只有监控阈值建议、尚未明确最小告警渠道和触发矩阵”的旧状态
+
 ## 2026-04-04T18:50:37Z
 
 ### 变更内容
