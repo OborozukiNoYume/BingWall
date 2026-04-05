@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T03:23:33Z
+- 更新时间：2026-04-05T03:46:34Z
 - 来源：`2026-04-04` 项目评估结论
 - 文档定位：按优先级输出整改任务、依赖关系与验收命令
 - 适用范围：当前一期单机架构仓库与目标部署环境
@@ -31,7 +31,7 @@
 | `M2` | 把部署验收纳入自动化 | `done` | 已完成（仓库） | 已新增独立 `Verify Deploy` workflow 和 runner 统一入口脚本，可在带 `bingwall-deploy` 标签的远端 runner 上执行 `make verify-deploy` |
 | `M3` | 同步项目状态文档 | `done` | 已完成 | `H4` / `H5` 相关口径已同步到 README、部署文档、项目状态、文档索引与变更记录 |
 | `M4` | 明确最小告警方案 | `done` | 已完成 | 已在运行手册明确 Webhook 渠道、触发矩阵和值班步骤，并已通过 Server 酱完成 1 次真实测试通知 |
-| `M5` | 为关键运维动作补执行记录模板 | `todo` | 未完成 | 仓库内尚未沉淀部署、恢复演练、`cron` 首轮验证等固定记录模板 |
+| `M5` | 为关键运维动作补执行记录模板 | `done` | 已完成（仓库） | 已新增固定模板文档，覆盖部署、恢复演练、`cron` 首轮验证、域名切换与回滚场景 |
 | `L1` | 拆分超大模块 | `todo` | 未完成 | 仍存在明显大文件，例如 `web/admin/assets/admin.js` |
 | `L2` | 建立搜索与查询性能基线 | `todo` | 未完成 | 还没有基准脚本、报告文档与升级阈值记录 |
 | `L3` | 设计密码算法升级路径 | `todo` | 未完成 | 当前仅记录现状为 `pbkdf2_sha256`，尚无兼容迁移设计文档 |
@@ -268,11 +268,12 @@ curl -sS -X POST "<webhook-url>" \
 
 ### M5 为关键运维动作补执行记录模板
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：已新增 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)，并在 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 中补充模板使用入口与记录要求
 - 前置依赖：`H4`、`H5`
 - 阻塞后续：无
 - 目标：为部署、恢复演练、cron 首轮验证、域名切换等关键动作建立固定记录模板，降低后续交接和复盘成本
-- 交付物：执行记录模板文档，建议补充到 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 或新增配套文档
+- 交付物：执行记录模板文档 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)，以及 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md) 中的使用说明
 - 验收命令：
 
 ```bash

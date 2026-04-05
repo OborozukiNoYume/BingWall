@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-04-05T03:46:34Z
+
+### 变更内容
+
+- 新增 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)，沉淀部署、恢复演练、`cron` 首轮验证、域名切换与回滚四类关键运维动作的固定记录模板，并统一必填字段为时间、操作者、环境、命令、结果、风险与回滚点
+- 更新 [docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)，新增 `M5` 模板入口与使用要求，并把当前剩余运维缺口收敛为“日志轮转”
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)，将 `M5` 从未完成调整为已完成，并同步模板文档入口
+
+### 变更原因
+
+- 你要求“执行 M5”
+- 当前仓库虽然已有 `H4` 的真实目标机记录样例，但还没有可直接复用的固定模板，后续部署、恢复演练、域名切换与回滚仍缺少统一记录格式
+- 需要把模板补齐并同步回写状态文档，避免仓库内继续保留“`M5` 未完成”的旧口径
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T03:46:34Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 仓库业务代码、部署模板和目标机运行状态未被本次修改直接改变；本次仅补齐文档模板与任务状态
+- 更新后，仓库内不再同时出现“`M5` 未完成”和“已有固定模板文档”的冲突描述
+
+### 验证步骤
+
+- 执行 `rg -n "部署记录|恢复演练记录|cron 首轮验证记录|回滚记录" docs/operations-record-templates.md docs/deployment-runbook.md docs/remediation-checklist.md`
+- 执行 `rg -n "operations-record-templates|M5|日志轮转" README.md PROJECT_STATE.md docs/README.md docs/deployment-runbook.md docs/remediation-checklist.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可恢复 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“只有 `H4` 单个样例记录、但没有统一运维记录模板”的状态
+
 ## 2026-04-05T03:32:52Z
 
 ### 变更内容

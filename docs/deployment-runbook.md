@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T03:27:43Z
+- 更新时间：2026-04-05T03:46:34Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -390,7 +390,7 @@
 
 - `H4` 首轮 `cron` 闭环验证已根据 `2026-04-04` 目标机执行报告回写到仓库，记录文件见 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
 - 当前已验收目标机实际使用 `ubuntu` 用户在 `/home/ubuntu/BingWall` 直接部署，`cron` 安装路径、备份目录与仓库推荐的 `/opt/bingwall/app` 口径存在差异
-- 当前生产机仍建议补齐日志轮转与运维执行记录模板
+- 运维执行记录模板已补充到 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)，当前生产机仍建议补齐日志轮转
 
 ### H5 已验收目标机记录
 
@@ -635,7 +635,32 @@ curl -sS -X POST "https://sctapi.ftqq.com/${BINGWALL_ALERT_SERVERCHAN_SENDKEY}.s
 7. 执行 `make archive-wallpapers`
 8. 验证 `curl http://127.0.0.1/`、`curl http://127.0.0.1/api/public/site-info` 和后台登录/后台列表接口
 
-## 10. 上线前检查清单
+## 10. 运维执行记录模板（M5）
+
+当前仓库已把部署、恢复演练、`cron` 首轮验证、域名切换与回滚的固定模板沉淀到 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)。
+
+使用要求：
+
+- 执行关键运维动作前，先复制对应模板到日期化记录文件，例如 `docs/deployment-record-2026-04-06.md`
+- 至少填写时间、操作者、环境、命令、结果、风险、回滚点
+- 未实际执行的步骤必须写明“未执行”或“待验证”，不要补写推测结果
+- 若存在截图、工单或日志文件，应在记录末尾补充附件路径，便于后续交接和复盘
+
+建议优先使用以下模板：
+
+| 场景 | 模板 |
+| --- | --- |
+| 正式部署 / 升级 | `部署记录模板` |
+| 恢复演练 / 故障恢复 | `恢复演练记录模板` |
+| `cron` 首轮闭环 | `cron 首轮验证记录模板` |
+| 域名切换 / 入口迁移 / 紧急回退 | `域名切换与回滚记录模板` |
+
+参考样例：
+
+- 已验收的 `H4` 首轮闭环记录见 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
+- 该样例保留了“仓库推荐口径”和“真实目标机口径”之间的差异说明，可作为后续记录的参考结构
+
+## 11. 上线前检查清单
 
 ### 阶段一公开链路最小检查
 
@@ -674,15 +699,14 @@ curl -sS -X POST "https://sctapi.ftqq.com/${BINGWALL_ALERT_SERVERCHAN_SENDKEY}.s
 - 首次恢复演练可执行
 - 首次手动采集已验证
 
-## 11. 当前已知缺口
+## 12. 当前已知缺口
 
 - 最小告警方案已收敛为“Webhook + 外层巡检/监控”，且已通过 Server 酱完成 1 次真实测试通知；若后续切换正式值班群或轮换密钥，需同步补运维记录
-- 尚未形成可复用的运维执行记录模板
 - 尚未确认生产机日志轮转策略
 
 补充说明：
 
 - 当前仓库已通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成 `T1.6` 自动化验收；该 Docker 代理链路主要用于模板验证与无现成代理时的备用方案
-- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成，`H4` 首轮 `cron` 闭环记录也已在同日回写到仓库；当前剩余缺口集中在告警、运维记录模板与日志轮转等标准化工作
+- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成，`H4` 首轮 `cron` 闭环记录也已在同日回写到仓库；当前剩余缺口集中在日志轮转等标准化工作
 
 这些缺口必须在阶段一和阶段二实施中逐项关闭。
