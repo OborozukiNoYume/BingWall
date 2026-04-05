@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-04-05T05:59:39Z
+
+### 变更内容
+
+- 新增 [docs/password-hash-migration.md](/home/ops/Projects/BingWall/docs/password-hash-migration.md)，基于当前 `app/core/security.py`、`app/services/admin_auth.py` 与 `app/services/admin_bootstrap.py` 的真实实现，补齐管理员密码从 `pbkdf2_sha256` 迁移到 `argon2id` 的兼容读取、渐进重哈希、验证范围与回滚边界
+- 更新 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，将 `L3` 从未完成调整为已完成，并把交付物指向新的迁移设计文档
+- 更新 [docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/system-design.md](/home/ops/Projects/BingWall/docs/system-design.md)、[README.md](/home/ops/Projects/BingWall/README.md) 与 [PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)，补齐该设计文档入口并同步当前状态口径
+
+### 变更原因
+
+- 你要求“推进 L3”，并明确要求先阅读 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)
+- `L3` 在整改清单中的交付物是“迁移设计文档与兼容策略说明”，此前仓库只记录了当前仍使用 `pbkdf2_sha256`，没有成文的兼容迁移与回滚方案
+- 当前登录与改密实现都直接依赖 `app/core/security.py` 的单算法实现，因此需要先把“双读、单写、渐进迁移”的边界写清楚，再进入真实代码改造
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T05:59:39Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/password-hash-migration.md](/home/ops/Projects/BingWall/docs/password-hash-migration.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/system-design.md](/home/ops/Projects/BingWall/docs/system-design.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 本次未修改 `app/core/security.py`、`app/services/admin_auth.py` 或数据库 schema；当前仅补齐设计文档和状态同步
+- 更新后，仓库内不再继续保留“`L3` 未完成，但已经有明确密码哈希迁移方案”的冲突口径
+
+### 验证步骤
+
+- 执行 `rg -n "argon2id|pbkdf2_sha256|兼容验证|渐进迁移|回滚方案" docs`
+- 执行 `rg -n "password-hash-migration|L3|密码哈希升级" docs/remediation-checklist.md docs/README.md README.md PROJECT_STATE.md docs/deployment-runbook.md docs/system-design.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [docs/password-hash-migration.md](/home/ops/Projects/BingWall/docs/password-hash-migration.md)，并恢复 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/system-design.md](/home/ops/Projects/BingWall/docs/system-design.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“只知道当前是 `pbkdf2_sha256`，但缺少成文迁移路径、兼容验证范围和回滚边界”的状态
+
 ## 2026-04-05T05:47:44Z
 
 ### 变更内容

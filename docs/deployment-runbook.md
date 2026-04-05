@@ -113,7 +113,7 @@
 - 当前配置层会对 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 强制执行“至少 `12` 位”校验
 - 当前后台改密接口会校验“当前密码正确”“两次新密码一致”“新旧密码不能相同”，但不会额外强制大小写 / 数字 / 特殊字符复杂度
 - 当前密码摘要算法已固定为 `pbkdf2_sha256`，迭代次数为 `600000`
-- 如需升级到更严格复杂度或 `argon2id`，应视为后续安全增强，不应写成当前已落地能力
+- 如需升级到更严格复杂度或 `argon2id`，应视为后续安全增强，不应写成当前已落地能力；本仓库当前兼容迁移设计见 [docs/password-hash-migration.md](/home/ops/Projects/BingWall/docs/password-hash-migration.md)
 
 #### 建议监控 / 告警阈值（当前未配置化）
 
