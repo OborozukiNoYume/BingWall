@@ -7,7 +7,9 @@ from datetime import datetime
 from datetime import timedelta
 from pathlib import Path
 import sqlite3
+from typing import cast
 
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from app.core.config import reset_settings_cache
@@ -162,10 +164,12 @@ def test_unhandled_500_request_is_recorded_by_metrics_endpoint(tmp_path: Path) -
     ensure_runtime_dirs(tmp_path)
 
     client = build_server_error_client(tmp_path)
+    app = cast(FastAPI, client.app)
 
-    @client.app.get("/__test__/boom")
     def boom() -> None:
         raise RuntimeError("boom")
+
+    app.add_api_route("/__test__/boom", boom, methods=["GET"])
 
     with client:
         error_response = client.get("/__test__/boom")
