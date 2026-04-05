@@ -82,32 +82,52 @@ def test_admin_frontend_assets_only_reference_admin_api_contract(tmp_path: Path)
     prepare_database(tmp_path)
 
     with build_client(tmp_path) as client:
-        js_response = client.get("/admin-assets/admin.js")
+        entry_response = client.get("/admin-assets/admin.js")
+        core_response = client.get("/admin-assets/modules/core.js")
+        auth_response = client.get("/admin-assets/pages/auth.js")
+        wallpapers_response = client.get("/admin-assets/pages/wallpapers.js")
+        tags_response = client.get("/admin-assets/pages/tags.js")
+        tasks_response = client.get("/admin-assets/pages/tasks.js")
+        observability_response = client.get("/admin-assets/pages/observability.js")
         css_response = client.get("/admin-assets/admin.css")
 
-    assert js_response.status_code == 200
-    assert "/api/admin/auth/login" in js_response.text
-    assert "/api/admin/auth/change-password" in js_response.text
-    assert "/api/admin/auth/logout" in js_response.text
-    assert "/api/admin/wallpapers" in js_response.text
-    assert "/api/admin/wallpapers/" in js_response.text
-    assert 'setOptionalParam(params, "keyword", state.keyword)' in js_response.text
-    assert "/api/admin/tags" in js_response.text
-    assert "/api/admin/collection-tasks" in js_response.text
-    assert "/api/admin/collection-tasks/" in js_response.text
-    assert "/consume" in js_response.text
-    assert "/api/admin/download-stats" in js_response.text
-    assert "/api/admin/logs" in js_response.text
-    assert "/api/admin/audit-logs" in js_response.text
-    assert "bindDetailPreviewFallback" in js_response.text
-    assert "默认资源加载失败" in js_response.text
-    assert "打开默认资源地址" in js_response.text
-    assert "逻辑删除" in js_response.text
-    assert "标签管理" in js_response.text
-    assert "修改后台密码" in js_response.text
-    assert "下载统计" in js_response.text
-    assert "立即执行该任务" in js_response.text
-    assert "sqlite" not in js_response.text.lower()
+    assert entry_response.status_code == 200
+    assert 'from "./modules/core.js"' in entry_response.text
+    assert 'from "./pages/auth.js"' in entry_response.text
+
+    assert core_response.status_code == 200
+    assert 'setOptionalParam(params, "keyword", state.keyword)' in core_response.text
+    assert "sqlite" not in core_response.text.lower()
+
+    assert auth_response.status_code == 200
+    assert "/api/admin/auth/login" in auth_response.text
+    assert "/api/admin/auth/change-password" in auth_response.text
+    assert "/api/admin/auth/logout" in auth_response.text
+    assert "修改后台密码" in auth_response.text
+
+    assert wallpapers_response.status_code == 200
+    assert "/api/admin/wallpapers" in wallpapers_response.text
+    assert "/api/admin/wallpapers/" in wallpapers_response.text
+    assert "bindDetailPreviewFallback" in wallpapers_response.text
+    assert "默认资源加载失败" in wallpapers_response.text
+    assert "打开默认资源地址" in wallpapers_response.text
+    assert "逻辑删除" in wallpapers_response.text
+
+    assert tags_response.status_code == 200
+    assert "/api/admin/tags" in tags_response.text
+    assert "标签维护" in tags_response.text
+
+    assert tasks_response.status_code == 200
+    assert "/api/admin/collection-tasks" in tasks_response.text
+    assert "/api/admin/collection-tasks/" in tasks_response.text
+    assert "/consume" in tasks_response.text
+    assert "立即执行该任务" in tasks_response.text
+
+    assert observability_response.status_code == 200
+    assert "/api/admin/download-stats" in observability_response.text
+    assert "/api/admin/logs" in observability_response.text
+    assert "/api/admin/audit-logs" in observability_response.text
+    assert "下载统计" in observability_response.text
 
     assert css_response.status_code == 200
     assert ".border-slate-200" in css_response.text

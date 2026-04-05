@@ -214,7 +214,7 @@ bash scripts/dev/playwright_smoke_with_admin.example.sh
 - 后台内容列表、详情、状态切换和审计查询 schema / repository / service；内容列表支持 `keyword + 状态` 联合检索
 - 启用、禁用和逻辑删除的状态流转校验，以及每次状态变更的审计日志写入
 - `/admin/login`、`/admin`、`/admin/wallpapers`、`/admin/wallpapers/{id}`、`/admin/change-password`、`/admin/audit-logs` 后台页面
-- `web/admin/assets/admin.js` 与 `web/admin/assets/admin.css` 后台静态资源，页面仅通过后台 API 工作
+- `web/admin/assets/admin.js`、`web/admin/assets/pages/*.js`、`web/admin/assets/modules/core.js` 与 `web/admin/assets/admin.css` 后台静态资源，按“入口 / 页面 / 共享工具”拆分，页面仅通过后台 API 工作
 - 后台内容管理、后台页面与公开可见性联动的集成测试
 
 当前 `T2.3` 已补齐内容：
