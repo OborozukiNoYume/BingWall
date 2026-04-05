@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-04T18:50:37Z
+- 更新时间：2026-04-05T03:46:34Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -92,7 +92,7 @@
 | 采集配置 | 来源开关、默认市场、市场列表、定时回溯天数、超时、重试次数 |
 | 安全配置 | 会话密钥、登录过期时间、初始化管理员密码约束 |
 | 日志配置 | 当前已实现 `BINGWALL_LOG_LEVEL`；日志目录依赖部署目录约定 |
-| 告警配置 | 当前未提供邮件 / Webhook 等内建告警配置项 |
+| 告警配置 | 当前未提供内建发送器；若使用 Server 酱，可通过 `BINGWALL_ALERT_SERVERCHAN_SENDKEY` 在受控环境文件中注入密钥 |
 
 ### 关键配置基线
 
@@ -117,13 +117,16 @@
 
 #### 建议监控 / 告警阈值（当前未配置化）
 
-- 以下阈值目前仅可作为运维侧监控建议，仓库内尚未提供邮件、Webhook 或其他主动告警发送能力
-- 当前代码里唯一直接使用的阈值是深度健康检查中的磁盘使用率 `85%`
-- 连续 `3` 次自动采集失败
-- 最近 `50` 次下载中失败率超过 `20%`
-- 磁盘使用率超过 `85%`
-- 最近 `5` 分钟 API `5xx` 比例超过 `5%`
-- 超过 `24` 小时未产生成功备份
+- 以下阈值用于当前阶段的最小运维告警方案；仓库内仍未提供邮件、Webhook 或其他主动告警发送能力，发送动作需由目标机外层监控或巡检脚本承担
+- 当前代码里唯一直接内建的阈值是深度健康检查中的磁盘使用率 `85%`
+- 最小必配：
+  - 最近 `3` 个 `trigger_type = cron` 且 `task_type = scheduled_collect` 的任务全部为 `failed` 或 `partially_failed`
+  - `GET /api/health/deep` 连续 `2` 次返回 HTTP 非 `200`，或返回体中的 `status != ok`
+  - `disk_usage.used_percent >= 85%`
+  - 最近一次成功备份距当前超过 `30` 小时
+- 可后续补充：
+  - 最近 `50` 次下载中失败率超过 `20%`
+  - 最近 `5` 分钟 API `5xx` 比例超过 `5%`
 
 ### 配置原则
 
@@ -144,6 +147,7 @@
 | `BINGWALL_APP_BASE_URL` | `http://127.0.0.1:30003` | 对外基础 URL，用于生成站点级链接与回调语义 |
 | `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` | 未设置 | 仅当资源使用 `storage_backend = oss` 时设置；本地文件存储场景保持未设置 |
 | `BINGWALL_LOG_LEVEL` | `INFO` | 当前唯一已实现的日志级别配置项 |
+| `BINGWALL_ALERT_SERVERCHAN_SENDKEY` | 未设置 | 可选；仅当外层告警脚本使用 Server 酱通道时设置，建议写入 `.env` 或 `/etc/bingwall/bingwall.env`，不要写死到脚本或文档 |
 | `BINGWALL_COLLECT_AUTO_PUBLISH_ENABLED` | `true` | 采集完成且资源就绪后是否自动公开；生产模板默认延续当前自动公开策略 |
 | `BINGWALL_COLLECT_NASA_APOD_ENABLED` | `true` | 是否启用 `nasa_apod` 来源采集 |
 | `BINGWALL_COLLECT_NASA_APOD_DEFAULT_MARKET` | `global` | `nasa_apod` 默认市场代码，当前固定使用 `global` |
@@ -161,6 +165,7 @@
 - `BINGWALL_COLLECT_NASA_APOD_API_KEY` 在模板中仍保留 `DEMO_KEY` 仅用于占位；真实生产环境应替换为有效 NASA API Key，或直接关闭该来源
 - `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_*` 属于一次性引导配置；首次成功初始化管理员后，建议从生产环境文件中移除，降低误用与暴露风险
 - `BINGWALL_STORAGE_OSS_PUBLIC_BASE_URL` 只在 `storage_backend = oss` 场景填写；本地文件存储场景不要写成空字符串，而应保持未设置
+- `BINGWALL_ALERT_SERVERCHAN_SENDKEY` 属于敏感密钥，只应保存在本地 `.env` 或目标机 `/etc/bingwall/bingwall.env` 这类受控环境文件中，不应写死到仓库配置、脚本参数或文档正文
 
 ### Bing 采集配置补充
 
@@ -385,7 +390,7 @@
 
 - `H4` 首轮 `cron` 闭环验证已根据 `2026-04-04` 目标机执行报告回写到仓库，记录文件见 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
 - 当前已验收目标机实际使用 `ubuntu` 用户在 `/home/ubuntu/BingWall` 直接部署，`cron` 安装路径、备份目录与仓库推荐的 `/opt/bingwall/app` 口径存在差异
-- 当前生产机仍建议补齐日志轮转、最小告警与运维执行记录模板
+- 运维执行记录模板已补充到 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)，当前生产机仍建议补齐日志轮转
 
 ### H5 已验收目标机记录
 
@@ -436,6 +441,108 @@
 - `GET /api/health/deep`：返回最近一次采集任务摘要、磁盘使用率和资源目录摘要；严重异常时返回 `503`
 - `make inspect-resources`：巡检数据库就绪资源与正式资源目录的一致性，发现资源缺失时自动刷新资源与内容状态
 - `make archive-wallpapers`：把本地 ready 资源迁移到统一结构化路径，清理临时目录遗留文件、空文件和重复孤儿文件，并把损坏资源隔离到失败目录；若发现损坏资源或目标路径存在内容冲突，命令会返回非零退出码
+
+### 最小告警方案（M4）
+
+#### 告警渠道决策
+
+- 当前阶段的最小告警渠道固定为“运维值班群 Webhook”，当前已选定并实测通过的具体通道为 Server 酱（ServerChan）
+- Webhook 可选任一支持 HTTP POST 的群机器人或事件入口，例如 Server 酱、飞书、企业微信、Slack 或等价平台；仓库只约定“可被 `curl` 直接测试”的接口形态，不绑定具体厂商
+- 选择 Webhook 的原因是：当前仓库没有 SMTP、告警中心或消息队列依赖，而 Webhook 可直接复用目标机现有 `curl` 与 `cron` 能力完成测试和后续对接
+- 当前边界仍保持不变：BingWall 仓库没有内建主动发告警能力；告警应由目标机外层 URL 监控、主机巡检脚本或现有运维平台发送
+
+#### 推荐落地方式
+
+- URL 监控：每 `1` 分钟访问 `http://127.0.0.1:8000/api/health/deep`；连续 `2` 次 HTTP 非 `200` 或返回 `status != ok` 时推送 Webhook
+- 主机侧巡检：每 `10` 分钟检查最近 `3` 个定时采集任务状态、最近一次成功备份时间和磁盘占用；命中阈值即推送 Webhook
+- 值班对象：至少落到 `1` 个运维值班群；若 `30` 分钟内无人确认，再升级到站点维护人私聊、电话或等价即时渠道
+
+#### 触发矩阵
+
+| 场景 | 级别 | 触发条件 | 检测入口 | 首次处理要求 | 升级路径 |
+|---|---|---|---|---|---|
+| 采集连续失败 | `P2` | 最近 `3` 个 `cron` 采集任务全部为 `failed` 或 `partially_failed` | SQLite `collection_tasks`、后台 `/admin/tasks` | 10 分钟内确认上游源站、网络、磁盘与任务错误摘要 | 30 分钟未恢复或连续第 `4` 次失败时升级 |
+| 深度健康异常 | `P1` | `GET /api/health/deep` 连续 `2` 次 HTTP 非 `200`，或返回 `status = fail` | `/api/health/deep` | 5 分钟内确认服务进程、数据库路径、关键目录和磁盘状态 | 15 分钟未恢复时升级 |
+| 深度健康降级 | `P2` | `GET /api/health/deep` 连续 `2` 次返回 `status = degraded` | `/api/health/deep` | 10 分钟内确认最近任务失败原因、资源状态和回退日志 | 30 分钟未恢复时升级 |
+| 备份过期 | `P1` | 最近一次成功备份距当前超过 `30` 小时，或最新快照缺少 `manifest.json` | 备份目录、`backup.log` | 15 分钟内确认 `cron`、备份目录权限和快照完整性，并补跑一次 `make backup` | 30 分钟内仍无法生成可用快照时升级 |
+| 磁盘占用过高 | `P1` | `disk_usage.used_percent >= 85%`，或 `/api/health/deep` 中任一磁盘项状态为 `fail` | `/api/health/deep`、`df -h` | 15 分钟内确认占满目录，优先处理日志、临时文件和历史备份 | 30 分钟内仍高于 `85%` 或继续上涨时升级 |
+
+#### 推荐检查命令
+
+最近 `3` 个 `cron` 采集任务是否全部失败：
+
+```bash
+sqlite3 /var/lib/bingwall/data/bingwall.sqlite3 "
+SELECT COUNT(*)
+FROM (
+  SELECT task_status
+  FROM collection_tasks
+  WHERE trigger_type = 'cron'
+    AND task_type = 'scheduled_collect'
+    AND finished_at_utc IS NOT NULL
+  ORDER BY created_at_utc DESC, id DESC
+  LIMIT 3
+)
+WHERE task_status IN ('failed', 'partially_failed');
+"
+```
+
+结果为 `3` 时触发“采集连续失败”告警。
+
+检查深度健康：
+
+```bash
+curl -sS http://127.0.0.1:8000/api/health/deep
+```
+
+检查最近备份年龄：
+
+```bash
+python - <<'PY'
+from pathlib import Path
+import time
+
+manifests = sorted(
+    Path("/var/backups/bingwall").glob("backup-*/manifest.json"),
+    key=lambda path: path.stat().st_mtime,
+    reverse=True,
+)
+if not manifests:
+    print("missing")
+else:
+    age_hours = (time.time() - manifests[0].stat().st_mtime) / 3600
+    print(f"{age_hours:.2f}")
+PY
+```
+
+结果为 `missing` 或大于 `30.00` 时触发“备份过期”告警。
+
+#### 值班处理步骤
+
+1. 在值班群内确认告警已被接手，并记录确认时间
+2. 保留第一现场信息：告警原文、`/api/health/deep` 返回、相关日志片段、执行命令和结果
+3. 优先恢复服务可用性，再处理根因；禁止先删库、先清空正式资源或直接覆盖历史备份
+4. 若需要人工补跑，优先使用 `make consume-collection-tasks`、`make inspect-resources`、`make archive-wallpapers`、`make backup`
+5. 恢复后补一条“恢复通知”到同一值班群，并在后续运维记录中补全时间线、影响范围、处置动作和回滚点
+
+#### Webhook 真实测试通知
+
+- 已于 `2026-04-05T03:22:59Z` 使用 Server 酱通道完成一次真实测试通知
+- 执行方式：对 Server 酱 `.send` 接口发起 `POST`，标题为 `[BingWall] M4 alert test`
+- 入队回执：`code = 0`
+- 状态查询结果：`wxstatus` 返回成功
+- 记录边界：仓库内不保存真实 SENDKEY，仅记录“通道类型、执行时间、结果摘要”；实际密钥建议通过 `BINGWALL_ALERT_SERVERCHAN_SENDKEY` 从 `.env` 或 `/etc/bingwall/bingwall.env` 注入
+
+建议测试命令模板如下：
+
+```bash
+curl -sS -X POST "https://sctapi.ftqq.com/${BINGWALL_ALERT_SERVERCHAN_SENDKEY}.send" \
+  -H "Content-Type: application/x-www-form-urlencoded; charset=utf-8" \
+  --data-urlencode "title=[BingWall] alert test" \
+  --data-urlencode "desp=## BingWall alert test"
+```
+
+- 通过标准：值班群实际收到测试消息，且记录中包含执行时间、操作者、目标渠道和返回结果
 
 ## 7. 日志要求
 
@@ -528,7 +635,32 @@
 7. 执行 `make archive-wallpapers`
 8. 验证 `curl http://127.0.0.1/`、`curl http://127.0.0.1/api/public/site-info` 和后台登录/后台列表接口
 
-## 10. 上线前检查清单
+## 10. 运维执行记录模板（M5）
+
+当前仓库已把部署、恢复演练、`cron` 首轮验证、域名切换与回滚的固定模板沉淀到 [docs/operations-record-templates.md](/home/ops/Projects/BingWall/docs/operations-record-templates.md)。
+
+使用要求：
+
+- 执行关键运维动作前，先复制对应模板到日期化记录文件，例如 `docs/deployment-record-2026-04-06.md`
+- 至少填写时间、操作者、环境、命令、结果、风险、回滚点
+- 未实际执行的步骤必须写明“未执行”或“待验证”，不要补写推测结果
+- 若存在截图、工单或日志文件，应在记录末尾补充附件路径，便于后续交接和复盘
+
+建议优先使用以下模板：
+
+| 场景 | 模板 |
+| --- | --- |
+| 正式部署 / 升级 | `部署记录模板` |
+| 恢复演练 / 故障恢复 | `恢复演练记录模板` |
+| `cron` 首轮闭环 | `cron 首轮验证记录模板` |
+| 域名切换 / 入口迁移 / 紧急回退 | `域名切换与回滚记录模板` |
+
+参考样例：
+
+- 已验收的 `H4` 首轮闭环记录见 [docs/h4-cron-first-run-record-2026-04-04.md](/home/ops/Projects/BingWall/docs/h4-cron-first-run-record-2026-04-04.md)
+- 该样例保留了“仓库推荐口径”和“真实目标机口径”之间的差异说明，可作为后续记录的参考结构
+
+## 11. 上线前检查清单
 
 ### 阶段一公开链路最小检查
 
@@ -567,15 +699,14 @@
 - 首次恢复演练可执行
 - 首次手动采集已验证
 
-## 11. 当前已知缺口
+## 12. 当前已知缺口
 
-- 尚未完成最小告警方案与真实测试通知
-- 尚未形成可复用的运维执行记录模板
+- 最小告警方案已收敛为“Webhook + 外层巡检/监控”，且已通过 Server 酱完成 1 次真实测试通知；若后续切换正式值班群或轮换密钥，需同步补运维记录
 - 尚未确认生产机日志轮转策略
 
 补充说明：
 
 - 当前仓库已通过临时 `systemd --user` 服务和 Docker 化 `nginx` 完成 `T1.6` 自动化验收；该 Docker 代理链路主要用于模板验证与无现成代理时的备用方案
-- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成，`H4` 首轮 `cron` 闭环记录也已在同日回写到仓库；当前剩余缺口集中在告警、运维记录模板与日志轮转等标准化工作
+- `H5` 所需的真实目标机长期驻留部署与公网接入已在 `2026-04-04` 完成，`H4` 首轮 `cron` 闭环记录也已在同日回写到仓库；当前剩余缺口集中在日志轮转等标准化工作
 
 这些缺口必须在阶段一和阶段二实施中逐项关闭。

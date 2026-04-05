@@ -2,6 +2,12 @@
 
 @source "../../app/web/routes.py";
 @source "../admin/assets/admin.js";
+@source "../admin/assets/modules/core.js";
+@source "../admin/assets/pages/auth.js";
+@source "../admin/assets/pages/wallpapers.js";
+@source "../admin/assets/pages/tags.js";
+@source "../admin/assets/pages/tasks.js";
+@source "../admin/assets/pages/observability.js";
 
 @theme {
   --color-accent: #d97706;
