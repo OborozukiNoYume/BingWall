@@ -62,11 +62,32 @@ class LatestCollectionTaskStatus(BaseModel):
     updated_at_utc: str
 
 
+class CollectionMetricsSummary(BaseModel):
+    window_days: int
+    completed_task_count: int
+    succeeded_task_count: int
+    partially_failed_task_count: int
+    failed_task_count: int
+    successful_item_count: int
+    duplicate_item_count: int
+    failed_item_count: int
+    success_rate_percent: float | None
+    latest_finished_at_utc: str | None
+
+
 class ResourceDirectorySummary(BaseModel):
     path: str
     ready_resource_count: int
     failed_resource_count: int
     total_resource_count: int
+
+
+class LatestBackupSnapshotStatus(BaseModel):
+    snapshot_id: str
+    finished_at_utc: str
+    snapshot_dir: str
+    manifest_path: str
+    age_hours: float
 
 
 class LatestRestoreVerificationStatus(BaseModel):
@@ -94,6 +115,30 @@ class DeepHealthResponse(BaseModel):
     latest_collection_task: LatestCollectionTaskStatus | None
     resource_directory: ResourceDirectorySummary
     latest_restore_verification: LatestRestoreVerificationStatus | None
+
+
+class Http5xxLatestEventStatus(BaseModel):
+    method: str
+    path: str
+    status_code: int
+    trace_id: str
+    error_type: str | None
+    occurred_at_utc: str
+
+
+class Http5xxMetricsSummary(BaseModel):
+    window_hours: int
+    count: int
+    latest_event: Http5xxLatestEventStatus | None
+
+
+class OperationsMetricsResponse(BaseModel):
+    service: str
+    environment: Literal["development", "test", "production"]
+    timestamp: datetime
+    collection: CollectionMetricsSummary
+    latest_backup: LatestBackupSnapshotStatus | None
+    http_5xx: Http5xxMetricsSummary
 
 
 class ResourceInspectionItem(BaseModel):

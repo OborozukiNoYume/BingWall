@@ -15,6 +15,7 @@ from app.api.errors import request_validation_exception_handler
 from app.api.router import api_router
 from app.core.config import get_settings
 from app.core.logging import bind_trace_id, configure_logging, reset_trace_id
+from app.services.health import persist_http_5xx_event
 from app.web import get_assets_dir
 from app.web import get_admin_assets_dir
 from app.web import router as web_router
@@ -55,13 +56,48 @@ def create_app() -> FastAPI:
         try:
             response = await call_next(request)
             duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
-            logging.getLogger("app.access").info(
+            if response.status_code >= 500:
+                persist_http_5xx_event(
+                    database_path=settings.database_path,
+                    method=request.method,
+                    path=request.url.path,
+                    status_code=response.status_code,
+                    trace_id=trace_id,
+                    error_type=None,
+                )
+                logging.getLogger("app.access").warning(
+                    "Request completed method=%s path=%s status_code=%s duration_ms=%s",
+                    request.method,
+                    request.url.path,
+                    response.status_code,
+                    duration_ms,
+                )
+            else:
+                logging.getLogger("app.access").info(
+                    "Request completed method=%s path=%s status_code=%s duration_ms=%s",
+                    request.method,
+                    request.url.path,
+                    response.status_code,
+                    duration_ms,
+                )
+        except Exception as exc:
+            duration_ms = round((time.perf_counter() - started_at) * 1000, 2)
+            persist_http_5xx_event(
+                database_path=settings.database_path,
+                method=request.method,
+                path=request.url.path,
+                status_code=500,
+                trace_id=trace_id,
+                error_type=type(exc).__name__,
+            )
+            logging.getLogger("app.access").exception(
                 "Request completed method=%s path=%s status_code=%s duration_ms=%s",
                 request.method,
                 request.url.path,
-                response.status_code,
+                500,
                 duration_ms,
             )
+            raise
         finally:
             reset_trace_id(token)
         response.headers["X-Trace-Id"] = trace_id

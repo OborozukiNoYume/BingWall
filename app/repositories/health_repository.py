@@ -51,6 +51,88 @@ class HealthRepository:
         ).fetchone()
         return cast(sqlite3.Row | None, row)
 
+    def get_recent_collection_task_metrics(self, *, since_utc: str) -> sqlite3.Row:
+        row = self.connection.execute(
+            """
+            SELECT
+                COUNT(*) AS completed_task_count,
+                SUM(CASE WHEN task_status = 'succeeded' THEN 1 ELSE 0 END) AS succeeded_task_count,
+                SUM(CASE WHEN task_status = 'partially_failed' THEN 1 ELSE 0 END)
+                    AS partially_failed_task_count,
+                SUM(CASE WHEN task_status = 'failed' THEN 1 ELSE 0 END) AS failed_task_count,
+                SUM(success_count) AS successful_item_count,
+                SUM(duplicate_count) AS duplicate_item_count,
+                SUM(failure_count) AS failed_item_count,
+                MAX(finished_at_utc) AS latest_finished_at_utc
+            FROM collection_tasks
+            WHERE finished_at_utc IS NOT NULL
+              AND finished_at_utc >= ?;
+            """,
+            (since_utc,),
+        ).fetchone()
+        if row is None:
+            msg = "Failed to query collection task metrics."
+            raise RuntimeError(msg)
+        return cast(sqlite3.Row, row)
+
+    def record_http_5xx_event(
+        self,
+        *,
+        method: str,
+        path: str,
+        status_code: int,
+        trace_id: str,
+        error_type: str | None,
+        occurred_at_utc: str,
+    ) -> None:
+        with self.connection:
+            self.connection.execute(
+                """
+                INSERT INTO http_request_5xx_events (
+                    method,
+                    path,
+                    status_code,
+                    trace_id,
+                    error_type,
+                    occurred_at_utc
+                )
+                VALUES (?, ?, ?, ?, ?, ?);
+                """,
+                (method, path, status_code, trace_id, error_type, occurred_at_utc),
+            )
+
+    def count_recent_http_5xx_events(self, *, since_utc: str) -> int:
+        row = self.connection.execute(
+            """
+            SELECT COUNT(*) AS total_count
+            FROM http_request_5xx_events
+            WHERE occurred_at_utc >= ?;
+            """,
+            (since_utc,),
+        ).fetchone()
+        if row is None:
+            return 0
+        return int(row["total_count"] or 0)
+
+    def get_latest_http_5xx_event(self, *, since_utc: str) -> sqlite3.Row | None:
+        row = self.connection.execute(
+            """
+            SELECT
+                method,
+                path,
+                status_code,
+                trace_id,
+                error_type,
+                occurred_at_utc
+            FROM http_request_5xx_events
+            WHERE occurred_at_utc >= ?
+            ORDER BY occurred_at_utc DESC, id DESC
+            LIMIT 1;
+            """,
+            (since_utc,),
+        ).fetchone()
+        return cast(sqlite3.Row | None, row)
+
     def get_resource_counts(self) -> sqlite3.Row:
         row = self.connection.execute(
             """

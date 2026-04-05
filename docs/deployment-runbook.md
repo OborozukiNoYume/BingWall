@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T03:46:34Z
+- 更新时间：2026-04-05T06:28:11Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -439,6 +439,7 @@
 - `GET /api/health/live`：确认进程可响应
 - `GET /api/health/ready`：确认配置、数据库和关键目录可用；失败时返回 `503`
 - `GET /api/health/deep`：返回最近一次采集任务摘要、磁盘使用率和资源目录摘要；严重异常时返回 `503`
+- `GET /api/health/metrics`：返回最近 `7` 天采集成功率、最近一次备份快照摘要，以及最近 `24` 小时 HTTP `5xx` 统计
 - `make inspect-resources`：巡检数据库就绪资源与正式资源目录的一致性，发现资源缺失时自动刷新资源与内容状态
 - `make archive-wallpapers`：把本地 ready 资源迁移到统一结构化路径，清理临时目录遗留文件、空文件和重复孤儿文件，并把损坏资源隔离到失败目录；若发现损坏资源或目标路径存在内容冲突，命令会返回非零退出码
 
@@ -454,7 +455,7 @@
 #### 推荐落地方式
 
 - URL 监控：每 `1` 分钟访问 `http://127.0.0.1:8000/api/health/deep`；连续 `2` 次 HTTP 非 `200` 或返回 `status != ok` 时推送 Webhook
-- 主机侧巡检：每 `10` 分钟检查最近 `3` 个定时采集任务状态、最近一次成功备份时间和磁盘占用；命中阈值即推送 Webhook
+- 主机侧巡检：每 `10` 分钟读取 `http://127.0.0.1:8000/api/health/metrics` 中的最近采集成功率、最近一次备份时间和最近 `24` 小时 HTTP `5xx` 情况，再结合 `/api/health/deep` 的磁盘占用；命中阈值即推送 Webhook
 - 值班对象：至少落到 `1` 个运维值班群；若 `30` 分钟内无人确认，再升级到站点维护人私聊、电话或等价即时渠道
 
 #### 触发矩阵
@@ -469,7 +470,19 @@
 
 #### 推荐检查命令
 
-最近 `3` 个 `cron` 采集任务是否全部失败：
+最小运维指标出口：
+
+```bash
+curl -sS http://127.0.0.1:8000/api/health/metrics
+```
+
+建议主机侧巡检直接读取以下字段：
+
+- `collection.success_rate_percent`：最近 `7` 天采集成功率，按 `success_count + duplicate_count` 与总处理条目数计算
+- `latest_backup.finished_at_utc` / `latest_backup.age_hours`：最近一次备份完成时间与距今小时数
+- `http_5xx.count` / `http_5xx.latest_event`：最近 `24` 小时 HTTP `5xx` 总数与最后一次事件
+
+如需继续细查最近 `3` 个 `cron` 采集任务是否全部失败，可再执行：
 
 ```bash
 sqlite3 /var/lib/bingwall/data/bingwall.sqlite3 "
@@ -495,7 +508,7 @@ WHERE task_status IN ('failed', 'partially_failed');
 curl -sS http://127.0.0.1:8000/api/health/deep
 ```
 
-检查最近备份年龄：
+如需单独检查最近备份年龄：
 
 ```bash
 python - <<'PY'

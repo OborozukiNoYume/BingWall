@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T05:59:39Z
+- 更新时间：2026-04-05T06:28:11Z
 - 来源：`2026-04-04` 项目评估结论
 - 文档定位：按优先级输出整改任务、依赖关系与验收命令
 - 适用范围：当前一期单机架构仓库与目标部署环境
@@ -35,7 +35,7 @@
 | `L1` | 拆分超大模块 | `done` | 已完成（仓库） | 已完成后台前端脚本拆分，并把采集主服务与采集仓储改为“门面 + 内部分层”结构；`make verify` 已通过，原 `1k+` 行文件已拆分 |
 | `L2` | 建立搜索与查询性能基线 | `done` | 已完成（仓库） | 已新增基准脚本、报告文档与升级阈值记录，当前 `12k` 壁纸样本下无需额外索引或 `FTS` |
 | `L3` | 设计密码算法升级路径 | `done` | 已完成（仓库） | 已新增密码哈希升级迁移设计文档，并把现状、渐进迁移和回滚边界同步到相关文档 |
-| `L4` | 增加最小运维指标出口 | `todo` | 未完成 | 尚未提供可读取“采集成功率 / 最近备份时间 / 5xx” 的指标出口 |
+| `L4` | 增加最小运维指标出口 | `done` | 已完成（仓库） | 已新增 `/api/health/metrics`，可读取最近 `7` 天采集成功率、最近备份快照和最近 `24` 小时 HTTP `5xx` 统计 |
 | `L5` | 收口前端构建与源码边界 | `todo` | 部分完成 | 已有构建命令与目录，但“源码 / 产物边界”和提交流程说明仍不完整 |
 
 ## 高优先级
@@ -348,17 +348,18 @@ rg -n "argon2id|pbkdf2_sha256|兼容验证|渐进迁移|回滚方案" docs
 
 ### L4 增加最小运维指标出口
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：已新增 [app/repositories/migrations/versions/V0010__http_request_5xx_events.sql](/home/ops/Projects/BingWall/app/repositories/migrations/versions/V0010__http_request_5xx_events.sql)、[app/api/health.py](/home/ops/Projects/BingWall/app/api/health.py) 中的 `/api/health/metrics` 接口，并把 README / 部署手册同步到统一读取口径；`uv run pytest tests/integration/test_health_checks.py` 已通过
 - 前置依赖：`M4`
 - 阻塞后续：无
 - 目标：让运维能够快速回答“最近采集成功率、最近备份时间、最近 5xx 情况”等基础问题
-- 交付物：最小指标导出方案、说明文档，以及对应脚本或接口
+- 交付物：最小指标导出方案、说明文档，以及对应接口；当前统一入口为 [app/api/health.py](/home/ops/Projects/BingWall/app/api/health.py) 中的 `GET /api/health/metrics`
 - 验收命令：
 
 ```bash
-# 以下命令依赖本任务新增的指标出口
-rg -n "采集成功率|最近备份时间|5xx|指标出口" docs
-curl -sS http://127.0.0.1:30003/<metrics-endpoint-or-script-output>
+rg -n "采集成功率|最近备份时间|5xx|指标出口|/api/health/metrics" docs README.md
+curl -sS http://127.0.0.1:30003/api/health/metrics
+uv run pytest tests/integration/test_health_checks.py
 ```
 
 - 通过标准：关键运维指标可以被稳定读取，且读取方式已写入文档

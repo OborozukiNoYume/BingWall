@@ -112,7 +112,10 @@ make run
 curl http://127.0.0.1:30003/api/health/live
 curl http://127.0.0.1:30003/api/health/ready
 curl http://127.0.0.1:30003/api/health/deep
+curl http://127.0.0.1:30003/api/health/metrics
 ```
+
+- `/api/health/metrics` 会返回最小运维指标摘要：最近 `7` 天采集成功率、最近一次备份快照时间，以及最近 `24` 小时 HTTP `5xx` 统计
 
 阶段一自动化部署验收命令：
 
@@ -182,7 +185,7 @@ bash scripts/dev/playwright_smoke_with_admin.example.sh
 - `make restore SNAPSHOT=/var/backups/bingwall/<snapshot> TARGET_ROOT=/tmp/bingwall-restore FORCE=1` 恢复入口，适用于先恢复到隔离目录做演练
 - `make verify-backup-restore` 备份恢复演练入口，会自动执行一次“备份 -> 恢复 -> 页面/API/健康检查/巡检验证”
 - `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env` 目标机 `cron` 一键安装入口，会渲染仓库内模板、备份当前用户已有 `crontab`，再安装包含采集、消费、巡检、归档和备份的完整计划任务
-- 最小 FastAPI 服务和 `/api/health/live`、`/api/health/ready`、`/api/health/deep` 健康检查
+- 最小 FastAPI 服务和 `/api/health/live`、`/api/health/ready`、`/api/health/deep`、`/api/health/metrics` 健康检查 / 运维指标接口
 - SQLite 版本化迁移基线与核心表结构
 - 空库初始化与重复执行迁移能力
 - Bing 元数据拉取、字段映射、双层去重、任务与明细落库、图片下载重试和资源状态联动；当前已补齐 `subtitle`、`description`、`location_text`、`published_at_utc` 与 `portrait_image_url` 落库
@@ -230,7 +233,7 @@ bash scripts/dev/playwright_smoke_with_admin.example.sh
 
 当前 `T2.4` 已补齐内容：
 
-- `/api/health/ready`、`/api/health/deep` 健康检查接口，覆盖数据库、关键目录、磁盘使用率和最近一次采集任务摘要
+- `/api/health/ready`、`/api/health/deep`、`/api/health/metrics` 健康检查 / 运维指标接口；其中 `/api/health/metrics` 额外汇总最近 `7` 天采集成功率、最近备份快照和最近 `24` 小时 HTTP `5xx`
 - `scripts/run_resource_inspection.py` 与 `make inspect-resources` 资源巡检入口，可检查数据库就绪资源与正式资源目录的一致性
 - `scripts/run_wallpaper_archive.py` 与 `make archive-wallpapers` 本地资源归档入口，可把历史 ready 资源迁移到 `source/year/month/day_market_type_resolution.ext` 结构化路径，同时清理临时目录遗留文件、空文件、重复孤儿文件，并把损坏资源隔离到失败目录
 - 资源文件缺失后的状态联动：自动把异常资源标记为 `failed`，刷新壁纸 `resource_status`，并在公开启用内容失去可用资源时将其降级为 `disabled`
@@ -423,6 +426,7 @@ curl -H 'Authorization: Bearer <session_token>' \
 curl http://127.0.0.1:30003/api/health/live
 curl http://127.0.0.1:30003/api/health/ready
 curl http://127.0.0.1:30003/api/health/deep
+curl http://127.0.0.1:30003/api/health/metrics
 make inspect-resources
 ```
 

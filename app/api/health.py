@@ -10,6 +10,7 @@ from app.core.config import Settings, get_settings
 from app.repositories.health_repository import HealthRepository
 from app.schemas.health import DeepHealthResponse
 from app.schemas.health import LiveHealthResponse
+from app.schemas.health import OperationsMetricsResponse
 from app.schemas.health import ReadyHealthResponse
 from app.services.health import HealthService
 
@@ -69,3 +70,14 @@ def get_deep_health(
     else:
         logger.info("Deep health check succeeded.")
     return health
+
+
+@router.get("/metrics", response_model=OperationsMetricsResponse)
+def get_operations_metrics(
+    settings: Annotated[Settings, Depends(get_settings)],
+    repository: Annotated[HealthRepository, Depends(get_health_repository)],
+) -> OperationsMetricsResponse:
+    service = HealthService(settings, repository)
+    metrics = service.build_operations_metrics()
+    logger.info("Operations metrics requested.")
+    return metrics
