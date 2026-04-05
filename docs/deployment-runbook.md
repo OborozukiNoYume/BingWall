@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T03:46:34Z
+- 更新时间：2026-04-05T06:36:49Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -113,7 +113,7 @@
 - 当前配置层会对 `BINGWALL_SECURITY_BOOTSTRAP_ADMIN_PASSWORD` 强制执行“至少 `12` 位”校验
 - 当前后台改密接口会校验“当前密码正确”“两次新密码一致”“新旧密码不能相同”，但不会额外强制大小写 / 数字 / 特殊字符复杂度
 - 当前密码摘要算法已固定为 `pbkdf2_sha256`，迭代次数为 `600000`
-- 如需升级到更严格复杂度或 `argon2id`，应视为后续安全增强，不应写成当前已落地能力
+- 如需升级到更严格复杂度或 `argon2id`，应视为后续安全增强，不应写成当前已落地能力；本仓库当前兼容迁移设计见 [docs/password-hash-migration.md](/home/ops/Projects/BingWall/docs/password-hash-migration.md)
 
 #### 建议监控 / 告警阈值（当前未配置化）
 
@@ -265,6 +265,16 @@
 - Ubuntu 24.04 若浏览器启动缺 GTK 运行库，优先安装 `libgtk-3-0t64`；旧版发行版对应包名通常为 `libgtk-3-0`
 - `cron` 安装脚本：`scripts/install_cron.py`
 
+### 前端静态资源构建
+
+- 统一入口：`make frontend-build` 或 `npm run build:css`
+- 持续监听：`make frontend-watch` 或 `npm run watch:css`
+- `web/src` 只存放 Tailwind 输入文件与 `@source` 声明，不直接作为浏览器静态目录
+- `web/public/assets/site.js`、`web/admin/assets/admin.js`、`web/admin/assets/modules/*.js`、`web/admin/assets/pages/*.js` 是手工维护的运行时代码
+- `web/public/assets/site.css` 与 `web/admin/assets/admin.css` 是构建产物，部署前若样式源码或 Tailwind 类名发生变化，必须重新生成并连同源码一起提交
+- 当前仓库的部署、验收与备用 `nginx` 方案都会直接读取仓库中的静态文件，不会在服务启动前自动补跑 Node 构建
+- 目录边界与提交要求见 [docs/frontend-build-boundary.md](/home/ops/Projects/BingWall/docs/frontend-build-boundary.md)
+
 ### 仓库内自动化部署验收
 
 当前仓库额外提供：
@@ -380,11 +390,12 @@
 建议部署步骤：
 
 1. 确认 `/opt/bingwall/app`、`uv` 可执行文件、`/opt/bingwall/app/.venv`、`/var/log/bingwall` 与 `/etc/bingwall/bingwall.env` 已存在且权限正确
-2. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
-3. 观察安装输出中的 `backup_path`，记录当前用户旧 `crontab` 备份位置，便于回滚
-4. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
-5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
-6. 观察 `/var/log/bingwall/create-scheduled-collection-tasks.log`、`consume-collection-tasks.log`、`inspect-resources.log`、`archive-wallpapers.log` 与 `backup.log`，确认首轮计划任务结果
+2. 若本次改动涉及 `web/src/*` 或 Tailwind 类名，先执行 `make frontend-build` 或 `npm run build:css`，确认 `web/public/assets/site.css` 与 `web/admin/assets/admin.css` 已更新到预期版本
+3. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
+4. 观察安装输出中的 `backup_path`，记录当前用户旧 `crontab` 备份位置，便于回滚
+5. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
+6. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
+7. 观察 `/var/log/bingwall/create-scheduled-collection-tasks.log`、`consume-collection-tasks.log`、`inspect-resources.log`、`archive-wallpapers.log` 与 `backup.log`，确认首轮计划任务结果
 
 当前已记录的目标机首轮闭环结果：
 
@@ -439,6 +450,7 @@
 - `GET /api/health/live`：确认进程可响应
 - `GET /api/health/ready`：确认配置、数据库和关键目录可用；失败时返回 `503`
 - `GET /api/health/deep`：返回最近一次采集任务摘要、磁盘使用率和资源目录摘要；严重异常时返回 `503`
+- `GET /api/health/metrics`：返回最近 `7` 天采集成功率、最近一次备份快照摘要，以及最近 `24` 小时 HTTP `5xx` 统计
 - `make inspect-resources`：巡检数据库就绪资源与正式资源目录的一致性，发现资源缺失时自动刷新资源与内容状态
 - `make archive-wallpapers`：把本地 ready 资源迁移到统一结构化路径，清理临时目录遗留文件、空文件和重复孤儿文件，并把损坏资源隔离到失败目录；若发现损坏资源或目标路径存在内容冲突，命令会返回非零退出码
 
@@ -454,7 +466,7 @@
 #### 推荐落地方式
 
 - URL 监控：每 `1` 分钟访问 `http://127.0.0.1:8000/api/health/deep`；连续 `2` 次 HTTP 非 `200` 或返回 `status != ok` 时推送 Webhook
-- 主机侧巡检：每 `10` 分钟检查最近 `3` 个定时采集任务状态、最近一次成功备份时间和磁盘占用；命中阈值即推送 Webhook
+- 主机侧巡检：每 `10` 分钟读取 `http://127.0.0.1:8000/api/health/metrics` 中的最近采集成功率、最近一次备份时间和最近 `24` 小时 HTTP `5xx` 情况，再结合 `/api/health/deep` 的磁盘占用；命中阈值即推送 Webhook
 - 值班对象：至少落到 `1` 个运维值班群；若 `30` 分钟内无人确认，再升级到站点维护人私聊、电话或等价即时渠道
 
 #### 触发矩阵
@@ -469,7 +481,19 @@
 
 #### 推荐检查命令
 
-最近 `3` 个 `cron` 采集任务是否全部失败：
+最小运维指标出口：
+
+```bash
+curl -sS http://127.0.0.1:8000/api/health/metrics
+```
+
+建议主机侧巡检直接读取以下字段：
+
+- `collection.success_rate_percent`：最近 `7` 天采集成功率，按 `success_count + duplicate_count` 与总处理条目数计算
+- `latest_backup.finished_at_utc` / `latest_backup.age_hours`：最近一次备份完成时间与距今小时数
+- `http_5xx.count` / `http_5xx.latest_event`：最近 `24` 小时 HTTP `5xx` 总数与最后一次事件
+
+如需继续细查最近 `3` 个 `cron` 采集任务是否全部失败，可再执行：
 
 ```bash
 sqlite3 /var/lib/bingwall/data/bingwall.sqlite3 "
@@ -495,7 +519,7 @@ WHERE task_status IN ('failed', 'partially_failed');
 curl -sS http://127.0.0.1:8000/api/health/deep
 ```
 
-检查最近备份年龄：
+如需单独检查最近备份年龄：
 
 ```bash
 python - <<'PY'

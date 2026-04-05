@@ -13,7 +13,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
 
     applied = migrate_database(database_path)
 
-    assert [migration.version for migration in applied] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert [migration.version for migration in applied] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
 
     connection = sqlite3.connect(database_path)
     try:
@@ -59,6 +59,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "collection_task_items",
         "collection_tasks",
         "download_events",
+        "http_request_5xx_events",
         "image_resources",
         "schema_migrations",
         "tags",
@@ -77,6 +78,7 @@ def test_sqlite_migrations_create_t1_2_schema(tmp_path: Path) -> None:
         "idx_download_events_resource_occurred",
         "idx_download_events_result_occurred",
         "idx_download_events_wallpaper_occurred",
+        "idx_http_request_5xx_events_occurred",
         "idx_image_resources_content_hash",
         "idx_image_resources_source_url_hash",
         "idx_image_resources_status_processed",
@@ -110,7 +112,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
     first_run = migrate_database(database_path)
     second_run = migrate_database(database_path)
 
-    assert [migration.version for migration in first_run] == [1, 2, 3, 4, 5, 6, 7, 8, 9]
+    assert [migration.version for migration in first_run] == [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
     assert second_run == []
 
     connection = sqlite3.connect(database_path)
@@ -135,6 +137,7 @@ def test_sqlite_migrations_are_repeatable(tmp_path: Path) -> None:
         (7, "image_resource_download_resolution_variants"),
         (8, "wallpapers_bing_portrait_image_url"),
         (9, "bing_wallpaper_localizations"),
+        (10, "http_request_5xx_events"),
     ]
 
 
@@ -168,7 +171,7 @@ def test_admin_user_status_constraint_migration_cleans_legacy_values_and_blocks_
         connection.close()
 
     applied = migrate_database(database_path)
-    assert [migration.version for migration in applied] == [6, 7, 8, 9]
+    assert [migration.version for migration in applied] == [6, 7, 8, 9, 10]
 
     connection = sqlite3.connect(database_path)
     try:

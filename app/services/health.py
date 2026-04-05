@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC
 from datetime import datetime
+from datetime import timedelta
 import json
 import logging
 import os
@@ -13,12 +14,17 @@ from typing import cast
 
 from app.core.config import Settings
 from app.repositories.health_repository import HealthRepository
+from app.schemas.health import CollectionMetricsSummary
 from app.schemas.health import DeepHealthResponse
 from app.schemas.health import DirectoryHealthStatus
 from app.schemas.health import DiskUsageStatus
 from app.schemas.health import HealthDependencyStatus
+from app.schemas.health import Http5xxLatestEventStatus
+from app.schemas.health import Http5xxMetricsSummary
+from app.schemas.health import LatestBackupSnapshotStatus
 from app.schemas.health import LatestRestoreVerificationStatus
 from app.schemas.health import LatestCollectionTaskStatus
+from app.schemas.health import OperationsMetricsResponse
 from app.schemas.health import ReadyHealthResponse
 from app.schemas.health import ResourceDirectorySummary
 from app.schemas.health import ResourceInspectionItem
@@ -28,6 +34,8 @@ from app.services.backup_restore import RESTORE_VERIFICATION_DIR_NAME
 logger = logging.getLogger(__name__)
 
 DISK_USAGE_THRESHOLD_PERCENT = 85.0
+COLLECTION_METRICS_WINDOW_DAYS = 7
+HTTP_5XX_METRICS_WINDOW_HOURS = 24
 ReadyStatus = Literal["ok", "fail"]
 DeepStatus = Literal["ok", "degraded", "fail"]
 InspectionAction = Literal["marked_failed", "marked_failed_and_disabled", "skipped"]
@@ -85,6 +93,17 @@ class HealthService:
             latest_collection_task=latest_task,
             resource_directory=resource_directory,
             latest_restore_verification=latest_restore_verification,
+        )
+
+    def build_operations_metrics(self) -> OperationsMetricsResponse:
+        timestamp = datetime.now(UTC)
+        return OperationsMetricsResponse(
+            service="bingwall-api",
+            environment=self.settings.app_env,
+            timestamp=timestamp,
+            collection=self._build_collection_metrics_summary(now=timestamp),
+            latest_backup=self._build_latest_backup_snapshot(now=timestamp),
+            http_5xx=self._build_http_5xx_metrics_summary(now=timestamp),
         )
 
     def _check_configuration(self) -> HealthDependencyStatus:
@@ -203,6 +222,36 @@ class HealthService:
             updated_at_utc=str(row["updated_at_utc"]),
         )
 
+    def _build_collection_metrics_summary(self, *, now: datetime) -> CollectionMetricsSummary:
+        since_utc = (
+            now - timedelta(days=COLLECTION_METRICS_WINDOW_DAYS)
+        ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        row = self.repository.get_recent_collection_task_metrics(since_utc=since_utc)
+        successful_item_count = int(row["successful_item_count"] or 0)
+        duplicate_item_count = int(row["duplicate_item_count"] or 0)
+        failed_item_count = int(row["failed_item_count"] or 0)
+        total_processed_item_count = (
+            successful_item_count + duplicate_item_count + failed_item_count
+        )
+        success_rate_percent: float | None = None
+        if total_processed_item_count > 0:
+            success_rate_percent = round(
+                ((successful_item_count + duplicate_item_count) / total_processed_item_count) * 100,
+                2,
+            )
+        return CollectionMetricsSummary(
+            window_days=COLLECTION_METRICS_WINDOW_DAYS,
+            completed_task_count=int(row["completed_task_count"] or 0),
+            succeeded_task_count=int(row["succeeded_task_count"] or 0),
+            partially_failed_task_count=int(row["partially_failed_task_count"] or 0),
+            failed_task_count=int(row["failed_task_count"] or 0),
+            successful_item_count=successful_item_count,
+            duplicate_item_count=duplicate_item_count,
+            failed_item_count=failed_item_count,
+            success_rate_percent=success_rate_percent,
+            latest_finished_at_utc=_optional_text(row["latest_finished_at_utc"]),
+        )
+
     def _build_resource_directory_summary(self) -> ResourceDirectorySummary:
         row = self.repository.get_resource_counts()
         return ResourceDirectorySummary(
@@ -236,6 +285,62 @@ class HealthService:
         if latest_record is None:
             return None
         return latest_record[1]
+
+    def _build_latest_backup_snapshot(self, *, now: datetime) -> LatestBackupSnapshotStatus | None:
+        if not self.settings.backup_dir.is_dir():
+            return None
+
+        latest_snapshot: tuple[datetime, LatestBackupSnapshotStatus] | None = None
+        for snapshot_dir in sorted(self.settings.backup_dir.iterdir()):
+            if not snapshot_dir.is_dir():
+                continue
+            manifest_path = snapshot_dir / "manifest.json"
+            if not manifest_path.is_file():
+                continue
+            try:
+                payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+                snapshot_id = str(payload["snapshot_id"])
+                finished_at_utc = str(payload["finished_at_utc"])
+                finished_at = _parse_utc_timestamp(finished_at_utc)
+            except (KeyError, OSError, TypeError, ValueError, json.JSONDecodeError):
+                logger.warning("Skip invalid backup manifest path=%s", manifest_path)
+                continue
+
+            snapshot = LatestBackupSnapshotStatus(
+                snapshot_id=snapshot_id,
+                finished_at_utc=finished_at_utc,
+                snapshot_dir=str(snapshot_dir),
+                manifest_path=str(manifest_path),
+                age_hours=max(0.0, round((now - finished_at).total_seconds() / 3600, 2)),
+            )
+            if latest_snapshot is None or finished_at > latest_snapshot[0]:
+                latest_snapshot = (finished_at, snapshot)
+
+        if latest_snapshot is None:
+            return None
+        return latest_snapshot[1]
+
+    def _build_http_5xx_metrics_summary(self, *, now: datetime) -> Http5xxMetricsSummary:
+        since_utc = (
+            now - timedelta(hours=HTTP_5XX_METRICS_WINDOW_HOURS)
+        ).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+        count = self.repository.count_recent_http_5xx_events(since_utc=since_utc)
+        latest_row = self.repository.get_latest_http_5xx_event(since_utc=since_utc)
+        latest_event: Http5xxLatestEventStatus | None = None
+        if latest_row is not None:
+            latest_event = Http5xxLatestEventStatus(
+                method=str(latest_row["method"]),
+                path=str(latest_row["path"]),
+                status_code=int(latest_row["status_code"]),
+                trace_id=str(latest_row["trace_id"]),
+                error_type=_optional_text(latest_row["error_type"]),
+                occurred_at_utc=str(latest_row["occurred_at_utc"]),
+            )
+        return Http5xxMetricsSummary(
+            window_hours=HTTP_5XX_METRICS_WINDOW_HOURS,
+            count=count,
+            latest_event=latest_event,
+        )
 
 
 class ResourceInspectionService:
@@ -293,10 +398,44 @@ class ResourceInspectionService:
         return summary
 
 
+def persist_http_5xx_event(
+    *,
+    database_path: Path,
+    method: str,
+    path: str,
+    status_code: int,
+    trace_id: str,
+    error_type: str | None,
+) -> None:
+    repository = HealthRepository(database_path)
+    try:
+        repository.record_http_5xx_event(
+            method=method,
+            path=path,
+            status_code=status_code,
+            trace_id=trace_id,
+            error_type=error_type,
+            occurred_at_utc=utc_now_text(),
+        )
+    except sqlite3.Error:
+        logger.exception("Failed to persist http 5xx event path=%s status_code=%s", path, status_code)
+    finally:
+        repository.close()
+
+
 def _optional_text(value: object) -> str | None:
     if value is None:
         return None
-    return str(value)
+    text = str(value).strip()
+    return text or None
+
+
+def _parse_utc_timestamp(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(UTC)
+
+
+def utc_now_text() -> str:
+    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
 
 
 def os_access(path: Path, mode: str) -> bool:
