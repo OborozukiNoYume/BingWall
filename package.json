@@ -9,7 +9,9 @@
   },
   "scripts": {
     "test": "node --test tests/node/*.test.js",
-    "browser-smoke": "node scripts/dev/playwright_smoke.js"
+    "browser-smoke": "node scripts/dev/playwright_smoke.js",
+    "build:css": "npx @tailwindcss/cli -i web/src/input-public.css -o web/public/assets/site.css --minify && npx @tailwindcss/cli -i web/src/input-admin.css -o web/admin/assets/admin.css --minify",
+    "watch:css": "npx @tailwindcss/cli -i web/src/input-public.css -o web/public/assets/site.css --watch & npx @tailwindcss/cli -i web/src/input-admin.css -o web/admin/assets/admin.css --watch"
   },
   "repository": {
     "type": "git",

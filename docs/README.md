@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T05:59:39Z
+- 更新时间：2026-04-05T06:36:49Z
 - 文档定位：文档入口与阅读顺序说明
 - 总纲文件：`docs/system-design.md`
 
@@ -15,12 +15,13 @@
 3. [数据模型说明](data-model.md)
 4. [API 约定](api-conventions.md)
 5. [部署与运行说明](deployment-runbook.md)
-6. [密码哈希升级迁移设计](password-hash-migration.md)
-7. [运维执行记录模板](operations-record-templates.md)
-8. [搜索与查询性能基线报告](benchmark-report.md)
-9. [整改清单](remediation-checklist.md)
-10. [项目状态](../PROJECT_STATE.md)
-11. [变更记录](../CHANGELOG.md)
+6. [前端构建与静态资源边界](frontend-build-boundary.md)
+7. [密码哈希升级迁移设计](password-hash-migration.md)
+8. [运维执行记录模板](operations-record-templates.md)
+9. [搜索与查询性能基线报告](benchmark-report.md)
+10. [整改清单](remediation-checklist.md)
+11. [项目状态](../PROJECT_STATE.md)
+12. [变更记录](../CHANGELOG.md)
 
 ## 各文档职责
 
@@ -54,31 +55,37 @@
 - 作用：定义单机部署、配置、目录结构、运行要求、备份恢复、健康检查与最小告警要求
 - 使用方式：用于单机环境准备、真实目标机复盘与持续运维实施
 
-### 6. 密码哈希升级迁移设计
+### 6. 前端构建与静态资源边界
+
+- 文件：`docs/frontend-build-boundary.md`
+- 作用：明确 `web/src`、`web/public/assets`、`web/admin/assets` 的源码 / 构建产物边界、统一构建命令与提交口径
+- 使用方式：在修改公开页或后台样式、调整 Tailwind 类名、准备部署或回看前端目录职责时优先阅读
+
+### 7. 密码哈希升级迁移设计
 
 - 文件：`docs/password-hash-migration.md`
 - 作用：定义管理员密码从 `pbkdf2_sha256` 渐进迁移到 `argon2id` 的兼容读取、渐进重哈希、验收与回滚边界
 - 使用方式：在真正实现密码算法升级前，先按本文确认读写切换顺序、测试范围和回滚前提
 
-### 7. 运维执行记录模板
+### 8. 运维执行记录模板
 
 - 文件：`docs/operations-record-templates.md`
 - 作用：提供部署、恢复演练、`cron` 首轮验证、域名切换与回滚的固定记录模板
 - 使用方式：在执行关键运维动作前复制对应模板，按实际结果填写命令、结果、风险和回滚点
 
-### 8. 搜索与查询性能基线报告
+### 9. 搜索与查询性能基线报告
 
 - 文件：`docs/benchmark-report.md`
 - 作用：记录公开列表与后台内容列表的离线性能基线、样本规模、最新测量结果和索引 / `FTS` 升级阈值
 - 使用方式：在修改搜索条件、排序规则、索引策略或数据规模假设前后，先复跑基准脚本并回写结果
 
-### 9. 整改清单
+### 10. 整改清单
 
 - 文件：`docs/remediation-checklist.md`
 - 作用：把当前项目评估结论落成可执行整改任务，并为每项任务补充依赖关系和验收命令
 - 使用方式：作为当前剩余整改项、运维补强和后续工程治理的执行清单
 
-### 10. 运维执行记录
+### 11. 运维执行记录
 
 - 文件：`docs/h4-cron-first-run-record-2026-04-04.md`
 - 作用：沉淀当前已验收目标机在 `2026-04-04` 的首轮 `cron` 闭环验证记录，并保留与仓库推荐部署口径的差异说明
@@ -88,5 +95,6 @@
 
 - 所有配套文档都必须以 `docs/system-design.md` 为总纲
 - 如果系统设计总纲有变化，相关配套文档必须同步更新
+- 前端样式或静态资源目录约定有变化时，应同步更新 `docs/frontend-build-boundary.md`，并回看 README 中的构建入口是否仍一致
 - 每次文档调整都应更新 `CHANGELOG.md`
 - 涉及阶段状态变化时，应同步更新 `PROJECT_STATE.md`

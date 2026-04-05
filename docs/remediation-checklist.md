@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T06:28:11Z
+- 更新时间：2026-04-05T06:36:49Z
 - 来源：`2026-04-04` 项目评估结论
 - 文档定位：按优先级输出整改任务、依赖关系与验收命令
 - 适用范围：当前一期单机架构仓库与目标部署环境
@@ -28,7 +28,7 @@
 | `H5` | 完成真实目标机长驻部署与公网接入 | `done` | 已完成（目标机） | 目标机 `139.224.235.228:8000` 已形成长驻服务；本次会话已复核首页、公开 API、样例图片和后台登录入口，对外 `systemd` 状态沿用目标机部署记录 |
 | `H4` | 完成首轮 `cron` 闭环验证 | `done` | 已完成（目标机） | 已根据 `2026-04-04` 目标机执行报告回写首轮 `cron` 安装、日志、备份与深度健康检查记录，详见 `docs/h4-cron-first-run-record-2026-04-04.md` |
 | `M1` | 正式化 Node 测试链路 | `done` | 已完成（仓库） | `npm test` 已接入 Node 原生测试，`playwright` 已纳入锁文件，浏览器冒烟默认口径已与本地启动脚本对齐 |
-| `M2` | 把部署验收纳入自动化 | `done` | 已完成（仓库） | 已新增独立 `Verify Deploy` workflow 和 runner 统一入口脚本，可在带 `bingwall-deploy` 标签的远端 runner 上执行 `make verify-deploy` |
+| `M2` | 把部署验收纳入自动化 | `done` | 已完成（仓库） | 已保留 `make verify-deploy` 与 runner 统一入口脚本，可在满足前置条件的自托管环境中脚本化执行部署验收；当前仓库不再提供独立 workflow |
 | `M3` | 同步项目状态文档 | `done` | 已完成 | `H4` / `H5` 相关口径已同步到 README、部署文档、项目状态、文档索引与变更记录 |
 | `M4` | 明确最小告警方案 | `done` | 已完成 | 已在运行手册明确 Webhook 渠道、触发矩阵和值班步骤，并已通过 Server 酱完成 1 次真实测试通知 |
 | `M5` | 为关键运维动作补执行记录模板 | `done` | 已完成（仓库） | 已新增固定模板文档，覆盖部署、恢复演练、`cron` 首轮验证、域名切换与回滚场景 |
@@ -36,7 +36,7 @@
 | `L2` | 建立搜索与查询性能基线 | `done` | 已完成（仓库） | 已新增基准脚本、报告文档与升级阈值记录，当前 `12k` 壁纸样本下无需额外索引或 `FTS` |
 | `L3` | 设计密码算法升级路径 | `done` | 已完成（仓库） | 已新增密码哈希升级迁移设计文档，并把现状、渐进迁移和回滚边界同步到相关文档 |
 | `L4` | 增加最小运维指标出口 | `done` | 已完成（仓库） | 已新增 `/api/health/metrics`，可读取最近 `7` 天采集成功率、最近备份快照和最近 `24` 小时 HTTP `5xx` 统计 |
-| `L5` | 收口前端构建与源码边界 | `todo` | 部分完成 | 已有构建命令与目录，但“源码 / 产物边界”和提交流程说明仍不完整 |
+| `L5` | 收口前端构建与源码边界 | `done` | 已完成（仓库） | 已补齐前端边界文档、统一构建入口与提交口径，开发者可判断何时重建 CSS、哪些产物必须提交 |
 
 ## 高优先级
 
@@ -203,23 +203,24 @@ make browser-smoke
 ### M2 把部署验收纳入自动化
 
 - 状态：`done`
-- 完成记录：已新增 [`.github/workflows/verify-deploy.yml`](/home/ops/Projects/BingWall/.github/workflows/verify-deploy.yml) 和 [scripts/github/run_verify_deploy.sh](/home/ops/Projects/BingWall/scripts/github/run_verify_deploy.sh)，支持 `workflow_dispatch` 与部署相关文件变更触发的远端部署验收入口
+- 完成记录：已保留 [scripts/github/run_verify_deploy.sh](/home/ops/Projects/BingWall/scripts/github/run_verify_deploy.sh) 与仓库内 `make verify-deploy` 统一入口，便于在满足 `systemd --user`、Docker 与 `uv` 前置条件的自托管环境中脚本化执行部署验收；当前仓库不再提供独立 `verify-deploy.yml` workflow
 - 前置依赖：`H1`、`H3`
 - 阻塞后续：无
-- 目标：把 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 或等价部署验收接入 CI / 手动 workflow，避免部署模板回归只靠本地人工发现
-- 交付物：新的 GitHub Actions workflow、runner 统一入口脚本、触发说明与仓库内执行口径
+- 目标：把 [scripts/verify_t1_6.py](/home/ops/Projects/BingWall/scripts/verify_t1_6.py) 或等价部署验收沉淀为可复用的脚本化入口，避免部署模板回归只靠人工临时拼装命令发现
+- 交付物：runner 统一入口脚本、仓库内执行口径与部署验收命令说明
 - 验收命令：
 
 ```bash
-rg -n "verify_t1_6.py|make verify-deploy" .github/workflows
+rg -n "verify_t1_6.py|make verify-deploy" \
+  scripts/github/run_verify_deploy.sh \
+  README.md \
+  docs/deployment-runbook.md
 
-# 若仓库已安装 GitHub CLI，可直接触发并观察运行结果
-gh workflow list
-gh workflow run <workflow-name> --ref dev
-gh run watch
+# 若当前环境满足 systemd --user、Docker 与 uv 前置条件，可直接执行
+bash scripts/github/run_verify_deploy.sh
 ```
 
-- 通过标准：仓库内存在可用的自动化入口，并能在远端流水线中执行部署验收
+- 通过标准：仓库内存在可复用的脚本化入口，且可在满足前置条件的自托管环境中执行部署验收
 
 ### M3 同步项目状态文档
 
@@ -366,11 +367,12 @@ uv run pytest tests/integration/test_health_checks.py
 
 ### L5 收口前端构建与源码边界
 
-- 状态：`todo`
+- 状态：`done`
+- 完成记录：已新增 [docs/frontend-build-boundary.md](/home/ops/Projects/BingWall/docs/frontend-build-boundary.md)，并补充 `make frontend-build` / `make frontend-watch` 与 `npm run build:css` / `npm run watch:css` 统一入口；README、部署文档和文档索引已同步前端源码 / 构建产物边界
 - 前置依赖：`M1`
 - 阻塞后续：无
 - 目标：明确 `web/src`、`web/public/assets`、`web/admin/assets` 的职责，避免构建产物和手工维护文件混用
-- 交付物：更新后的前端构建说明、约定清晰的源码/产物边界
+- 交付物：前端边界说明文档、统一构建命令与更新后的前端构建说明；当前以 [docs/frontend-build-boundary.md](/home/ops/Projects/BingWall/docs/frontend-build-boundary.md)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[package.json](/home/ops/Projects/BingWall/package.json) 与 [Makefile](/home/ops/Projects/BingWall/Makefile) 为准
 - 验收命令：
 
 ```bash

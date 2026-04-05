@@ -1,5 +1,42 @@
 # CHANGELOG
 
+## 2026-04-05T06:36:49Z
+
+### 变更内容
+
+- 新增 [docs/frontend-build-boundary.md](/home/ops/Projects/BingWall/docs/frontend-build-boundary.md)，明确 `web/src`、`web/public/assets`、`web/admin/assets` 的源码 / 构建产物边界、CSS 重建触发条件与提交口径
+- 更新 [package.json](/home/ops/Projects/BingWall/package.json) 与 [Makefile](/home/ops/Projects/BingWall/Makefile)，补充 `npm run build:css` / `npm run watch:css` 与 `make frontend-build` / `make frontend-watch` 统一入口
+- 更新 [README.md](/home/ops/Projects/BingWall/README.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md) 与 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)，同步前端构建说明并将 `L5` 调整为已完成
+
+### 变更原因
+
+- 你要求“推进 L5”，并明确要求先阅读 [docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md)
+- `L5` 的仓库内缺口不是缺少 Tailwind 或静态目录，而是缺少“哪些目录属于源码、哪些文件是构建产物、何时必须重建、产物是否应提交”的统一口径
+- 当前部署与验收都会直接读取仓库中的静态文件，因此需要把前端构建边界文档化，并补一个一致的命令入口
+
+### 依赖变更
+
+- 无新增第三方依赖
+- 无第三方包版本升级或降级
+- 变更时间：`2026-04-05T06:36:49Z`
+- 依赖类型：无直接或间接第三方包变更
+
+### 影响范围
+
+- 影响范围覆盖 [docs/frontend-build-boundary.md](/home/ops/Projects/BingWall/docs/frontend-build-boundary.md)、[package.json](/home/ops/Projects/BingWall/package.json)、[Makefile](/home/ops/Projects/BingWall/Makefile)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md)
+- 本次未改动公开页面、后台页面、路由模板或 CSS 构建结果；当前仅收口命令入口和文档边界
+- 更新后，仓库内不再继续保留“`L5` 未完成，但前端构建约定已隐含存在”的冲突口径
+
+### 验证步骤
+
+- 执行 `rg -n "web/src|web/public/assets|web/admin/assets|构建产物|源码" README.md docs/README.md docs/remediation-checklist.md package.json Makefile`
+- 执行 `rg -n "frontend-build|watch:css|build:css|frontend-build-boundary" README.md docs/README.md docs/deployment-runbook.md package.json Makefile PROJECT_STATE.md`
+
+### 回滚说明
+
+- 如需回滚本次变更，可删除 [docs/frontend-build-boundary.md](/home/ops/Projects/BingWall/docs/frontend-build-boundary.md)，并恢复 [package.json](/home/ops/Projects/BingWall/package.json)、[Makefile](/home/ops/Projects/BingWall/Makefile)、[README.md](/home/ops/Projects/BingWall/README.md)、[docs/README.md](/home/ops/Projects/BingWall/docs/README.md)、[docs/deployment-runbook.md](/home/ops/Projects/BingWall/docs/deployment-runbook.md)、[PROJECT_STATE.md](/home/ops/Projects/BingWall/PROJECT_STATE.md)、[docs/remediation-checklist.md](/home/ops/Projects/BingWall/docs/remediation-checklist.md) 与 [CHANGELOG.md](/home/ops/Projects/BingWall/CHANGELOG.md) 的本次修改
+- 回滚后，仓库会重新回到“静态目录可用，但前端源码 / 构建产物边界和提交流程没有统一成文说明”的状态
+
 ## 2026-04-05T05:59:39Z
 
 ### 变更内容

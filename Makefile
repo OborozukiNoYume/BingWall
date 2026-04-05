@@ -3,7 +3,7 @@ PYTHON_VERSION ?= 3.14
 VENV ?= .venv
 UV_RUN := $(UV_BIN) run python
 
-.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources archive-wallpapers backup restore install-cron verify-backup-restore browser-smoke css css-watch run clean
+.PHONY: setup format lint typecheck test verify verify-deploy db-migrate collect-bing collect-nasa-apod create-scheduled-collection-tasks scheduled-collect consume-collection-tasks inspect-resources archive-wallpapers backup restore install-cron verify-backup-restore browser-smoke css css-watch frontend-build frontend-watch run clean
 
 MARKET ?=
 COUNT ?= 1
@@ -85,6 +85,10 @@ css:
 css-watch:
 	npx @tailwindcss/cli -i web/src/input-public.css -o web/public/assets/site.css --watch &
 	npx @tailwindcss/cli -i web/src/input-admin.css -o web/admin/assets/admin.css --watch
+
+frontend-build: css
+
+frontend-watch: css-watch
 
 run:
 	$(UV_RUN) -c 'from app.core.config import get_settings; import uvicorn; settings = get_settings(); uvicorn.run("app.main:create_app", factory=True, host=settings.app_host, port=settings.app_port)'

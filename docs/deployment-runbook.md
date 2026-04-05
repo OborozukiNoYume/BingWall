@@ -2,7 +2,7 @@
 
 ## 文档元信息
 
-- 更新时间：2026-04-05T06:28:11Z
+- 更新时间：2026-04-05T06:36:49Z
 - 依据文档：`docs/system-design.md`
 - 文档定位：一期单机部署、配置、运行、备份与恢复要求说明
 
@@ -265,6 +265,16 @@
 - Ubuntu 24.04 若浏览器启动缺 GTK 运行库，优先安装 `libgtk-3-0t64`；旧版发行版对应包名通常为 `libgtk-3-0`
 - `cron` 安装脚本：`scripts/install_cron.py`
 
+### 前端静态资源构建
+
+- 统一入口：`make frontend-build` 或 `npm run build:css`
+- 持续监听：`make frontend-watch` 或 `npm run watch:css`
+- `web/src` 只存放 Tailwind 输入文件与 `@source` 声明，不直接作为浏览器静态目录
+- `web/public/assets/site.js`、`web/admin/assets/admin.js`、`web/admin/assets/modules/*.js`、`web/admin/assets/pages/*.js` 是手工维护的运行时代码
+- `web/public/assets/site.css` 与 `web/admin/assets/admin.css` 是构建产物，部署前若样式源码或 Tailwind 类名发生变化，必须重新生成并连同源码一起提交
+- 当前仓库的部署、验收与备用 `nginx` 方案都会直接读取仓库中的静态文件，不会在服务启动前自动补跑 Node 构建
+- 目录边界与提交要求见 [docs/frontend-build-boundary.md](/home/ops/Projects/BingWall/docs/frontend-build-boundary.md)
+
 ### 仓库内自动化部署验收
 
 当前仓库额外提供：
@@ -380,11 +390,12 @@
 建议部署步骤：
 
 1. 确认 `/opt/bingwall/app`、`uv` 可执行文件、`/opt/bingwall/app/.venv`、`/var/log/bingwall` 与 `/etc/bingwall/bingwall.env` 已存在且权限正确
-2. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
-3. 观察安装输出中的 `backup_path`，记录当前用户旧 `crontab` 备份位置，便于回滚
-4. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
-5. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
-6. 观察 `/var/log/bingwall/create-scheduled-collection-tasks.log`、`consume-collection-tasks.log`、`inspect-resources.log`、`archive-wallpapers.log` 与 `backup.log`，确认首轮计划任务结果
+2. 若本次改动涉及 `web/src/*` 或 Tailwind 类名，先执行 `make frontend-build` 或 `npm run build:css`，确认 `web/public/assets/site.css` 与 `web/admin/assets/admin.css` 已更新到预期版本
+3. 以 `bingwall` 用户执行 `make install-cron CRON_APP_DIR=/opt/bingwall/app CRON_ENV_FILE=/etc/bingwall/bingwall.env CRON_LOG_DIR=/var/log/bingwall`
+4. 观察安装输出中的 `backup_path`，记录当前用户旧 `crontab` 备份位置，便于回滚
+5. 先手工执行一次 `make create-scheduled-collection-tasks` 与 `make consume-collection-tasks` 验证数据库、日志目录和图片目录权限
+6. 观察后台 `/admin/tasks` 与 `/admin/logs`，确认自动任务记录带有 `trigger_type = cron`，并能看到 `market_code`、`date_from`、`date_to`、`backtrack_days` 与回退日志
+7. 观察 `/var/log/bingwall/create-scheduled-collection-tasks.log`、`consume-collection-tasks.log`、`inspect-resources.log`、`archive-wallpapers.log` 与 `backup.log`，确认首轮计划任务结果
 
 当前已记录的目标机首轮闭环结果：
 
